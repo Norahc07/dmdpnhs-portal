@@ -12,7 +12,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
+import { APP_NAME, SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const LOGIN_OPTIONS = [
@@ -252,24 +252,32 @@ export function LandingHeader({
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:h-18 sm:gap-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3">
           <Image
-            src="/images/logo-school.png"
-            alt={`${SCHOOL_SHORT} logo`}
+            src="/images/logo-pastraportal.png"
+            alt={`${APP_NAME} logo`}
             width={48}
             height={48}
             className={cn(
-              "size-10 shrink-0 rounded-full bg-white object-contain ring-2 sm:size-12",
+              "size-10 shrink-0 rounded-xl object-cover ring-2 sm:size-12",
               transparent ? "ring-white/45" : "ring-[#800000]/20"
             )}
             priority
           />
           <span
             className={cn(
-              "truncate font-heading text-xs font-bold leading-snug sm:text-sm md:text-[15px]",
+              "min-w-0 truncate font-heading text-xs font-bold leading-snug sm:text-sm md:text-[15px]",
               transparent ? "text-white" : "text-[#6b0000]"
             )}
           >
-            <span className="hidden sm:inline">{SCHOOL_NAME}</span>
-            <span className="sm:hidden">{SCHOOL_SHORT}</span>
+            <span className="block">{APP_NAME}</span>
+            <span
+              className={cn(
+                "mt-0.5 block truncate text-[10px] font-semibold tracking-wide sm:text-[11px]",
+                transparent ? "text-white/75" : "text-[#800000]/65"
+              )}
+            >
+              <span className="hidden sm:inline">{SCHOOL_NAME}</span>
+              <span className="sm:hidden">{SCHOOL_SHORT}</span>
+            </span>
           </span>
         </Link>
 

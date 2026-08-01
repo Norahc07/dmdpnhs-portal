@@ -1,9 +1,9 @@
-const CACHE = "dmdpnhs-portal-v2";
+const CACHE = "dmdpnhs-portal-v3";
 const OFFLINE_URLS = [
   "/",
   "/login",
   "/manifest.json",
-  "/images/logo-school.png",
+  "/images/logo-pastraportal.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];

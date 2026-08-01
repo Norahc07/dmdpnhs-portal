@@ -31,11 +31,12 @@ export const metadata = {
   },
   icons: {
     icon: [
-      { url: "/images/logo-school.png", type: "image/png", sizes: "512x512" },
+      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
       { url: "/favicon.png", type: "image/png", sizes: "48x48" },
     ],
-    apple: [{ url: "/images/logo-school.png", type: "image/png", sizes: "180x180" }],
-    shortcut: "/images/logo-school.png",
+    apple: [{ url: "/icons/icon-512.png", type: "image/png", sizes: "180x180" }],
+    shortcut: "/favicon.png",
   },
 };
 
@@ -51,8 +52,9 @@ export default function RootLayout({ children }) {
     >
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" sizes="48x48" />
-        <link rel="icon" href="/images/logo-school.png" type="image/png" sizes="512x512" />
-        <link rel="apple-touch-icon" href="/images/logo-school.png" />
+        <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
+        <link rel="icon" href="/icons/icon-512.png" type="image/png" sizes="512x512" />
+        <link rel="apple-touch-icon" href="/icons/icon-512.png" />
         <link
           rel="preload"
           as="image"

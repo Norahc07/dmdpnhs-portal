@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { PortalNav } from "@/components/layout/PortalNav";
-import { SCHOOL_SHORT } from "@/lib/constants";
+import { APP_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { LogOut } from "lucide-react";
 
@@ -51,12 +51,12 @@ function BrandBlock({ size = "md" }) {
   return (
     <div className="flex flex-col items-center px-2 text-center">
       <Image
-        src="/images/logo-school.png"
-        alt={`${SCHOOL_SHORT} logo`}
+        src="/images/logo-pastraportal.png"
+        alt={`${APP_NAME} logo`}
         width={logoSize}
         height={logoSize}
         className={cn(
-          "mb-2 rounded-full bg-white object-contain",
+          "mb-2 rounded-2xl object-cover shadow-sm ring-1 ring-[#800000]/15",
           size === "lg" ? "size-18" : "size-14"
         )}
         priority={size === "md"}
@@ -70,7 +70,7 @@ function BrandBlock({ size = "md" }) {
           size === "lg" ? "text-xl" : "text-lg"
         )}
       >
-        School Portal
+        {APP_NAME}
       </h1>
     </div>
   );
@@ -151,18 +151,18 @@ export function AppShell({
         {!menuOpen && (
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Image
-              src="/images/logo-school.png"
-              alt={`${SCHOOL_SHORT} logo`}
+              src="/images/logo-pastraportal.png"
+              alt={`${APP_NAME} logo`}
               width={32}
               height={32}
-              className="size-8 shrink-0 rounded-full bg-white object-contain"
+              className="size-8 shrink-0 rounded-lg object-cover ring-1 ring-[#800000]/15"
             />
             <div className="min-w-0 text-left">
               <p className="truncate text-[10px] font-semibold tracking-[0.18em] text-[#800000]/70 uppercase">
                 {SCHOOL_SHORT}
               </p>
               <p className="truncate text-sm font-semibold text-[#4a1515]">
-                School Portal
+                {APP_NAME}
               </p>
             </div>
           </div>
