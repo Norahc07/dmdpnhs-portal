@@ -328,44 +328,47 @@ export function LandingHeader({
   }
 
   return (
-    <header className="sticky top-0 z-60 border-b border-[#800000]/10 bg-white shadow-sm transition-all duration-300">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:h-18 sm:gap-4 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          onClick={() => setOpen(false)}
-          className="flex min-w-0 items-center gap-2.5 sm:gap-3"
-        >
-          <Image
-            src="/images/logo-pastraportal.png"
-            alt={`${APP_NAME} logo`}
-            width={48}
-            height={48}
-            className="size-10 shrink-0 rounded-xl object-cover sm:size-12"
-            priority
-          />
-          <span className="min-w-0 truncate font-heading text-xs font-bold leading-snug text-[#6b0000] sm:text-sm md:text-[15px]">
-            <span className="block">{APP_NAME}</span>
-            <span className="mt-0.5 block truncate text-[10px] font-semibold tracking-wide text-[#800000]/65 sm:text-[11px]">
-              <span className="hidden sm:inline">{SCHOOL_NAME}</span>
-              <span className="sm:hidden">{SCHOOL_SHORT}</span>
+    <>
+      <header className="sticky top-0 z-60 border-b border-[#800000]/10 bg-white shadow-sm transition-all duration-300">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:h-18 sm:gap-4 sm:px-6 lg:px-8">
+          <Link
+            href="/"
+            onClick={() => setOpen(false)}
+            className="flex min-w-0 items-center gap-2.5 sm:gap-3"
+          >
+            <Image
+              src="/images/logo-pastraportal.png"
+              alt={`${APP_NAME} logo`}
+              width={48}
+              height={48}
+              className="size-10 shrink-0 rounded-xl object-cover sm:size-12"
+              priority
+            />
+            <span className="min-w-0 truncate font-heading text-xs font-bold leading-snug text-[#6b0000] sm:text-sm md:text-[15px]">
+              <span className="block">{APP_NAME}</span>
+              <span className="mt-0.5 block truncate text-[10px] font-semibold tracking-wide text-[#800000]/65 sm:text-[11px]">
+                <span className="hidden sm:inline">{SCHOOL_NAME}</span>
+                <span className="sm:hidden">{SCHOOL_SHORT}</span>
+              </span>
             </span>
-          </span>
-        </Link>
+          </Link>
 
-        <nav
-          className="hidden items-center gap-6 md:flex lg:gap-8"
-          aria-label="Main"
-        >
-          {nav.map((item) => (
-            <NavItem key={item.label} item={item} transparent={transparent} />
-          ))}
-          <LoginMenu {...loginMenuProps} />
-        </nav>
+          <nav
+            className="hidden items-center gap-6 md:flex lg:gap-8"
+            aria-label="Main"
+          >
+            {nav.map((item) => (
+              <NavItem key={item.label} item={item} transparent={transparent} />
+            ))}
+            <LoginMenu {...loginMenuProps} />
+          </nav>
 
-        <MenuToggle open={open} onClick={toggleMenu} />
-      </div>
+          <MenuToggle open={open} onClick={toggleMenu} />
+        </div>
+      </header>
 
-      {/* Full-screen mobile menu */}
+      {/* Full-screen mobile menu, kept outside the header so the sticky
+          brand row and toggle stay above the sheet */}
       <div
         id="landing-mobile-menu"
         aria-hidden={!open}
@@ -382,7 +385,7 @@ export function LandingHeader({
           )}
         >
           {/* Spacer keeps the sheet content below the sticky header row */}
-          <div className="h-16 shrink-0 border-b border-[#800000]/10 sm:h-18" />
+          <div className="h-16 shrink-0 sm:h-18" />
 
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-12">
             <nav className="flex flex-col gap-1" aria-label="Mobile">
@@ -423,6 +426,6 @@ export function LandingHeader({
           </div>
         </div>
       </div>
-    </header>
+    </>
   );
 }
