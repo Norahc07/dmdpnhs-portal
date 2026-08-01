@@ -4,14 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BookOpen,
-  ChevronDown,
-  GraduationCap,
-  Menu,
-  Users,
-  X,
-} from "lucide-react";
+import { BookOpen, ChevronDown, GraduationCap, Users } from "lucide-react";
 import { APP_NAME, SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +29,40 @@ const LOGIN_OPTIONS = [
   },
 ];
 
+function MenuToggle({ open, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={open ? "Close menu" : "Open menu"}
+      aria-expanded={open}
+      aria-controls="landing-mobile-menu"
+      className="relative -mr-1 inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-[#800000] transition-colors duration-200 hover:bg-[#800000]/6 active:scale-95 md:hidden"
+    >
+      <span className="relative block h-3.5 w-5" aria-hidden>
+        <span
+          className={cn(
+            "absolute left-0 block h-0.5 w-5 origin-center rounded-full bg-current transition-transform duration-300 ease-out",
+            open ? "translate-y-1.5 rotate-45" : "translate-y-0 rotate-0"
+          )}
+        />
+        <span
+          className={cn(
+            "absolute top-1.5 left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-200 ease-out",
+            open ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
+          )}
+        />
+        <span
+          className={cn(
+            "absolute top-3 left-0 block h-0.5 w-5 origin-center rounded-full bg-current transition-transform duration-300 ease-out",
+            open ? "-translate-y-1.5 -rotate-45" : "translate-y-0 rotate-0"
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
 function NavItem({ item, onClick, mobile = false, transparent = false }) {
   if (mobile) {
     return (
@@ -44,17 +71,22 @@ function NavItem({ item, onClick, mobile = false, transparent = false }) {
         onClick={onClick}
         aria-current={item.active ? "page" : undefined}
         className={cn(
-          "px-3 py-2.5 font-sans text-sm font-medium transition-all duration-300 ease-out active:scale-[0.98]",
-          transparent
-            ? item.active
-              ? "font-semibold text-[#ffd700]"
-              : "text-white/85 hover:pl-4 hover:text-white"
-            : item.active
-              ? "font-semibold text-[#800000]"
-              : "text-neutral-800 hover:pl-4 hover:text-[#800000]"
+          "group flex items-center justify-between rounded-xl px-3 py-3.5 font-sans text-lg font-medium transition-all duration-300 ease-out active:scale-[0.98]",
+          item.active
+            ? "bg-[#800000]/6 font-semibold text-[#800000]"
+            : "text-neutral-800 hover:bg-[#800000]/4 hover:text-[#800000]"
         )}
       >
         {item.label}
+        <span
+          aria-hidden
+          className={cn(
+            "h-1.5 w-1.5 rounded-full bg-[#800000] transition-all duration-300 ease-out",
+            item.active
+              ? "scale-100 opacity-100"
+              : "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-60"
+          )}
+        />
       </Link>
     );
   }
@@ -105,7 +137,7 @@ function LoginMenu({
 }) {
   const btnClass = cn(
     "inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 font-(family-name:--font-poppins) text-sm font-semibold transition sm:px-5",
-    mobile && "w-full",
+    mobile && "w-full py-3.5 text-base",
     transparent
       ? "bg-[#ffd700] text-[#4a0000] hover:bg-[#ffe44d]"
       : "bg-[#800000] text-white hover:bg-[#6a0000]",
@@ -122,6 +154,42 @@ function LoginMenu({
     );
   }
 
+  const optionsPanel = (
+    <div
+      role="menu"
+      className="overflow-hidden rounded-xl border border-[#800000]/10 bg-white p-1.5 shadow-xl"
+    >
+      <p className="px-3 py-2 font-(family-name:--font-poppins) text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+        Sign in as
+      </p>
+      {LOGIN_OPTIONS.map(({ href, label, description, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          role="menuitem"
+          tabIndex={loginOpen ? undefined : -1}
+          onClick={() => {
+            setLoginOpen(false);
+            setOpen(false);
+          }}
+          className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition hover:bg-[#800000]/6"
+        >
+          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
+            <Icon className="size-4" />
+          </span>
+          <span>
+            <span className="block font-(family-name:--font-montserrat) text-sm font-semibold text-[#3d1212]">
+              {label}
+            </span>
+            <span className="block font-(family-name:--font-poppins) text-xs text-muted-foreground">
+              {description}
+            </span>
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+
   return (
     <div
       className={cn("relative", mobile && "w-full")}
@@ -137,50 +205,30 @@ function LoginMenu({
         Login
         <ChevronDown
           className={cn(
-            "size-4 transition duration-200",
+            "size-4 transition-transform duration-300 ease-out",
             loginOpen && "rotate-180"
           )}
         />
       </button>
 
-      {loginOpen && (
+      {mobile ? (
         <div
-          role="menu"
+          aria-hidden={!loginOpen}
           className={cn(
-            "z-50 overflow-hidden rounded-xl border border-[#800000]/10 bg-white p-1.5 shadow-xl",
-            mobile
-              ? "relative mt-2 w-full"
-              : "absolute top-full right-0 mt-2 w-64"
+            "grid transition-all duration-300 ease-out",
+            loginOpen
+              ? "mt-3 grid-rows-[1fr] opacity-100"
+              : "mt-0 grid-rows-[0fr] opacity-0"
           )}
         >
-          <p className="px-3 py-2 font-(family-name:--font-poppins) text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Sign in as
-          </p>
-          {LOGIN_OPTIONS.map(({ href, label, description, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              role="menuitem"
-              onClick={() => {
-                setLoginOpen(false);
-                setOpen(false);
-              }}
-              className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition hover:bg-[#800000]/6"
-            >
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
-                <Icon className="size-4" />
-              </span>
-              <span>
-                <span className="block font-(family-name:--font-montserrat) text-sm font-semibold text-[#3d1212]">
-                  {label}
-                </span>
-                <span className="block font-(family-name:--font-poppins) text-xs text-muted-foreground">
-                  {description}
-                </span>
-              </span>
-            </Link>
-          ))}
+          <div className="overflow-hidden">{optionsPanel}</div>
         </div>
+      ) : (
+        loginOpen && (
+          <div className="absolute top-full right-0 z-50 mt-2 w-64 duration-200 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1">
+            {optionsPanel}
+          </div>
+        )
       )}
     </div>
   );
@@ -209,13 +257,42 @@ export function LandingHeader({
     function onDocClick(e) {
       if (!loginRef.current?.contains(e.target)) setLoginOpen(false);
     }
-    if (loginOpen) document.addEventListener("mousedown", onDocClick);
+    // The mobile sheet keeps its own inline panel, so only guard the desktop popover
+    if (loginOpen && !open) document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [loginOpen]);
+  }, [loginOpen, open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKeyDown(e) {
+      if (e.key !== "Escape") return;
+      setLoginOpen(false);
+      setOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 768px)");
+    function onChange(e) {
+      if (e.matches) setOpen(false);
+    }
+    desktop.addEventListener("change", onChange);
+    return () => desktop.removeEventListener("change", onChange);
+  }, []);
 
   // Solid white header on all public pages
   const transparent = false;
-  const glass = false;
 
   const nav = [
     { href: "/", label: "Home", active: isHome },
@@ -243,14 +320,21 @@ export function LandingHeader({
     loginRef,
   };
 
+  function toggleMenu() {
+    setOpen((v) => {
+      if (v) setLoginOpen(false);
+      return !v;
+    });
+  }
+
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-50 transition-all duration-300 border-b border-[#800000]/10 bg-white shadow-sm"
-      )}
-    >
+    <header className="sticky top-0 z-60 border-b border-[#800000]/10 bg-white shadow-sm transition-all duration-300">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:h-18 sm:gap-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+        <Link
+          href="/"
+          onClick={() => setOpen(false)}
+          className="flex min-w-0 items-center gap-2.5 sm:gap-3"
+        >
           <Image
             src="/images/logo-pastraportal.png"
             alt={`${APP_NAME} logo`}
@@ -259,65 +343,86 @@ export function LandingHeader({
             className="size-10 shrink-0 rounded-xl object-cover sm:size-12"
             priority
           />
-          <span
-            className={cn(
-              "min-w-0 truncate font-heading text-xs font-bold leading-snug sm:text-sm md:text-[15px]",
-              transparent ? "text-white" : "text-[#6b0000]"
-            )}
-          >
+          <span className="min-w-0 truncate font-heading text-xs font-bold leading-snug text-[#6b0000] sm:text-sm md:text-[15px]">
             <span className="block">{APP_NAME}</span>
-            <span
-              className={cn(
-                "mt-0.5 block truncate text-[10px] font-semibold tracking-wide sm:text-[11px]",
-                transparent ? "text-white/75" : "text-[#800000]/65"
-              )}
-            >
+            <span className="mt-0.5 block truncate text-[10px] font-semibold tracking-wide text-[#800000]/65 sm:text-[11px]">
               <span className="hidden sm:inline">{SCHOOL_NAME}</span>
               <span className="sm:hidden">{SCHOOL_SHORT}</span>
             </span>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-6 md:flex lg:gap-8" aria-label="Main">
+        <nav
+          className="hidden items-center gap-6 md:flex lg:gap-8"
+          aria-label="Main"
+        >
           {nav.map((item) => (
             <NavItem key={item.label} item={item} transparent={transparent} />
           ))}
           <LoginMenu {...loginMenuProps} />
         </nav>
 
-        <button
-          type="button"
-          className={cn(
-            "inline-flex rounded-lg p-2 md:hidden",
-            transparent ? "text-white" : "text-[#800000]"
-          )}
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Toggle menu"
-        >
-          {open ? <X className="size-6" /> : <Menu className="size-6" />}
-        </button>
+        <MenuToggle open={open} onClick={toggleMenu} />
       </div>
 
-      {open && (
+      {/* Full-screen mobile menu */}
+      <div
+        id="landing-mobile-menu"
+        aria-hidden={!open}
+        className={cn(
+          "fixed inset-0 z-50 md:hidden",
+          open ? "pointer-events-auto" : "pointer-events-none"
+        )}
+      >
         <div
-          className="border-t border-[#800000]/10 bg-white px-4 py-4 md:hidden"
+          className={cn(
+            "absolute inset-0 flex flex-col bg-white will-change-transform",
+            "transition-[transform,opacity] duration-300 ease-out",
+            open ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+          )}
         >
-          <div className="flex flex-col gap-2">
-            {nav.map((item) => (
-              <NavItem
-                key={item.label}
-                item={item}
-                mobile
-                transparent={transparent}
-                onClick={() => setOpen(false)}
-              />
-            ))}
-            <div className="pt-2">
+          {/* Spacer keeps the sheet content below the sticky header row */}
+          <div className="h-16 shrink-0 border-b border-[#800000]/10 sm:h-18" />
+
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-12">
+            <nav className="flex flex-col gap-1" aria-label="Mobile">
+              {nav.map((item, index) => (
+                <div
+                  key={item.label}
+                  className={cn(
+                    "transition-all duration-300 ease-out",
+                    open
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-3 opacity-0"
+                  )}
+                  style={{
+                    transitionDelay: open ? `${120 + index * 60}ms` : "0ms",
+                  }}
+                >
+                  <NavItem
+                    item={item}
+                    mobile
+                    transparent={transparent}
+                    onClick={() => setOpen(false)}
+                  />
+                </div>
+              ))}
+            </nav>
+
+            <div
+              className={cn(
+                "mt-6 transition-all duration-300 ease-out",
+                open ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+              )}
+              style={{
+                transitionDelay: open ? `${120 + nav.length * 60}ms` : "0ms",
+              }}
+            >
               <LoginMenu {...loginMenuProps} mobile />
             </div>
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }
