@@ -1,6 +1,6 @@
 "use client";
 
-import { SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
+import { APP_NAME, SCHOOL_NAME } from "@/lib/constants";
 
 const GOLD = "#ffd700";
 
@@ -65,8 +65,7 @@ export function LandingHero() {
         </p>
 
         <h1 className="hero-enter hero-enter-delay-3 mt-2 font-heading text-[2.5rem] leading-[1.05] font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl">
-          {SCHOOL_SHORT}{" "}
-          <span style={{ color: GOLD }}>Portal</span>
+          <span style={{ color: GOLD }}>{APP_NAME}</span>
         </h1>
 
         <div

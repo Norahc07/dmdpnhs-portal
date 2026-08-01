@@ -1,5 +1,7 @@
 export const SCHOOL_NAME = "Dr. Maria D. Pastrana National High School";
 export const SCHOOL_SHORT = "DMDPNHS";
+/** Product / install name shown on the welcome hero and when adding to home screen */
+export const APP_NAME = "PastraPortal";
 export const SCHOOL_YEAR_DEFAULT = "2025-2026";
 
 /** Public portal URL used in SMS messages */

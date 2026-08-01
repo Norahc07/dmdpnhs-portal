@@ -1,0 +1,503 @@
+DMDPNHS Portal — User & Testing Guide
+Dr. Maria D. Pastrana National High School Digital Portal
+Version for demo / feedback testing
+Live site: https://dmdpnhs-portal.vercel.app
+(Local testing: http://localhost:3000)
+
+================================================================================
+1. PURPOSE OF THIS GUIDE
+================================================================================
+
+Use this document to:
+• Learn how each user type uses the portal
+• Walk through the main features step by step
+• Test the system and write feedback notes
+
+User types in the system:
+1) Student
+2) Parent / Guardian
+3) Teacher (including Department Head for grade validation)
+4) Registrar
+
+================================================================================
+2. BEFORE YOU START (IMPORTANT)
+================================================================================
+
+A. Open the site
+   Live:  https://dmdpnhs-portal.vercel.app
+   Local: http://localhost:3000
+
+B. On first visit you may see the Data Privacy Notice (RA 10173).
+   Click OK / Continue to proceed.
+
+C. Demo accounts below work only if the walkthrough seed data was applied
+   in Supabase (seed-walkthrough-demo.sql and related upgrades).
+
+D. Recommended SQL upgrades for full testing (run in Supabase SQL Editor if not yet applied):
+   • student-activation-upgrade.sql
+   • class-record-upgrade.sql
+   • grades-term-upgrade.sql
+   • seed-walkthrough-demo.sql
+   • student-dashboard-upgrade.sql (optional)
+   • profile-upgrade.sql (profile photo upload)
+   • grade-validation-upgrade.sql (departments + grade lock workflow)
+
+E. Feedback tip
+   While testing, note:
+   • What worked
+   • What was confusing
+   • Bugs (page, steps, expected vs actual)
+   • Suggestions
+
+================================================================================
+3. DEMO LOGIN CREDENTIALS (QUICK REFERENCE)
+================================================================================
+
+REGISTRAR
+  Login page:  Educator / Teacher Login → /login/teacher
+  Email:       registrar@dmdpnhs.edu.ph
+  Password:    Registrar@2026
+
+TEACHER (active)
+  Login page:  /login/teacher
+  Email:       teacher.reyes@dmdpnhs.edu.ph
+  OR Teacher ID: T26-10001
+  Password:    Teacher@2026
+
+PARENT
+  Login page:  /login/parent
+  Access code: P26-10001
+  Linked child: Juan Dela Cruz (LRN 111111111111)
+
+STUDENTS (active) — Login page: /login/student
+  LRN              Password   Name
+  111111111111     demo123    Juan Dela Cruz
+  222222222222     demo123    Pedro Reyes
+  333333333333     demo123    Ana Garcia
+  444444444444     demo123    Maria Lopez
+  555555555555     demo123    Carlo Mendoza
+  666666666666     demo123    Sofia Cruz
+
+PENDING TEACHER (for Faculty approval test)
+  Email:    teacher.pending@dmdpnhs.edu.ph
+  Password: Pending@2026
+
+PENDING STUDENT (for Activations test)
+  LRN: 777777777777 / Password: demo123
+
+INCOMPLETE STUDENT (new registration walkthrough)
+  LRN: 888888888888
+  Use Phase 1 at /register/student (LRN + birthdate + new password)
+  Then Phase 2 at /student/activate
+
+================================================================================
+4. HOW TO ENTER EACH PORTAL (FROM HOME PAGE)
+================================================================================
+
+1) Open the home page.
+2) Scroll to “Choose your portal” (or use the menu).
+3) Pick one:
+   • Student portal
+   • Parent portal
+   • Educator portal (Teachers + Registrar use this login)
+
+================================================================================
+5. STUDENT GUIDE & TEST SCRIPT
+================================================================================
+
+5.1 Sign in (active student)
+----------------------------
+1) Go to Student Login (/login/student).
+2) Enter LRN: 111111111111
+3) Enter Password: demo123
+4) Click Sign in.
+5) You should land on the Student Dashboard.
+
+Expected:
+• Welcome / student overview banner with name, LRN, grade & section
+• Temporary notice only if account is still pending activation
+
+5.2 My Profile
+--------------
+1) Open My Profile in the side menu.
+2) Upload a photo OR take a selfie (needs camera permission).
+3) Update contact number / address if needed.
+4) Click Save personal details.
+
+Expected:
+• Photo appears on dashboard after save
+• Success message when details are saved
+Note: Profile photo needs profile-upgrade.sql (avatars bucket) in Supabase.
+
+5.3 My Grades
+-------------
+1) Open My Grades.
+2) Use the term dropdown (1st Term / 2nd Term / Final) and school year if shown.
+3) Check the table: Subject | Term grade | Status (Pass/Fail).
+
+Expected:
+• Grades visible for activated + enrolled students
+• Status uses passing mark (typically 75)
+Note: Newly encoded teacher grades appear for students only after Registrar
+locks/publishes them (if grade-validation workflow is enabled).
+
+5.4 Attendance
+--------------
+1) Open Attendance.
+2) Review attendance marks (Present / Absent / Late).
+
+Expected:
+• List of attendance records for the learner
+
+5.5 Documents
+-------------
+1) Open Documents / Requests.
+2) Submit a document request (e.g. Form 137, Good Moral).
+3) Add optional notes.
+4) Submit and check status (Pending → Processing → Ready for Pickup).
+
+Expected:
+• Request appears in the list with a status
+
+5.6 Calendar
+------------
+1) Open Calendar.
+2) View school events / schedule items if seeded.
+
+5.7 New student activation (full walkthrough)
+---------------------------------------------
+Use incomplete LRN 888888888888 (must exist from registrar enroll / seed).
+
+Phase 1 — Create account
+1) Go to /register/student
+2) Enter LRN + birthdate (must match school record) + password
+3) Submit → redirected to Complete Profile (/student/activate)
+
+Phase 2 — Personal & parent details
+1) Fill name, grade, section, contact, address
+2) Fill parent/guardian name, phone, relationship, address
+3) Optional: upload profile photo
+4) Submit for registrar verification
+
+While waiting:
+• Student sees a temporary dashboard
+• Grades/attendance stay locked until registrar activates
+
+After registrar approves:
+• Student gets fuller access (when enrolled)
+• Parent receives Access Code by SMS (if Semaphore is configured)
+
+TEST CHECKLIST — STUDENT
+[ ] Login works
+[ ] Dashboard loads
+[ ] Profile photo / details save
+[ ] Grades show and term filter works
+[ ] Attendance opens
+[ ] Document request can be submitted
+[ ] Incomplete student can finish Phase 1 + Phase 2
+[ ] Pending student cannot open grades until activated
+
+Feedback notes (Student):
+_______________________________________________________________
+_______________________________________________________________
+
+================================================================================
+6. PARENT GUIDE & TEST SCRIPT
+================================================================================
+
+6.1 Sign in
+-----------
+1) Go to Parent Login (/login/parent).
+2) Enter Access Code: P26-10001
+3) Sign in.
+
+Expected:
+• Parent dashboard for linked child (Juan Dela Cruz)
+
+6.2 Grades
+----------
+1) Open Grades.
+2) Select term (1st / 2nd / Final).
+3) Review subject grades and pass/fail status.
+
+6.3 Attendance
+--------------
+1) Open Attendance.
+2) Check child’s attendance history.
+
+Expected:
+• Parent can view linked child’s records only (not edit grades)
+
+TEST CHECKLIST — PARENT
+[ ] Access code login works
+[ ] Child info is correct
+[ ] Grades visible
+[ ] Term filter works
+[ ] Attendance visible
+[ ] Cannot access teacher/registrar pages
+
+Feedback notes (Parent):
+_______________________________________________________________
+_______________________________________________________________
+
+================================================================================
+7. TEACHER GUIDE & TEST SCRIPT
+================================================================================
+
+7.1 Sign in
+-----------
+1) Go to Educator/Teacher Login (/login/teacher).
+2) Email: teacher.reyes@dmdpnhs.edu.ph
+   OR Teacher ID: T26-10001
+3) Password: Teacher@2026
+4) Sign in → Teacher Dashboard.
+
+Expected:
+• Maroon welcome overview
+• Teacher ID, department, advisory section (if any), assignment count
+
+7.2 My Profile
+--------------
+1) Open My Profile.
+2) Upload photo or take selfie.
+3) Fill contact number, address, gender, birthdate, department label.
+4) Save.
+
+7.3 My Students
+---------------
+1) Open My Students.
+2) Review learners in assigned / advisory sections.
+
+7.4 Gradebook / Class Record
+----------------------------
+1) Open Gradebook (Class Records).
+2) Open a card, e.g. English · Grade 7 Rose.
+3) Use tabs:
+   • Input Data — header metadata
+   • 1st Semestral Grade — WW / Performance / Exams scores
+   • Term Grades — 1st / 2nd / Final
+   • Passed Summary / Analysis tabs
+4) Set Highest Possible Scores (HPS) first, then encode learner scores.
+5) Check component weights panel (Written / Performance / Examinations).
+   Weights must total 100%. Save weights if you change them.
+6) Click Save draft (autosave also runs while editing).
+
+Expected:
+• PS, WS, Initial, Quarterly grades compute automatically
+• Weights match registrar Academics for that subject
+
+7.5 Submit for grade validation (Reading Committee workflow)
+------------------------------------------------------------
+1) On the class record, find “Reading committee workflow”.
+2) Optional note → Submit for validation.
+3) Status should become Submitted.
+4) Editing should pause until returned or unlocked.
+
+7.6 Department Head — Grade Validation
+--------------------------------------
+(Only appears if Registrar assigned you as Department Head in a department.)
+
+1) Open Grade Validation in the teacher menu.
+2) Review submitted class records in your department.
+3) Check failing flags (below 75) if shown.
+4) Either:
+   • Endorse for registrar  OR
+   • Return to teacher (note required)
+
+7.7 Attendance
+--------------
+1) Open Attendance.
+2) Select section and date.
+3) Mark Present / Absent / Late.
+4) If Absent, parent SMS may send (Semaphore must be configured).
+
+7.8 Pending teacher approval test
+---------------------------------
+1) Sign out.
+2) Login as teacher.pending@dmdpnhs.edu.ph / Pending@2026
+3) Expected: Pending approval page only (no full portal).
+4) Registrar must approve under Faculty.
+
+TEST CHECKLIST — TEACHER
+[ ] Login with email and with Teacher ID
+[ ] Dashboard overview correct
+[ ] Profile photo/details save
+[ ] Class record opens and calculates grades
+[ ] Weights save and affect WS %
+[ ] Submit for validation works
+[ ] Attendance marking works
+[ ] Pending teacher is blocked until approved
+[ ] (If dept head) Grade Validation endorse/return works
+
+Feedback notes (Teacher):
+_______________________________________________________________
+_______________________________________________________________
+
+================================================================================
+8. REGISTRAR GUIDE & TEST SCRIPT
+================================================================================
+
+8.1 Sign in
+-----------
+1) Use Educator login (/login/teacher).
+2) Email: registrar@dmdpnhs.edu.ph
+3) Password: Registrar@2026
+4) You should land on Registrar Dashboard.
+
+8.2 Dashboard
+-------------
+Review counts: enrolled students, pending teachers, pending activations, document requests.
+
+8.3 Activations (Student verification)
+--------------------------------------
+1) Open Activations.
+2) Review pending students (personal + parent contact details).
+3) Call parent number to verify (school process).
+4) Approve or Reject.
+5) On approve: parent Access Code SMS + student notice (if SMS configured).
+
+Test with pending LRN 777777777777 if present in seed.
+
+8.4 Academics
+-------------
+Tabs typically include Subjects, Sections, Enrollment helpers, Teacher assignments.
+
+Subjects
+1) Filter JHS / SHS.
+2) Add subject with Written / Performance / Exam weights (must total 100).
+3) Click Weights on a subject to edit shared weights.
+Expected: Teacher class record for that subject shows the same weights.
+
+Sections
+1) Add section (JHS name or SHS strand letter naming).
+2) Optional adviser.
+
+Assign teacher
+1) Assign teacher + section + subject + school year.
+2) Teacher should then see that class record card.
+
+8.5 Enrollment
+--------------
+1) Open Enrollment.
+2) Filter by school year, grade, section, gender.
+3) Review totals per grade (and Filtered total when All grades).
+
+8.6 Faculty
+-----------
+1) Pending approvals — approve/reject pending teachers.
+2) Departments & faculty assignments:
+   • Add department (e.g. Filipino · Junior High)
+   • Assign teacher → Department + Position
+     Positions: Regular teacher / Sub-teacher / Department head
+3) Department heads get Grade Validation in their teacher portal.
+
+8.7 Grade Lock (publish official grades)
+----------------------------------------
+1) Open Grade Lock.
+2) View records Awaiting lock (submitted / endorsed).
+3) Lock & publish → grades become official for students/parents.
+4) Locked list can be Unlocked with a required reason (returns to teacher edit flow).
+
+8.8 Promotion (Students)
+------------------------
+1) Open Promotion / Students.
+2) Select learners and set status (promoted, retained, remedial, etc.).
+3) Optionally move grade/section.
+
+8.9 Documents
+-------------
+1) Open Documents / Requests.
+2) Advance status: Pending → Processing → Ready for Pickup.
+
+8.10 School Forms
+-----------------
+1) Open School Forms.
+2) Export CSV/forms filters as needed for SF-style reports.
+
+TEST CHECKLIST — REGISTRAR
+[ ] Login lands on registrar dashboard
+[ ] Approve/reject student activation
+[ ] Approve/reject pending teacher
+[ ] Create/edit subject weights
+[ ] Create section and assign teacher
+[ ] Assign department + department head
+[ ] Lock grades after endorsement
+[ ] Advance document request status
+[ ] Enrollment filters work
+[ ] Promotion updates learner status
+
+Feedback notes (Registrar):
+_______________________________________________________________
+_______________________________________________________________
+
+================================================================================
+9. END-TO-END SCENARIOS (RECOMMENDED FOR FEEDBACK SESSION)
+================================================================================
+
+Scenario A — New learner activation
+1) Registrar enrolls / confirms LRN exists
+2) Student registers (Phase 1) + completes profile (Phase 2)
+3) Registrar Activations → Approve
+4) Parent logs in with SMS Access Code (or demo code if seeded)
+5) Student grades/attendance unlock after activation + enrollment
+
+Scenario B — Encode and publish grades
+1) Teacher encodes class record → Save draft
+2) Teacher Submit for validation
+3) Department head Endorse (or Return with notes)
+4) Registrar Grade Lock → Lock & publish
+5) Student + Parent open Grades and verify
+
+Scenario C — Faculty onboarding
+1) New teacher registers → Pending page
+2) Registrar Faculty → Approve
+3) Registrar assigns section/subject + department/position
+4) Teacher accesses Gradebook and (if head) Grade Validation
+
+Scenario D — Attendance alert
+1) Teacher marks a learner Absent
+2) Linked parent receives SMS (only if Semaphore key works on the deployed site)
+
+================================================================================
+10. KNOWN LIMITS / NOTES FOR TESTERS
+================================================================================
+
+• Registrar uses the Teacher/Educator login page (no separate /login/registrar yet).
+• Department Head is NOT a separate account type — same teacher login with a registrar assignment.
+• Official grades for new encodings require Lock when grade-validation-upgrade is applied.
+• Profile selfie needs browser camera permission (HTTPS on Vercel is required for camera).
+• SMS features need a valid Semaphore API key on Vercel.
+• Demo passwords are for testing only — change before real school use.
+
+================================================================================
+11. FEEDBACK FORM (COPY PER TESTER)
+================================================================================
+
+Tester name: _______________________   Role tested: _______________________
+Date: _______________   Device/Browser: _______________________
+Site used: [ ] Live Vercel   [ ] Localhost
+
+Overall rating (1–5): _____
+
+What worked well?
+_______________________________________________________________
+_______________________________________________________________
+
+What was confusing?
+_______________________________________________________________
+_______________________________________________________________
+
+Bugs found (steps + screenshot notes):
+_______________________________________________________________
+_______________________________________________________________
+
+Priority improvements:
+1) ____________________________________________________________
+2) ____________________________________________________________
+3) ____________________________________________________________
+
+Would you recommend this for school use after fixes?  [ ] Yes  [ ] Not yet
+
+================================================================================
+END OF GUIDE
+================================================================================

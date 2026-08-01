@@ -1,7 +1,7 @@
 import { Montserrat, Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
-import { SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
+import { APP_NAME, SCHOOL_NAME } from "@/lib/constants";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -18,15 +18,16 @@ const poppins = Poppins({
 
 export const metadata = {
   title: {
-    default: `${SCHOOL_SHORT} Portal`,
-    template: `%s · ${SCHOOL_SHORT}`,
+    default: APP_NAME,
+    template: `%s · ${APP_NAME}`,
   },
   description: `${SCHOOL_NAME} digital school portal for learners, parents, teachers, and registrar.`,
+  applicationName: APP_NAME,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: SCHOOL_SHORT,
+    title: APP_NAME,
   },
   icons: {
     icon: [

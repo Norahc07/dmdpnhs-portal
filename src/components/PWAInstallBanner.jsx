@@ -62,12 +62,12 @@ export function PWAInstallBanner() {
         </div>
         <div className="flex-1">
           <p className="text-sm font-semibold text-[#3d1212]">
-            Install Portal App
+            Install PastraPortal
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {iosHint && !deferred
               ? "On iOS: tap Share, then “Add to Home Screen”."
-              : "Add DMDPNHS Portal to your home screen for faster offline access."}
+              : "Add PastraPortal to your home screen for faster offline access."}
           </p>
           <div className="mt-3 flex gap-2">
             {deferred && (

@@ -1,6 +1,6 @@
 {
-  "name": "DMDPNHS Portal",
-  "short_name": "DMDPNHS",
+  "name": "PastraPortal",
+  "short_name": "PastraPortal",
   "description": "Dr. Maria D. Pastrana National High School digital portal",
   "start_url": "/",
   "display": "standalone",
