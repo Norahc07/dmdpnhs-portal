@@ -256,10 +256,7 @@ export function LandingHeader({
             alt={`${APP_NAME} logo`}
             width={48}
             height={48}
-            className={cn(
-              "size-10 shrink-0 rounded-xl object-cover ring-2 sm:size-12",
-              transparent ? "ring-white/45" : "ring-[#800000]/20"
-            )}
+            className="size-10 shrink-0 rounded-xl object-cover sm:size-12"
             priority
           />
           <span

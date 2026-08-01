@@ -56,7 +56,7 @@ function BrandBlock({ size = "md" }) {
         width={logoSize}
         height={logoSize}
         className={cn(
-          "mb-2 rounded-2xl object-cover shadow-sm ring-1 ring-[#800000]/15",
+          "mb-2 rounded-2xl object-cover",
           size === "lg" ? "size-18" : "size-14"
         )}
         priority={size === "md"}
@@ -155,7 +155,7 @@ export function AppShell({
               alt={`${APP_NAME} logo`}
               width={32}
               height={32}
-              className="size-8 shrink-0 rounded-lg object-cover ring-1 ring-[#800000]/15"
+              className="size-8 shrink-0 rounded-lg object-cover"
             />
             <div className="min-w-0 text-left">
               <p className="truncate text-[10px] font-semibold tracking-[0.18em] text-[#800000]/70 uppercase">
