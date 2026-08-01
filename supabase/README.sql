@@ -1,0 +1,12 @@
+-- Full schema: apply your base migration first (profiles, students, teachers, …).
+-- Then run upgrades + seed in this order in the Supabase SQL Editor:
+--
+--   1) supabase/class-record-upgrade.sql
+--   2) supabase/grades-term-upgrade.sql
+--   3) supabase/seed-walkthrough-demo.sql
+--
+-- Credentials and walkthrough notes: supabase/seed-notes.sql
+--
+-- Optional: student-dashboard-upgrade.sql + seed-student-dashboard-demo.sql
+-- Optional: profile-upgrade.sql (teacher details + avatars bucket for My Profile pages)
+-- Optional: grade-validation-upgrade.sql (departments, faculty positions, reading committee / lock workflow)

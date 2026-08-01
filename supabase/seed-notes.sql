@@ -1,0 +1,85 @@
+-- =============================================================================
+-- Seed helpers / walkthrough credentials
+-- =============================================================================
+--
+-- Recommended run order in Supabase SQL Editor:
+--   1) Base schema (profiles, students, teachers, parents, sections, subjects…)
+--   2) supabase/student-activation-upgrade.sql   (if not already applied)
+--   3) supabase/class-record-upgrade.sql
+--   4) supabase/grades-term-upgrade.sql          (3 terms + school year history)
+--   5) supabase/seed-walkthrough-demo.sql        ← full demo walkthrough
+--
+-- Optional extras:
+--   - supabase/student-dashboard-upgrade.sql
+--   - supabase/seed-student-dashboard-demo.sql
+--   - supabase/profile-upgrade.sql   (teacher personal fields + avatars storage)
+--   - supabase/grade-validation-upgrade.sql  (departments, dept heads, grade lock workflow)
+--
+-- After profile-upgrade.sql, student/teacher can use My Profile:
+--   /student/profile · /teacher/profile  (photo upload / selfie + personal details)
+--
+-- After grade-validation-upgrade.sql:
+--   Registrar Faculty → assign department + position (department head)
+--   Teacher Gradebook → Submit for validation
+--   Teacher Grade Validation (dept heads) → endorse / return
+--   Registrar Grade Lock → lock & publish to students/parents
+--
+-- -----------------------------------------------------------------------------
+-- Walkthrough logins (from seed-walkthrough-demo.sql)
+-- -----------------------------------------------------------------------------
+--
+-- REGISTRAR
+--   Email:    registrar@dmdpnhs.edu.ph
+--   Password: Registrar@2026
+--   Try: /registrar, Academics, Activations, Faculty, Requests
+--
+-- TEACHER (active, 4 sections + advisory Rose)
+--   Email / Teacher ID: teacher.reyes@dmdpnhs.edu.ph  OR  T26-10001
+--   Password: Teacher@2026
+--   Try: /teacher/gradebook → English · Grade 7 Rose (sample class record)
+--
+-- PARENT
+--   Access code: P26-10001
+--   Linked to: Juan Dela Cruz (LRN 111111111111)
+--   Try: /parent/grades → term dropdown (1st / 2nd / Final)
+--
+-- STUDENTS (active)
+--   LRN 111111111111 / demo123   Juan Dela Cruz
+--   LRN 222222222222 / demo123   Pedro Reyes
+--   LRN 333333333333 / demo123   Ana Garcia
+--   LRN 444444444444 / demo123   Maria Lopez
+--   LRN 555555555555 / demo123   Carlo Mendoza
+--   LRN 666666666666 / demo123   Sofia Cruz
+--   Try: /student/grades → "1st Term School Year 2025-2026" dropdown
+--
+-- PENDING TEACHER (Faculty approvals)
+--   Email: teacher.pending@dmdpnhs.edu.ph / Pending@2026
+--
+-- PENDING STUDENT (Activations)
+--   LRN 777777777777 / demo123
+--
+-- INCOMPLETE STUDENT (Register Account walkthrough)
+--   LRN 888888888888  — Phase 1 at /register/student (LRN + birthdate + password)
+--                     — Phase 2 at /student/activate (personal + parent contacts)
+--
+-- Student activation flow:
+--   1) Registrar enrolls LRN
+--   2) Student Phase 1: LRN + birthdate + password
+--   3) Student Phase 2: name, grade, section, address, contacts + parent details
+--   4) Temporary dashboard while pending
+--   5) Registrar calls parent number → Verify & Approve
+--   6) SMS Parent Access Code + student activation notice (sender DMDPNHS)
+--   7) Grades/attendance unlock after activation + section enrollment
+--
+-- =============================================================================
+
+-- Manual registrar link (only if you create Auth user yourself in Dashboard):
+-- INSERT INTO public.profiles (id, role, first_name, last_name, email, status)
+-- VALUES (
+--   'PASTE-AUTH-USER-UUID-HERE',
+--   'registrar',
+--   'School',
+--   'Registrar',
+--   'registrar@dmdpnhs.edu.ph',
+--   'active'
+-- );
