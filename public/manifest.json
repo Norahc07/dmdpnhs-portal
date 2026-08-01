@@ -4,7 +4,7 @@
   "description": "Dr. Maria D. Pastrana National High School digital portal",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
+  "background_color": "#ffffff",
   "theme_color": "#800000",
   "orientation": "portrait-primary",
   "icons": [

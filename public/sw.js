@@ -1,4 +1,4 @@
-const CACHE = "dmdpnhs-portal-v3";
+const CACHE = "dmdpnhs-portal-v4";
 const OFFLINE_URLS = [
   "/",
   "/login",

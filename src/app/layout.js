@@ -31,12 +31,13 @@ export const metadata = {
   },
   icons: {
     icon: [
-      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
-      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/favicon.png", type: "image/png", sizes: "48x48" },
+      { url: "/icons/icon-512.png?v=2", type: "image/png", sizes: "512x512" },
+      { url: "/icons/icon-192.png?v=2", type: "image/png", sizes: "192x192" },
+      { url: "/favicon.png?v=2", type: "image/png", sizes: "48x48" },
+      { url: "/icon.png?v=2", type: "image/png", sizes: "32x32" },
     ],
-    apple: [{ url: "/icons/icon-512.png", type: "image/png", sizes: "180x180" }],
-    shortcut: "/favicon.png",
+    apple: [{ url: "/apple-icon.png?v=2", type: "image/png", sizes: "180x180" }],
+    shortcut: "/favicon.png?v=2",
   },
 };
 
@@ -51,10 +52,11 @@ export default function RootLayout({ children }) {
       className={`${montserrat.variable} ${poppins.variable} h-full antialiased`}
     >
       <head>
-        <link rel="icon" href="/favicon.png" type="image/png" sizes="48x48" />
-        <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
-        <link rel="icon" href="/icons/icon-512.png" type="image/png" sizes="512x512" />
-        <link rel="apple-touch-icon" href="/icons/icon-512.png" />
+        <link rel="icon" href="/favicon.png?v=2" type="image/png" sizes="48x48" />
+        <link rel="icon" href="/icon.png?v=2" type="image/png" sizes="32x32" />
+        <link rel="icon" href="/icons/icon-192.png?v=2" type="image/png" sizes="192x192" />
+        <link rel="icon" href="/icons/icon-512.png?v=2" type="image/png" sizes="512x512" />
+        <link rel="apple-touch-icon" href="/apple-icon.png?v=2" />
         <link
           rel="preload"
           as="image"

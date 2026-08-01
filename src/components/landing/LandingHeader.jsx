@@ -341,7 +341,7 @@ export function LandingHeader({
               alt={`${APP_NAME} logo`}
               width={48}
               height={48}
-              className="size-10 shrink-0 rounded-xl object-cover sm:size-12"
+              className="size-10 shrink-0 rounded-full object-cover sm:size-12"
               priority
             />
             <span className="min-w-0 truncate font-heading text-xs font-bold leading-snug text-[#6b0000] sm:text-sm md:text-[15px]">
