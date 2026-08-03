@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
 import { GRADE_WORKFLOW } from "@/lib/grade-workflow";
+import { termLabel } from "@/lib/grades-terms";
 
 const PENDING_FACULTY = [
   {
@@ -752,7 +753,7 @@ async function ensureDemoSection(admin, { sectionName, gradeLevel }) {
     .select("id, section_name, grade_level, school_year")
     .eq("school_year", SCHOOL_YEAR_DEFAULT)
     .eq("grade_level", gradeLevel)
-    .eq("section_name", sectionName)
+    .ilike("section_name", sectionName)
     .maybeSingle();
   if (existing?.id) return existing;
 
@@ -771,13 +772,12 @@ async function ensureDemoSection(admin, { sectionName, gradeLevel }) {
 
   if (created?.id) return created;
 
-  // Race or missing optional columns
   const { data: again } = await admin
     .from("sections")
     .select("id, section_name, grade_level, school_year")
     .eq("school_year", SCHOOL_YEAR_DEFAULT)
     .eq("grade_level", gradeLevel)
-    .eq("section_name", sectionName)
+    .ilike("section_name", sectionName)
     .maybeSingle();
   if (again?.id) return again;
 
@@ -1027,10 +1027,12 @@ async function upsertClassRecordForAssignment({
   studentsPayload,
   demoMarker,
   examRevealDate = null,
+  term = 1,
 }) {
+  const termNum = Number(term) || 1;
   const metadata = {
     schoolYear: SCHOOL_YEAR_DEFAULT,
-    term: "1st Semestral Grade",
+    term: termLabel(termNum),
     subject: subject.subject_name,
     gradeSection: `Grade ${section.grade_level} - ${section.section_name}`,
     demo: demoMarker,
@@ -1039,7 +1041,7 @@ async function upsertClassRecordForAssignment({
 
   const payload = {
     assignment_id: assignmentId,
-    term: 1,
+    term: termNum,
     workflow_status: status,
     locked_at:
       status === GRADE_WORKFLOW.LOCKED ? new Date().toISOString() : null,
@@ -1061,7 +1063,7 @@ async function upsertClassRecordForAssignment({
     .from("class_records")
     .select("id")
     .eq("assignment_id", assignmentId)
-    .eq("term", 1)
+    .eq("term", termNum)
     .maybeSingle();
 
   if (existingRec?.id) {
@@ -1078,33 +1080,33 @@ async function upsertClassRecordForAssignment({
   } else {
     const { error: insErr } = await admin.from("class_records").insert(payload);
     if (insErr) {
-      console.error("[upsertClassRecordForAssignment]", insErr.message);
+      // Legacy DB without term column — try insert without term
+      if (/term/i.test(String(insErr.message || ""))) {
+        const { term: _t, ...legacy } = payload;
+        await admin.from("class_records").insert(legacy);
+      } else {
+        console.error("[upsertClassRecordForAssignment]", insErr.message);
+      }
     }
   }
 
   if (status === GRADE_WORKFLOW.LOCKED) {
     const gradeRows = [];
     for (const [studentId, scores] of Object.entries(studentsPayload)) {
-      const g1 = Number(scores.term1);
-      const g2 = Number(scores.term2);
-      const gf = Number(scores.finalTerm);
-      for (const [quarter, grade] of [
-        [1, g1],
-        [2, g2],
-        [3, gf],
-      ]) {
-        if (!Number.isFinite(grade)) continue;
-        gradeRows.push({
-          student_id: studentId,
-          subject_id: subject.id,
-          school_year: SCHOOL_YEAR_DEFAULT,
-          quarter,
-          final_transmuted_grade: grade,
-          written_scores: [],
-          performance_scores: [],
-          assessment_score: null,
-        });
-      }
+      const field =
+        termNum === 2 ? scores.term2 : termNum === 3 ? scores.finalTerm : scores.term1;
+      const grade = Number(field);
+      if (!Number.isFinite(grade)) continue;
+      gradeRows.push({
+        student_id: studentId,
+        subject_id: subject.id,
+        school_year: SCHOOL_YEAR_DEFAULT,
+        quarter: termNum,
+        final_transmuted_grade: grade,
+        written_scores: [],
+        performance_scores: [],
+        assessment_score: null,
+      });
     }
     if (gradeRows.length) {
       const { error: gErr } = await admin.from("grades").upsert(gradeRows, {
@@ -1266,6 +1268,7 @@ async function seedSectionRoster(admin, teachers, roster, options = {}) {
       studentsPayload,
       demoMarker,
       examRevealDate: mode === "live" ? examRevealDate : null,
+      term: 1,
     });
   }
 
@@ -1342,6 +1345,249 @@ async function ensureGradeLockDemoData(admin) {
   await syncSectionHeadcountsFromStudents(admin);
 }
 
+const JUAN_MITO_MARKER = "juan-mitochondria-demo-v1";
+const JUAN_LRN = "111111111111";
+
+/** Place Juan Dela Cruz in G8 Mitochondria: Term 1 locked + Term 2 live class record. */
+export async function ensureJuanMitochondriaDemo(admin) {
+  const { data: student } = await admin
+    .from("students")
+    .select("id, profile_id, lrn, section_id")
+    .eq("lrn", JUAN_LRN)
+    .maybeSingle();
+  if (!student?.id) {
+    console.warn("[ensureJuanMitochondriaDemo] Juan not found (LRN", JUAN_LRN, ")");
+    return { skipped: true, reason: "juan_missing" };
+  }
+
+  const section = await ensureDemoSection(admin, {
+    sectionName: "MITOCHONDRIA",
+    gradeLevel: 8,
+  });
+  if (!section) return { skipped: true, reason: "section_missing" };
+
+  await admin
+    .from("students")
+    .update({
+      section_id: section.id,
+      grade_level: 8,
+      status: "enrolled",
+      activation_status: "active",
+      personal_email: "juan.delacruz@gmail.com",
+    })
+    .eq("id", student.id);
+
+  if (student.profile_id) {
+    await admin
+      .from("profiles")
+      .update({
+        first_name: "Juan",
+        last_name: "Dela Cruz",
+        status: "active",
+        role: "student",
+      })
+      .eq("id", student.profile_id);
+  }
+
+  const { data: activeTeachers } = await admin
+    .from("teachers")
+    .select("id, profile_id, profiles!inner(status)")
+    .eq("profiles.status", "active")
+    .limit(8);
+
+  const teacherList = activeTeachers?.length
+    ? activeTeachers
+    : (await admin.from("teachers").select("id, profile_id").limit(8)).data ||
+      [];
+  if (!teacherList.length) {
+    return { skipped: true, reason: "no_teachers" };
+  }
+
+  const subjectNames = ["English", "Mathematics", "Science", "Filipino"];
+  const subjectList = await ensureDemoSubjects(admin, 8, subjectNames);
+  if (!subjectList.length) return { skipped: true, reason: "no_subjects" };
+
+  await dedupeSectionAssignments(
+    admin,
+    section.id,
+    subjectList.map((s) => s.id)
+  );
+
+  // A few classmates so the class record is realistic; student POV still shows Juan only
+  const classmates = [
+    { lrn: "910000000801", first_name: "Marco", last_name: "Reyes", gender: "Male" },
+    { lrn: "910000000802", first_name: "Nina", last_name: "Santos", gender: "Female" },
+    { lrn: "910000000803", first_name: "Omar", last_name: "Cruz", gender: "Male" },
+  ];
+  const studentIds = [student.id];
+  for (const mate of classmates) {
+    const id = await ensureDemoLearner(admin, section, mate);
+    if (id) studentIds.push(id);
+  }
+
+  for (let i = 0; i < subjectList.length; i += 1) {
+    const subject = subjectList[i];
+    const teacher = teacherList[i % teacherList.length];
+
+    let assignmentId;
+    const { data: existingAsgs } = await admin
+      .from("teacher_assignments")
+      .select("id")
+      .eq("section_id", section.id)
+      .eq("subject_id", subject.id)
+      .eq("school_year", SCHOOL_YEAR_DEFAULT)
+      .limit(1);
+    if (existingAsgs?.[0]?.id) {
+      assignmentId = existingAsgs[0].id;
+    } else {
+      const { data: createdAsg, error: asgErr } = await admin
+        .from("teacher_assignments")
+        .insert({
+          teacher_id: teacher.id,
+          section_id: section.id,
+          subject_id: subject.id,
+          school_year: SCHOOL_YEAR_DEFAULT,
+        })
+        .select("id")
+        .single();
+      if (asgErr || !createdAsg) {
+        console.error("[ensureJuanMitochondriaDemo] assignment", asgErr?.message);
+        continue;
+      }
+      assignmentId = createdAsg.id;
+    }
+
+    // Term 1 — locked (published grades)
+    const term1Students = {};
+    studentIds.forEach((sid, idx) => {
+      term1Students[sid] = buildDemoStudentScores(20 + i * 5 + idx);
+    });
+    await upsertClassRecordForAssignment({
+      admin,
+      assignmentId,
+      teacher,
+      section,
+      subject,
+      status: GRADE_WORKFLOW.LOCKED,
+      studentsPayload: term1Students,
+      demoMarker: JUAN_MITO_MARKER,
+      term: 1,
+    });
+
+    // Term 2 — live class record (WW/PT visible; exams still gated)
+    const term2Students = {};
+    studentIds.forEach((sid, idx) => {
+      term2Students[sid] = buildLiveDemoStudentScores(40 + i * 5 + idx);
+    });
+    await upsertClassRecordForAssignment({
+      admin,
+      assignmentId,
+      teacher,
+      section,
+      subject,
+      status: GRADE_WORKFLOW.DRAFT,
+      studentsPayload: term2Students,
+      demoMarker: JUAN_MITO_MARKER,
+      examRevealDate: "2026-10-15",
+      term: 2,
+    });
+  }
+
+  // Unlock Juan's grades view for current demo term (system + each teacher subject)
+  if (student.profile_id) {
+    const evalPayloads = [
+      {
+        evaluator_profile_id: student.profile_id,
+        evaluator_role: "student",
+        evaluation_type: "system",
+        school_year: SCHOOL_YEAR_DEFAULT,
+        term: 1,
+        scores: { access: 5, process: 5, distribution: 5, usability: 5, overall: 5 },
+        average_score: 5,
+        comments: "Demo unlock",
+      },
+      {
+        evaluator_profile_id: student.profile_id,
+        evaluator_role: "student",
+        evaluation_type: "system",
+        school_year: SCHOOL_YEAR_DEFAULT,
+        term: 2,
+        scores: { access: 5, process: 5, distribution: 5, usability: 5, overall: 5 },
+        average_score: 5,
+        comments: "Demo unlock",
+      },
+    ];
+    for (const subject of subjectList) {
+      const teacher = teacherList[subjectList.indexOf(subject) % teacherList.length];
+      for (const term of [1, 2]) {
+        evalPayloads.push({
+          evaluator_profile_id: student.profile_id,
+          evaluator_role: "student",
+          evaluation_type: "teacher",
+          school_year: SCHOOL_YEAR_DEFAULT,
+          term,
+          target_teacher_id: teacher.id,
+          target_subject_id: subject.id,
+          scores: {
+            teaching: 5,
+            fairness: 5,
+            engagement: 5,
+            communication: 5,
+            overall: 5,
+          },
+          average_score: 5,
+          comments: "Demo unlock",
+        });
+      }
+    }
+    for (const row of evalPayloads) {
+      const { error } = await admin.from("evaluations").upsert(row, {
+        onConflict:
+          row.evaluation_type === "system"
+            ? "evaluator_profile_id,school_year,term,evaluation_type"
+            : "evaluator_profile_id,school_year,term,evaluation_type,target_teacher_id,target_subject_id",
+      });
+      if (error) {
+        // Unique index names vary — insert-or-ignore via select
+        const q = admin
+          .from("evaluations")
+          .select("id")
+          .eq("evaluator_profile_id", row.evaluator_profile_id)
+          .eq("school_year", row.school_year)
+          .eq("term", row.term)
+          .eq("evaluation_type", row.evaluation_type);
+        const { data: hit } =
+          row.evaluation_type === "system"
+            ? await q.maybeSingle()
+            : await q
+                .eq("target_teacher_id", row.target_teacher_id)
+                .eq("target_subject_id", row.target_subject_id)
+                .maybeSingle();
+        if (!hit?.id) {
+          const { error: insErr } = await admin.from("evaluations").insert(row);
+          if (insErr && !/duplicate|unique/i.test(insErr.message || "")) {
+            console.error("[ensureJuanMitochondriaDemo] eval", insErr.message);
+          }
+        }
+      }
+    }
+  }
+
+  await ensureDemoAttendance(admin, {
+    studentIds: [student.id],
+    sectionId: section.id,
+    subjectId: subjectList[0]?.id,
+  });
+
+  await syncSectionHeadcountsFromStudents(admin);
+  return {
+    ok: true,
+    studentId: student.id,
+    section: section.section_name,
+    subjects: subjectList.length,
+  };
+}
+
 /** Prevent concurrent page loads from racing Auth/parent inserts. */
 let opsDemoInFlight = null;
 
@@ -1369,6 +1615,7 @@ export async function ensureRegistrarOpsDemoData() {
       await ensurePendingFaculty(admin);
       await ensurePendingActivations(admin);
       await ensureGradeLockDemoData(admin);
+      await ensureJuanMitochondriaDemo(admin);
       return { ok: true };
     } catch (err) {
       console.error("[ensureRegistrarOpsDemoData]", err);
@@ -1389,5 +1636,6 @@ export async function seedDemoGradesAttendanceParents() {
   await ensurePendingFaculty(admin);
   await ensurePendingActivations(admin);
   await ensureGradeLockDemoData(admin);
-  return { ok: true };
+  const juan = await ensureJuanMitochondriaDemo(admin);
+  return { ok: true, juan };
 }

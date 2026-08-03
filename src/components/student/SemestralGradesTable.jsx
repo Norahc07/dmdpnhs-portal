@@ -20,14 +20,17 @@ function StatusText({ grade }) {
 }
 
 /**
- * Student/parent view of Semestral Grades only (one learner).
+ * Student/parent view of published subject grades only (one learner).
  * Never shows classmates or WW/PT/exam component scores.
  */
 export function SemestralGradesTable({
   rows = [],
-  emptyMessage = "No published semestral grades yet.",
-  gradeColumnLabel = "Semestral Grade",
+  emptyMessage = "No published subject grades yet.",
+  gradeColumnLabel = "Grade",
+  showTermColumn = false,
 }) {
+  const colSpan = showTermColumn ? 5 : 4;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
       <div className="overflow-x-auto">
@@ -36,6 +39,9 @@ export function SemestralGradesTable({
             <tr className="portal-panel-head text-[#3d1212]">
               <th className="px-3 py-2.5 text-left font-semibold">#</th>
               <th className="px-3 py-2.5 text-left font-semibold">Subject</th>
+              {showTermColumn ? (
+                <th className="px-3 py-2.5 text-left font-semibold">Term</th>
+              ) : null}
               <th className="px-3 py-2.5 text-right font-semibold">
                 {gradeColumnLabel}
               </th>
@@ -46,7 +52,7 @@ export function SemestralGradesTable({
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={colSpan}
                   className="px-3 py-8 text-center text-muted-foreground"
                 >
                   {emptyMessage}
@@ -69,6 +75,11 @@ export function SemestralGradesTable({
                   <td className="px-3 py-3 font-semibold text-[#3d1212]">
                     {row.subject_name || row.subjects?.subject_name || "—"}
                   </td>
+                  {showTermColumn ? (
+                    <td className="px-3 py-3 text-[#3d1212]">
+                      {row.term_label || "—"}
+                    </td>
+                  ) : null}
                   <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#3d1212]">
                     {grade ?? "—"}
                   </td>
@@ -82,8 +93,8 @@ export function SemestralGradesTable({
         </table>
       </div>
       <p className="border-t border-[#800000]/08 px-4 py-2.5 text-[11px] text-muted-foreground">
-        Only your Semestral Grade from locked class records is shown. Written,
-        Performance, and Exam scores stay with your teacher.
+        Published subject grades only. Open Class Record for Written Works,
+        Performance Tasks, and Examinations.
       </p>
     </div>
   );

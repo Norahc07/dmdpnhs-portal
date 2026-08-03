@@ -1,8 +1,11 @@
 import { LayoutGrid } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { EvaluationProgressCard } from "@/components/evaluation/EvaluationProgressCard";
-import { StudentClassRecordSemestralView } from "@/components/student/StudentClassRecordSemestralView";
-import { getStudentSemestralGrades } from "@/actions/student-grades";
+import { StudentGradesTabs } from "@/components/student/StudentGradesTabs";
+import {
+  getStudentSemestralGrades,
+  getStudentSubjectGrades,
+} from "@/actions/student-grades";
 import { getStudentGradesUnlockStatus } from "@/actions/evaluation";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
@@ -19,7 +22,7 @@ export default async function StudentGradesPage() {
   const { data: student } = await supabase
     .from("students")
     .select(
-      "id, grade_level, section_id, sections(section_name, grade_level, school_year)"
+      "id, grade_level, section_id, lrn, personal_email, sections(section_name, grade_level, school_year)"
     )
     .eq("profile_id", profile.id)
     .maybeSingle();
@@ -35,9 +38,12 @@ export default async function StudentGradesPage() {
       })
     : { unlocked: false, progress: null };
 
-  const semestral = studentId
-    ? await getStudentSemestralGrades({ studentId, schoolYear })
-    : { rows: [], error: null };
+  const [classRecord, subjectGrades] = studentId
+    ? await Promise.all([
+        getStudentSemestralGrades({ studentId, schoolYear }),
+        getStudentSubjectGrades({ studentId, schoolYear }),
+      ])
+    : [{ rows: [] }, { rows: [] }];
 
   const sectionLabel = student?.sections
     ? `Grade ${student.sections.grade_level ?? student.grade_level ?? "—"} - ${student.sections.section_name}`
@@ -45,14 +51,15 @@ export default async function StudentGradesPage() {
 
   const progress = unlock.progress;
   const unlocked = unlock.unlocked === true;
-  const rows = semestral.rows || [];
+  const classRecordRows = classRecord.rows || [];
+  const gradeRows = subjectGrades.rows || [];
 
   return (
     <AppShell
       role="student"
       profile={profile}
       title="My Grades"
-      subtitle="Class record · live Written & Performance; exams unlock on display date, when finished, or when locked."
+      subtitle="Class Record (WW / PT / Exams) and published Grades — your scores only."
       studentAccess={{ activated: true, enrolled: true }}
     >
       <div className="space-y-4">
@@ -63,13 +70,14 @@ export default async function StudentGradesPage() {
             </span>
             <div>
               <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
-                Class record · student POV
+                Student grades
               </p>
               <h3 className="font-heading text-xl font-bold text-[#3d1212] sm:text-2xl">
                 My Grades
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                SY {schoolYear} · your own row only
+                SY {schoolYear}
+                {student?.lrn ? ` · LRN ${student.lrn}` : ""} · your own row only
               </p>
             </div>
           </div>
@@ -102,18 +110,21 @@ export default async function StudentGradesPage() {
               <span className="font-semibold text-[#3d1212]">{sectionLabel}</span>
             </p>
 
-            {semestral.error ? (
+            {classRecord.error || subjectGrades.error ? (
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {semestral.error}
+                {classRecord.error || subjectGrades.error}
               </p>
             ) : null}
           </div>
         </div>
 
         {unlocked ? (
-          <StudentClassRecordSemestralView
-            rows={rows}
-            emptyMessage="No class record scores yet. Written and Performance appear as your teacher encodes them."
+          <StudentGradesTabs
+            classRecordRows={classRecordRows}
+            subjectGradeRows={gradeRows}
+            privacyLabel="Your record only"
+            classRecordEmpty="No class record scores yet. Written and Performance appear as your teacher encodes them."
+            gradesEmpty="No published subject grades yet. Locked term grades appear here."
           />
         ) : (
           <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-[#faf7f5] px-5 py-10 text-center text-sm text-muted-foreground">

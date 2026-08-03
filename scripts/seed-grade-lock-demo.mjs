@@ -20,72 +20,77 @@ const { seedDemoGradesAttendanceParents } = jiti(
 );
 const { createAdminClient } = jiti(path.join(src, "lib", "supabase", "admin.js"));
 
-console.log("Seeding Orchid (locked) + 6 live sections + parents + attendance…");
+console.log("Seeding demo grades (incl. Juan · G8 Mitochondria)…");
 const result = await seedDemoGradesAttendanceParents();
-console.log("seedDemoGradesAttendanceParents =>", result);
+console.log("seed =>", result);
 
 const admin = createAdminClient();
-const schoolYear = "2025-2026";
-
-const sectionNames = [
-  "Rose",
-  "Orchid",
-  "Lily",
-  "Daisy",
-  "Jasmine",
-  "Tulip",
-  "Sunflower",
-  "Hibiscus",
-];
-
-const { data: sections } = await admin
-  .from("sections")
-  .select("id, section_name, grade_level, male_count, female_count")
-  .eq("school_year", schoolYear)
-  .in("section_name", sectionNames);
-
-const sectionIds = (sections || []).map((s) => s.id);
-const { data: records } = sectionIds.length
-  ? await admin
-      .from("class_records")
-      .select("id, workflow_status, assignment_id, data, teacher_assignments!inner(section_id)")
-      .in("teacher_assignments.section_id", sectionIds)
-  : { data: [] };
-
-const byStatus = {};
-for (const r of records || []) {
-  byStatus[r.workflow_status] = (byStatus[r.workflow_status] || 0) + 1;
-}
-
-const { data: parent } = await admin
-  .from("parents")
-  .select("id, access_code, email, parent_student_links(student_id)")
-  .eq("access_code", "P26-GRADS")
+const { data: juan } = await admin
+  .from("students")
+  .select(
+    "id, lrn, grade_level, personal_email, sections(section_name, grade_level, school_year)"
+  )
+  .eq("lrn", "111111111111")
   .maybeSingle();
 
-const { count: attendanceCount } = await admin
-  .from("attendance")
-  .select("*", { count: "exact", head: true })
-  .in(
-    "section_id",
-    sectionIds.length ? sectionIds : ["00000000-0000-0000-0000-000000000000"]
-  );
+const { data: records } = juan?.id
+  ? await admin
+      .from("class_records")
+      .select(
+        "term, workflow_status, data, teacher_assignments!inner(section_id, subjects(subject_name))"
+      )
+      .eq("teacher_assignments.section_id", juan.sections ? undefined : "x")
+  : { data: [] };
+
+// Fetch by Juan's section id
+let juanRecords = [];
+if (juan?.id) {
+  const sectionId = (
+    await admin
+      .from("students")
+      .select("section_id")
+      .eq("id", juan.id)
+      .maybeSingle()
+  ).data?.section_id;
+
+  if (sectionId) {
+    const { data: asgs } = await admin
+      .from("teacher_assignments")
+      .select("id, subjects(subject_name)")
+      .eq("section_id", sectionId);
+    const asgIds = (asgs || []).map((a) => a.id);
+    if (asgIds.length) {
+      const { data: crs } = await admin
+        .from("class_records")
+        .select("term, workflow_status, data, assignment_id")
+        .in("assignment_id", asgIds);
+      juanRecords = (crs || []).map((r) => ({
+        term: r.term,
+        status: r.workflow_status,
+        hasJuan: Boolean(r.data?.students?.[juan.id]),
+        subject:
+          asgs.find((a) => a.id === r.assignment_id)?.subjects?.subject_name,
+      }));
+    }
+  }
+}
+
+const { data: gradeRows } = juan?.id
+  ? await admin
+      .from("grades")
+      .select("quarter, final_transmuted_grade, subjects(subject_name)")
+      .eq("student_id", juan.id)
+  : { data: [] };
 
 console.log({
-  sections: (sections || []).map((s) => ({
-    name: s.section_name,
-    grade: s.grade_level,
-    male: s.male_count,
-    female: s.female_count,
-  })),
-  classRecords: records?.length || 0,
-  byStatus,
-  demoParent: parent
+  juan: juan
     ? {
-        access_code: parent.access_code,
-        email: parent.email,
-        linkedChildren: parent.parent_student_links?.length || 0,
+        lrn: juan.lrn,
+        grade: juan.grade_level,
+        email: juan.personal_email,
+        section: juan.sections,
       }
     : null,
-  attendanceRows: attendanceCount,
+  classRecords: juanRecords,
+  publishedGrades: gradeRows,
 });

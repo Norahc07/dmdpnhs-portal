@@ -329,3 +329,115 @@ export async function getStudentSemestralGrades({
     rows,
   };
 }
+
+/**
+ * Published subject grades only (from grades table + locked class records).
+ * No WW / PT / exam component detail — that stays in getStudentSemestralGrades.
+ */
+export async function getStudentSubjectGrades({
+  studentId,
+  schoolYear,
+} = {}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile) return { error: "Unauthorized" };
+
+  const sid = String(studentId || "").trim();
+  if (!sid) return { error: "Missing student." };
+
+  const admin = createAdminClient();
+  const access = await assertCanViewStudentGrades(admin, profile, sid);
+  if (access.error) return { error: access.error };
+
+  const sy = schoolYear || SCHOOL_YEAR_DEFAULT;
+
+  const { data: student } = await admin
+    .from("students")
+    .select(
+      "id, section_id, grade_level, lrn, profiles(first_name, last_name), sections(id, section_name, grade_level, school_year)"
+    )
+    .eq("id", sid)
+    .maybeSingle();
+  if (!student) return { error: "Student not found." };
+
+  const byKey = new Map();
+
+  // 1) Official grades table
+  let gradeRows = [];
+  {
+    const withSy = await admin
+      .from("grades")
+      .select(
+        "id, subject_id, school_year, quarter, final_transmuted_grade, subjects(subject_name)"
+      )
+      .eq("student_id", sid)
+      .eq("school_year", sy);
+    if (!withSy.error) {
+      gradeRows = withSy.data || [];
+    } else {
+      const legacy = await admin
+        .from("grades")
+        .select(
+          "id, subject_id, quarter, final_transmuted_grade, subjects(subject_name)"
+        )
+        .eq("student_id", sid);
+      gradeRows = legacy.data || [];
+    }
+  }
+
+  for (const g of gradeRows) {
+    const term = normalizeGradeTerm(g.quarter ?? 1);
+    const grade = Number(g.final_transmuted_grade);
+    if (!Number.isFinite(grade)) continue;
+    const key = `${g.subject_id || g.subjects?.subject_name}-${term}`;
+    byKey.set(key, {
+      id: `grade-${g.id || key}`,
+      subject_id: g.subject_id,
+      subject_name: g.subjects?.subject_name || "Subject",
+      school_year: g.school_year || sy,
+      term,
+      term_label: termLabel(term),
+      semestral_grade: grade,
+      final_transmuted_grade: grade,
+      source: "grades",
+    });
+  }
+
+  // 2) Locked class records (fill gaps / override with latest locked TG)
+  const detail = await getStudentSemestralGrades({ studentId: sid, schoolYear: sy });
+  if (!detail.error) {
+    for (const row of detail.rows || []) {
+      if (row.workflow_status !== GRADE_WORKFLOW.LOCKED) continue;
+      if (row.semestral_grade == null) continue;
+      const key = `${row.subject_id || row.subject_name}-${row.term}`;
+      byKey.set(key, {
+        id: `locked-${row.id}`,
+        subject_id: row.subject_id,
+        subject_name: row.subject_name,
+        school_year: row.school_year || sy,
+        term: row.term,
+        term_label: row.term_label || termLabel(row.term),
+        semestral_grade: row.semestral_grade,
+        final_transmuted_grade: row.semestral_grade,
+        source: "class_record_locked",
+      });
+    }
+  }
+
+  const rows = Array.from(byKey.values()).sort(
+    (a, b) =>
+      Number(a.term) - Number(b.term) ||
+      String(a.subject_name).localeCompare(String(b.subject_name))
+  );
+
+  return { student, schoolYear: sy, rows };
+}

@@ -58,6 +58,12 @@
 --
 -- STUDENTS (active)
 --   LRN 111111111111 / demo123   Juan Dela Cruz
+--     · Grade 8 · MITOCHONDRIA
+--     · personal email: juan.delacruz@gmail.com
+--     · Term 1 class records LOCKED (published Grades tab)
+--     · Term 2 class records LIVE (Class Record tab — WW/PT + exam predictions)
+--   Try: /student/grades → Class Record | Grades tabs
+--
 --   LRN 222222222222 / demo123   Pedro Reyes
 --   LRN 333333333333 / demo123   Ana Garcia
 --   LRN 444444444444 / demo123   Maria Lopez

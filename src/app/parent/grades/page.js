@@ -1,8 +1,11 @@
 import { LayoutGrid } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ParentChildPicker } from "@/components/parent/ParentChildPicker";
-import { StudentClassRecordSemestralView } from "@/components/student/StudentClassRecordSemestralView";
-import { getStudentSemestralGrades } from "@/actions/student-grades";
+import { StudentGradesTabs } from "@/components/student/StudentGradesTabs";
+import {
+  getStudentSemestralGrades,
+  getStudentSubjectGrades,
+} from "@/actions/student-grades";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
 
@@ -32,12 +35,18 @@ export default async function ParentGradesPage({ searchParams }) {
 
   const schoolYear = selected?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
 
-  const semestral = selected?.id
-    ? await getStudentSemestralGrades({
-        studentId: selected.id,
-        schoolYear,
-      })
-    : { rows: [] };
+  const [classRecord, subjectGrades] = selected?.id
+    ? await Promise.all([
+        getStudentSemestralGrades({
+          studentId: selected.id,
+          schoolYear,
+        }),
+        getStudentSubjectGrades({
+          studentId: selected.id,
+          schoolYear,
+        }),
+      ])
+    : [{ rows: [] }, { rows: [] }];
 
   const sectionLabel = selected?.sections
     ? `Grade ${selected.sections.grade_level ?? selected.grade_level ?? "—"} - ${selected.sections.section_name}`
@@ -56,7 +65,7 @@ export default async function ParentGradesPage({ searchParams }) {
       title="Grades"
       subtitle={
         childName
-          ? `Class record for ${childName} — live WW/PT; exams gated until display date, finished, or locked.`
+          ? `Class Record and Grades for ${childName} only.`
           : "Grades for linked learners."
       }
     >
@@ -79,7 +88,7 @@ export default async function ParentGradesPage({ searchParams }) {
                 </span>
                 <div>
                   <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
-                    Class record · parent POV
+                    Parent grades
                   </p>
                   <h3 className="font-heading text-xl font-bold text-[#3d1212] sm:text-2xl">
                     Learner grades
@@ -100,18 +109,20 @@ export default async function ParentGradesPage({ searchParams }) {
                     {sectionLabel}
                   </span>
                 </p>
-                {semestral.error ? (
+                {classRecord.error || subjectGrades.error ? (
                   <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    {semestral.error}
+                    {classRecord.error || subjectGrades.error}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <StudentClassRecordSemestralView
-              rows={semestral.rows || []}
-              emptyMessage="No class record scores yet for this learner."
+            <StudentGradesTabs
+              classRecordRows={classRecord.rows || []}
+              subjectGradeRows={subjectGrades.rows || []}
               privacyLabel="This learner only"
+              classRecordEmpty="No class record scores yet for this learner."
+              gradesEmpty="No published subject grades yet for this learner."
             />
           </>
         )}
