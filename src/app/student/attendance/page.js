@@ -1,19 +1,26 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { StatusBadge } from "@/components/layout/StatusBadge";
+import { StudentAttendanceView } from "@/components/student/StudentAttendanceView";
+import { getStudentAttendance } from "@/actions/attendance";
 import { requireRole } from "@/lib/auth-guard";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  buildDemoAttendanceRecords,
+  groupAttendanceByDate,
+  summarizeAttendance,
+  toDateKey,
+} from "@/lib/attendance";
 
 export const metadata = { title: "Attendance" };
 
-export default async function StudentAttendancePage() {
-  const { supabase, profile } = await requireRole(["student", "student-enrolled"]);
+export default async function StudentAttendancePage({ searchParams }) {
+  const params = await searchParams;
+  const { supabase, profile } = await requireRole([
+    "student",
+    "student-enrolled",
+  ]);
+
+  const now = new Date();
+  const month = Number(params.month) || now.getMonth() + 1;
+  const year = Number(params.year) || now.getFullYear();
 
   const { data: student } = await supabase
     .from("students")
@@ -21,55 +28,64 @@ export default async function StudentAttendancePage() {
     .eq("profile_id", profile.id)
     .maybeSingle();
 
-  const { data: rows } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("student_id", student?.id || "00000000-0000-0000-0000-000000000000")
-    .order("date", { ascending: false })
-    .limit(60);
+  let days = [];
+  let stats = summarizeAttendance([]);
+  let records = [];
+  let isDemo = false;
+
+  if (student?.id) {
+    const result = await getStudentAttendance(student.id, month, year);
+    if (!result.error) {
+      days = result.days || [];
+      stats = result.stats || stats;
+      records = result.records || [];
+    } else {
+      const start = `${year}-${String(month).padStart(2, "0")}-01`;
+      const endDay = new Date(year, month, 0).getDate();
+      const end = `${year}-${String(month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
+      const { data: rows } = await supabase
+        .from("attendance")
+        .select("id, date, status, notes")
+        .eq("student_id", student.id)
+        .gte("date", start)
+        .lte("date", end)
+        .order("date", { ascending: false });
+
+      records = (rows || []).map((r) => ({
+        ...r,
+        date: toDateKey(r.date),
+        subjectName: "Daily / Homeroom",
+        excuse: null,
+      }));
+      days = groupAttendanceByDate(records);
+      stats = summarizeAttendance(records);
+    }
+  }
+
+  // Demo sample when there is no live attendance for the month
+  if (records.length === 0) {
+    records = buildDemoAttendanceRecords(month, year);
+    days = groupAttendanceByDate(records);
+    stats = summarizeAttendance(records);
+    isDemo = true;
+  }
 
   return (
     <AppShell
       role="student"
       profile={profile}
       title="Attendance"
-      subtitle="Your recent daily attendance records."
+      subtitle="Monthly rate, calendar by subject period, and digital excuse letters for absences."
       studentAccess={{ activated: true, enrolled: true }}
     >
-      <div className="overflow-hidden rounded-xl border border-[#800000]/10 bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-[#800000]/5">
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(rows || []).length === 0 && (
-              <TableRow>
-                <TableCell colSpan={2} className="h-20 text-center text-muted-foreground">
-                  No attendance records yet.
-                </TableCell>
-              </TableRow>
-            )}
-            {(rows || []).map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>
-                  {new Date(r.date).toLocaleDateString("en-PH", {
-                    weekday: "short",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={r.status} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <StudentAttendanceView
+        initialMonth={month}
+        initialYear={year}
+        days={days}
+        stats={stats}
+        records={records}
+        isDemo={isDemo}
+      />
     </AppShell>
   );
 }

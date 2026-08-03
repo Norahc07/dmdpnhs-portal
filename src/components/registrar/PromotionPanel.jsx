@@ -95,7 +95,7 @@ export function PromotionPanel({ students, sections }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-xl border border-[#800000]/10 bg-white p-4 md:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)] md:grid-cols-4">
         <div className="space-y-1.5">
           <Label>New grade level</Label>
           <Select items={gradeItems} value={gradeLevel} onValueChange={setGradeLevel}>
@@ -155,10 +155,10 @@ export function PromotionPanel({ students, sections }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#800000]/10 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         <Table>
           <TableHeader>
-            <TableRow className="bg-[#800000]/5">
+            <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
               <TableHead>
                 <input
                   type="checkbox"

@@ -9,7 +9,9 @@ export default async function StudentProfilePage() {
 
   const { data: student } = await supabase
     .from("students")
-    .select("*, sections(section_name, grade_level, school_year)")
+    .select(
+      "id, lrn, grade_level, section_id, status, activation_status, contact_number, personal_email, address, emergency_contact_name, emergency_contact_number, sections(section_name, grade_level, school_year)"
+    )
     .eq("profile_id", profile.id)
     .maybeSingle();
 
@@ -23,19 +25,11 @@ export default async function StudentProfilePage() {
     <AppShell
       role="student"
       profile={profile}
+      title="My profile"
+      subtitle="Update your photo and personal details used across the student portal."
       studentAccess={{ activated, enrolled }}
     >
-      <div className="mx-auto max-w-3xl space-y-4">
-        <div>
-          <h2 className="font-heading text-2xl font-bold text-[#3d1212]">
-            My profile
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Update your photo and personal details used across the student portal.
-          </p>
-        </div>
-        <StudentProfileForm profile={profile} student={student} />
-      </div>
+      <StudentProfileForm profile={profile} student={student} />
     </AppShell>
   );
 }

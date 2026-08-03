@@ -41,6 +41,7 @@ export function mapValidationItem(row) {
     teacher_name: [profile.first_name, profile.last_name]
       .filter(Boolean)
       .join(" ") || "—",
+    term: record.term != null ? Number(record.term) : 1,
     failCount: countFailingFromClassRecord(record.data, weights),
   };
 }

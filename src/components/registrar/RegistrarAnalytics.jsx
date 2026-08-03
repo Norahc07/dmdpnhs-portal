@@ -132,7 +132,7 @@ export function RegistrarAnalytics({ analytics }) {
 
   if (!schoolYears.length) {
     return (
-      <div className="rounded-xl border border-[#800000]/10 bg-white p-5">
+      <div className="rounded-2xl border border-[#800000]/10 bg-white p-5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         <h3 className="font-heading text-base font-semibold text-[#3d1212]">
           School-year analytics
         </h3>
@@ -146,7 +146,7 @@ export function RegistrarAnalytics({ analytics }) {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl border border-[#800000]/10 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)] sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="font-heading text-base font-semibold text-[#3d1212]">
             School-year analytics
@@ -174,7 +174,7 @@ export function RegistrarAnalytics({ analytics }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-[#800000]/10 bg-white p-4">
+        <div className="rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h4 className="text-sm font-semibold text-[#3d1212]">
@@ -191,7 +191,7 @@ export function RegistrarAnalytics({ analytics }) {
           <GradeBars primary={primary} primaryLabel={year} />
         </div>
 
-        <div className="rounded-xl border border-[#800000]/10 bg-white p-4">
+        <div className="rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
           <h4 className="mb-1 text-sm font-semibold text-[#3d1212]">
             Multi-year outlook
           </h4>

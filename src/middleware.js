@@ -66,6 +66,11 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
 
+  // Public marketing pages: refresh session only — skip profile/student DB hits.
+  if (user && !isProtected && !isAuthPage) {
+    return response;
+  }
+
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -75,6 +80,7 @@ export async function middleware(request) {
 
     const role = profile?.role;
     const status = profile?.status;
+    let studentActivation = null;
 
     // Pending teachers may only access /teacher/pending
     if (role === "teacher" && status === "pending") {
@@ -94,17 +100,14 @@ export async function middleware(request) {
     }
 
     // Student activation gates
-    // Phase 1 done (incomplete + profile) → /student/activate
-    // Phase 2 done (pending) → temporary /student dashboard
-    // active → full portal
     if (role === "student" && isProtected) {
       const { data: studentRow } = await supabase
         .from("students")
-        .select("activation_status, profile_id, section_id, status")
+        .select("activation_status, section_id, status")
         .eq("profile_id", user.id)
         .maybeSingle();
 
-      const activation = studentRow?.activation_status || "active";
+      studentActivation = studentRow?.activation_status || "active";
       const onPending = pathname === "/student/pending";
       const onActivate = pathname === "/student/activate";
       const onStudentHome = pathname === "/student";
@@ -112,26 +115,25 @@ export async function middleware(request) {
         pathname.startsWith("/student/grades") ||
         pathname.startsWith("/student/attendance");
 
-      if (activation === "incomplete") {
+      if (studentActivation === "incomplete") {
         if (!onActivate) {
           const url = request.nextUrl.clone();
           url.pathname = "/student/activate";
           return NextResponse.redirect(url);
         }
-      } else if (activation === "pending") {
+      } else if (studentActivation === "pending") {
         if (onActivate) {
           const url = request.nextUrl.clone();
           url.pathname = "/student";
           return NextResponse.redirect(url);
         }
-        // Temporary dashboard allowed; grades/attendance wait for activation
         if (needsEnrollment && !onStudentHome && !onPending) {
           const url = request.nextUrl.clone();
           url.pathname = "/student";
           url.searchParams.set("notice", "activation");
           return NextResponse.redirect(url);
         }
-      } else if (activation === "active") {
+      } else if (studentActivation === "active") {
         if (onActivate || onPending) {
           const url = request.nextUrl.clone();
           url.pathname = "/student";
@@ -156,12 +158,15 @@ export async function middleware(request) {
         home = "/teacher/pending";
       }
       if (role === "student") {
-        const { data: studentRow } = await supabase
-          .from("students")
-          .select("activation_status, profile_id")
-          .eq("profile_id", user.id)
-          .maybeSingle();
-        const activation = studentRow?.activation_status || "active";
+        let activation = studentActivation;
+        if (activation == null) {
+          const { data: studentRow } = await supabase
+            .from("students")
+            .select("activation_status")
+            .eq("profile_id", user.id)
+            .maybeSingle();
+          activation = studentRow?.activation_status || "active";
+        }
         if (activation === "incomplete") home = "/student/activate";
         else if (activation === "pending") home = "/student";
       }

@@ -28,18 +28,19 @@ export function TermGradesTable({
   const columnCount = showLearner ? 4 : 3;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+      <div className="overflow-x-auto">
       <table className="w-full min-w-120 border-collapse text-sm">
         <thead>
-          <tr className="border-b border-neutral-300 text-[#3d1212]">
+          <tr className="portal-panel-head text-[#3d1212]">
             {showLearner ? (
-              <th className="px-3 py-2 text-left font-semibold">Learner</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Learner</th>
             ) : null}
-            <th className="px-3 py-2 text-left font-semibold">Subject</th>
-            <th className="px-3 py-2 text-right font-semibold">
+            <th className="px-3 py-2.5 text-left font-semibold">Subject</th>
+            <th className="px-3 py-2.5 text-right font-semibold">
               {termLabel(term)}
             </th>
-            <th className="px-3 py-2 text-right font-semibold">Status</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -57,8 +58,8 @@ export function TermGradesTable({
             <tr
               key={g.id}
               className={cn(
-                "border-b border-neutral-200 last:border-b-0",
-                index % 2 === 0 ? "bg-neutral-50" : "bg-white"
+                "border-b border-[#800000]/8 last:border-b-0 transition hover:bg-[#800000]/4",
+                index % 2 === 0 ? "bg-[#faf7f5]/70" : "bg-white"
               )}
             >
               {showLearner ? (
@@ -80,6 +81,7 @@ export function TermGradesTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   UserRound,
   BarChart3,
   Lock,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const NAV = {
     { href: "/student/profile", label: "My Profile", icon: UserRound },
     { href: "/student/grades", label: "My Grades", icon: BookOpen },
     { href: "/student/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/student/evaluation", label: "Evaluation", icon: ClipboardCheck },
     { href: "/student/requests", label: "Documents", icon: FileText },
     { href: "/student/calendar", label: "Calendar", icon: CalendarDays },
   ],
@@ -31,6 +33,7 @@ const NAV = {
     { href: "/parent", label: "Dashboard", icon: LayoutDashboard },
     { href: "/parent/grades", label: "Grades", icon: BookOpen },
     { href: "/parent/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/parent/evaluation", label: "Evaluation", icon: ClipboardCheck },
   ],
   teacher: [
     { href: "/teacher", label: "Dashboard", icon: LayoutDashboard },
@@ -39,11 +42,13 @@ const NAV = {
     { href: "/teacher/gradebook", label: "Gradebook", icon: GraduationCap },
     {
       href: "/teacher/validation",
-      label: "Grade Validation",
-      icon: ClipboardCheck,
+      label: "Validation",
+      icon: ShieldCheck,
       requiresDeptHead: true,
     },
     { href: "/teacher/attendance", label: "Attendance", icon: ClipboardList },
+    { href: "/teacher/evaluation", label: "Evaluation", icon: ClipboardCheck },
+    { href: "/teacher/calendar", label: "Calendar", icon: CalendarDays },
   ],
   registrar: [
     { href: "/registrar", label: "Dashboard", icon: LayoutDashboard },
@@ -52,9 +57,10 @@ const NAV = {
     { href: "/registrar/enrollment", label: "Enrollment", icon: BarChart3 },
     { href: "/registrar/teachers", label: "Faculty", icon: Users },
     { href: "/registrar/grades", label: "Grade Lock", icon: Lock },
-    { href: "/registrar/students", label: "Promotion", icon: ClipboardList },
+    { href: "/registrar/promotion", label: "Promotion", icon: ClipboardList },
     { href: "/registrar/requests", label: "Documents", icon: FileText },
-    { href: "/registrar/forms", label: "School Forms", icon: BookOpen },
+    { href: "/registrar/evaluation", label: "Evaluation", icon: ClipboardCheck },
+    { href: "/registrar/calendar", label: "Calendar", icon: CalendarDays },
   ],
 };
 
@@ -103,19 +109,19 @@ export function PortalNav({ role, onNavigate, studentAccess, teacherAccess }) {
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "relative flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition",
+              "relative flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-200",
               active
-                ? "bg-[#800000] text-white shadow-md shadow-[#800000]/25"
-                : "text-[#4a1515]/80 hover:bg-[#800000]/8 hover:text-[#800000]"
+                ? "bg-[#800000]/10 text-[#800000] shadow-sm ring-1 ring-[#800000]/12"
+                : "text-[#4a1515]/80 hover:bg-[#800000]/6 hover:text-[#800000]"
             )}
           >
             {active && (
               <span
                 aria-hidden
-                className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#ffd700]"
+                className="absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[#800000]"
               />
             )}
-            <Icon className={cn("size-4", active && "text-[#ffd700]")} />
+            <Icon className={cn("size-4", active && "text-[#800000]")} />
             {label}
           </Link>
         );

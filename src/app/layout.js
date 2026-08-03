@@ -49,6 +49,7 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${montserrat.variable} ${poppins.variable} h-full antialiased`}
     >
       <head>

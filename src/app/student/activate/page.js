@@ -40,14 +40,15 @@ export default async function StudentActivatePage() {
     .order("section_name");
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 py-10 sm:px-6">
+    <div className="min-h-screen bg-[#f7f4f1] px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-3xl">
-        <Card className="border-[#800000]/10 shadow-lg">
+        <Card className="overflow-hidden shadow-[0_16px_36px_-20px_rgba(61,18,18,0.35)]">
+          <div className="h-[3px] w-full bg-linear-to-r from-[#800000] via-[#b33a3a] to-transparent" />
           <CardHeader>
             <p className="text-xs font-semibold tracking-[0.18em] text-[#800000] uppercase">
               Phase 2 · First login profile
             </p>
-            <CardTitle className="text-2xl text-[#3d1212]">
+            <CardTitle className="text-2xl font-bold text-[#3d1212]">
               Complete your personal details
             </CardTitle>
             <p className="text-sm text-muted-foreground">

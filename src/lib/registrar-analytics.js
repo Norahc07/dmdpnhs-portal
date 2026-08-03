@@ -154,7 +154,7 @@ export async function fetchRegistrarAnalytics(supabase) {
     { data: sections, error: sectionsError },
     { data: students, error: studentsError },
     { data: assignments, error: assignmentsError },
-    { data: grades, error: gradesError },
+    gradesResult,
     { data: classRecords, error: classRecordsError },
   ] = await Promise.all([
     supabase
@@ -175,6 +175,24 @@ export async function fetchRegistrarAnalytics(supabase) {
       .select("id, workflow_status, teacher_assignments(school_year)"),
   ]);
 
+  let grades = gradesResult.data || [];
+  let gradesError = gradesResult.error;
+
+  // grades-term-upgrade.sql may not be applied yet in some environments
+  if (
+    gradesError &&
+    /school_year/i.test(String(gradesError.message || ""))
+  ) {
+    const fallback = await supabase
+      .from("grades")
+      .select("student_id, final_transmuted_grade");
+    gradesError = fallback.error;
+    grades = (fallback.data || []).map((row) => ({
+      ...row,
+      school_year: SCHOOL_YEAR_DEFAULT,
+    }));
+  }
+
   const firstError =
     sectionsError ||
     studentsError ||
@@ -189,7 +207,7 @@ export async function fetchRegistrarAnalytics(supabase) {
     sections: sections || [],
     students: students || [],
     assignments: assignments || [],
-    grades: grades || [],
+    grades,
     classRecords: classRecords || [],
   });
 }

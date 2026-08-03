@@ -50,9 +50,9 @@ export function GradebookWorkspace({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-xl border border-[#800000]/10 bg-white p-4 md:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)] md:grid-cols-4 sm:p-5">
         <div className="space-y-1.5">
-          <Label>Section</Label>
+          <Label className="text-[#3d1212]">Section</Label>
           <Select
             items={sectionItems}
             value={selected.sectionId || ""}
@@ -71,7 +71,7 @@ export function GradebookWorkspace({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Subject</Label>
+          <Label className="text-[#3d1212]">Subject</Label>
           <Select
             items={subjectItems}
             value={selected.subjectId || ""}
@@ -90,7 +90,7 @@ export function GradebookWorkspace({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Quarter</Label>
+          <Label className="text-[#3d1212]">Quarter</Label>
           <Select
             items={quarterItems}
             value={String(selected.quarter || "1")}
@@ -142,7 +142,7 @@ export function GradebookWorkspace({
           }
         />
       ) : (
-        <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <p className="rounded-2xl border border-dashed border-[#800000]/20 bg-white p-8 text-center text-sm text-muted-foreground shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
           Select a section and subject to open the gradebook.
         </p>
       )}

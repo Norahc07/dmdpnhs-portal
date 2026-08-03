@@ -1,15 +1,45 @@
-/** Term codes stored in grades.quarter (1–3). */
+/** Term codes stored in grades.quarter and class_records.term (1–3). */
 export const GRADE_TERMS = [
-  { value: 1, key: "term1", shortLabel: "1st Term", label: "1st Term" },
-  { value: 2, key: "term2", shortLabel: "2nd Term", label: "2nd Term" },
-  { value: 3, key: "finalTerm", shortLabel: "Final Term", label: "Final Term" },
+  {
+    value: 1,
+    key: "term1",
+    shortLabel: "1st Term",
+    label: "1st Term",
+  },
+  {
+    value: 2,
+    key: "term2",
+    shortLabel: "2nd Term",
+    label: "2nd Term",
+  },
+  {
+    value: 3,
+    key: "finalTerm",
+    shortLabel: "Final Term",
+    label: "Final Term",
+  },
 ];
 
 export const PASSING_GRADE = 75;
 
+export function normalizeGradeTerm(term) {
+  const n = Number(term);
+  return [1, 2, 3].includes(n) ? n : 1;
+}
+
 export function termLabel(term) {
   const found = GRADE_TERMS.find((t) => t.value === Number(term));
   return found?.label || `Term ${term}`;
+}
+
+export function termShortLabel(term) {
+  const found = GRADE_TERMS.find((t) => t.value === Number(term));
+  return found?.shortLabel || `Term ${term}`;
+}
+
+export function termGradeFieldKey(term) {
+  const found = GRADE_TERMS.find((t) => t.value === Number(term));
+  return found?.key || "term1";
 }
 
 export function termOptionLabel(term, schoolYear) {

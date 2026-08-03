@@ -14,6 +14,11 @@
 --   - supabase/seed-student-dashboard-demo.sql
 --   - supabase/profile-upgrade.sql   (teacher personal fields + avatars storage)
 --   - supabase/grade-validation-upgrade.sql  (departments, dept heads, grade lock workflow)
+--   - supabase/seed-grade7-sections-2025-2026.sql  (17 G7 + 2 LWD/SNED sections, SY 2025-2026)
+--   - supabase/seed-grade8-sections-2025-2026.sql  (18 G8 sections, SY 2025-2026)
+--   - supabase/seed-grade9-sections-2025-2026.sql  (17 G9 sections + ICT/FCS/AFA tracks, SY 2025-2026)
+--   - supabase/seed-grade10-sections-2025-2026.sql (14 G10 sections + ICT/Cookery/Drafting tracks, SY 2025-2026)
+--   - supabase/seed-jhs-faculty-subjects-2025-2026.sql (departments, G7–10 subjects, adviser accounts + linking)
 --
 -- After profile-upgrade.sql, student/teacher can use My Profile:
 --   /student/profile · /teacher/profile  (photo upload / selfie + personal details)
@@ -42,6 +47,14 @@
 --   Access code: P26-10001
 --   Linked to: Juan Dela Cruz (LRN 111111111111)
 --   Try: /parent/grades → term dropdown (1st / 2nd / Final)
+--
+-- PARENT (demo grades + attendance — Orchid locked + 6 live sections)
+--   Access code: P26-GRADS
+--   Email:       parent.grades.demo@dmdpnhs.edu.ph
+--   Password:    Parent@2026!
+--   Linked to:   sample learners in Orchid (locked grades) and
+--                Lily / Daisy / Jasmine / Tulip / Sunflower / Hibiscus (live WW/PT)
+--   Try: /parent/grades · /parent/attendance
 --
 -- STUDENTS (active)
 --   LRN 111111111111 / demo123   Juan Dela Cruz

@@ -177,7 +177,8 @@ export default async function StudentDashboardPage({ searchParams }) {
           profile={profile}
           student={student}
           termLabel={termLabel}
-          enrolled={enrolled && activated}
+          activated={activated}
+          enrolled={enrolled}
         />
 
         {activated ? (

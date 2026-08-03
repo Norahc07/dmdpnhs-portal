@@ -32,11 +32,11 @@ function DetailChip({ icon: Icon, label, value, wide }) {
         wide && "sm:col-span-2"
       )}
     >
-      <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-[#ffd700]/90 uppercase">
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-[#800000]/75 uppercase">
         {Icon ? <Icon className="size-3.5 opacity-90" /> : null}
         {label}
       </div>
-      <p className="font-(family-name:--font-montserrat) text-sm font-semibold text-white sm:text-[15px]">
+      <p className="font-(family-name:--font-montserrat) text-sm font-semibold text-[#3d1212] sm:text-[15px]">
         {value}
       </p>
     </div>
@@ -56,54 +56,50 @@ export function TeacherProfileBanner({
     : "No advisory assigned";
 
   return (
-    <section className="portal-overview-banner rounded-2xl text-white">
+    <section className="portal-overview-banner rounded-2xl">
       <div className="relative z-10">
-        <div className="border-b border-white/15 px-5 py-4 sm:px-6">
-          <p className="text-xs font-semibold tracking-[0.2em] text-[#ffd700] uppercase">
-            Welcome to your dashboard
-          </p>
-          <h2 className="mt-1 font-heading text-xl font-bold sm:text-2xl">
-            Teacher overview
-          </h2>
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#800000]/10 px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-xs font-semibold tracking-[0.18em] text-[#800000] uppercase">
+              Welcome
+            </p>
+            <h2 className="mt-1 font-heading text-xl font-bold text-[#3d1212] sm:text-2xl">
+              Teacher overview
+            </h2>
+          </div>
+          <Link
+            href="/teacher/profile"
+            className="text-xs font-medium text-[#800000] underline-offset-2 hover:underline"
+          >
+            Edit profile
+          </Link>
         </div>
 
         <div className="grid gap-5 p-5 sm:grid-cols-[auto_1fr] sm:gap-6 sm:p-6">
-          <div className="flex flex-col items-center gap-3 sm:items-start">
-            <div className="relative">
-              <div
-                aria-hidden
-                className="absolute -inset-1 rounded-[1.15rem] bg-linear-to-br from-[#ffd700]/70 via-white/20 to-transparent opacity-80 blur-[1px]"
-              />
-              <div className="relative size-28 overflow-hidden rounded-2xl border border-white/25 bg-[#5c0000]/80 shadow-xl sm:size-32">
-                {profile?.avatar_url ? (
-                  <Image
-                    src={profile.avatar_url}
-                    alt={formatName(profile)}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-white/15 to-transparent font-(family-name:--font-montserrat) text-3xl font-bold tracking-wide text-white">
-                    {initials(profile)}
-                  </div>
-                )}
-              </div>
+          <div className="flex flex-col items-center gap-2 sm:items-start">
+            <div className="relative size-28 overflow-hidden rounded-full border-[3px] border-white bg-[#f3ebe8] shadow-[0_12px_28px_-12px_rgba(61,18,18,0.4)] ring-1 ring-[#800000]/15 sm:size-32">
+              {profile?.avatar_url ? (
+                <Image
+                  src={profile.avatar_url}
+                  alt={formatName(profile)}
+                  fill
+                  unoptimized
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-[#800000]/12 to-[#800000]/5 font-(family-name:--font-montserrat) text-3xl font-bold tracking-wide text-[#800000]">
+                  {initials(profile)}
+                </div>
+              )}
             </div>
-            <Link
-              href="/teacher/profile"
-              className="text-xs font-medium text-[#ffd700] underline-offset-2 hover:underline"
-            >
-              Edit profile photo
-            </Link>
           </div>
 
           <div className="min-w-0">
             <div className="portal-detail-chip mb-3 rounded-xl px-4 py-3.5">
-              <p className="text-[11px] font-medium tracking-wide text-[#ffd700]/90 uppercase">
+              <p className="text-[11px] font-medium tracking-wide text-[#800000]/75 uppercase">
                 Full name
               </p>
-              <p className="mt-1 font-(family-name:--font-montserrat) text-xl font-bold tracking-tight sm:text-2xl">
+              <p className="mt-1 font-(family-name:--font-montserrat) text-xl font-bold tracking-tight text-[#3d1212] sm:text-2xl">
                 {formatName(profile)}
               </p>
             </div>
@@ -136,23 +132,23 @@ export function TeacherProfileBanner({
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href="/teacher/gradebook"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#800000] px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#6a0000]"
               >
                 <BookOpen className="size-3.5" />
                 Class records
               </Link>
               <Link
                 href="/teacher/attendance"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-white px-3.5 text-xs font-semibold text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-[#faf7f5]"
               >
-                <ClipboardList className="size-3.5" />
+                <ClipboardList className="size-3.5 text-[#800000]" />
                 Attendance
               </Link>
               <Link
                 href="/teacher/students"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-white px-3.5 text-xs font-semibold text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-[#faf7f5]"
               >
-                <Users className="size-3.5" />
+                <Users className="size-3.5 text-[#800000]" />
                 My students
               </Link>
             </div>

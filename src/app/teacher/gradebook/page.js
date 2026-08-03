@@ -30,13 +30,34 @@ export default async function TeacherGradebookPage() {
     ...new Set((assignments || []).map((item) => item.section_id)),
   ];
   const assignmentIds = (assignments || []).map((item) => item.id);
-  let recordIds = new Set();
+
+  /** @type {Map<string, Record<number, string>>} */
+  const recordsByAssignment = new Map();
   if (assignmentIds.length) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("class_records")
-      .select("assignment_id")
+      .select("assignment_id, term, workflow_status")
       .in("assignment_id", assignmentIds);
-    recordIds = new Set((data || []).map((record) => record.assignment_id));
+
+    if (!error) {
+      for (const record of data || []) {
+        const term = Number(record.term) || 1;
+        const existing = recordsByAssignment.get(record.assignment_id) || {};
+        existing[term] = record.workflow_status || "draft";
+        recordsByAssignment.set(record.assignment_id, existing);
+      }
+    } else if (String(error.message || "").toLowerCase().includes("term")) {
+      // Legacy DB without term column — treat existing row as term 1
+      const { data: legacy } = await supabase
+        .from("class_records")
+        .select("assignment_id, workflow_status")
+        .in("assignment_id", assignmentIds);
+      for (const record of legacy || []) {
+        recordsByAssignment.set(record.assignment_id, {
+          1: record.workflow_status || "draft",
+        });
+      }
+    }
   }
 
   let students = [];
@@ -52,12 +73,13 @@ export default async function TeacherGradebookPage() {
   const groupsBySection = new Map();
   for (const assignment of assignments || []) {
     if (!assignment.sections) continue;
+    const enriched = {
+      ...assignment,
+      recordsByTerm: recordsByAssignment.get(assignment.id) || {},
+    };
     const existing = groupsBySection.get(assignment.section_id);
     if (existing) {
-      existing.assignments.push({
-        ...assignment,
-        hasRecord: recordIds.has(assignment.id),
-      });
+      existing.assignments.push(enriched);
       continue;
     }
     groupsBySection.set(assignment.section_id, {
@@ -66,9 +88,7 @@ export default async function TeacherGradebookPage() {
       studentCount: students.filter(
         (student) => student.section_id === assignment.section_id
       ).length,
-      assignments: [
-        { ...assignment, hasRecord: recordIds.has(assignment.id) },
-      ],
+      assignments: [enriched],
     });
   }
 
@@ -84,7 +104,7 @@ export default async function TeacherGradebookPage() {
       profile={profile}
       teacherAccess={teacherAccess}
       title="Class Records"
-      subtitle="Open a handled section and subject to encode grades, review performance, and analyze assessments."
+      subtitle="Create a class record for 1st, 2nd, and Final Term each school year. Submit for department head / committee validation."
     >
       <ClassRecordCards groups={groups} />
     </AppShell>

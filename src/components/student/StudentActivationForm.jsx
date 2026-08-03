@@ -39,7 +39,7 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
 
   return (
     <div className="space-y-8">
-      <section className="space-y-3 rounded-xl border border-[#800000]/10 bg-[#800000]/3 p-4">
+      <section className="space-y-3 rounded-2xl border border-[#800000]/10 bg-[#faf7f5] p-4 shadow-sm">
         <h2 className="font-heading text-lg font-bold text-[#3d1212]">
           Profile photo
         </h2>

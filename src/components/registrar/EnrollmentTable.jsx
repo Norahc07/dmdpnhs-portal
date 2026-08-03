@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { GRADE_LEVELS, SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
+import { SearchInput } from "@/components/ui/search-input";
 
 export function EnrollmentTable({ students, sections }) {
   const schoolYears = useMemo(() => {
@@ -20,6 +21,7 @@ export function EnrollmentTable({ students, sections }) {
     return Array.from(years).sort().reverse();
   }, [sections]);
 
+  const [search, setSearch] = useState("");
   const [schoolYear, setSchoolYear] = useState(schoolYears[0] || SCHOOL_YEAR_DEFAULT);
   const [gradeLevel, setGradeLevel] = useState("all");
   const [sectionId, setSectionId] = useState("all");
@@ -38,6 +40,8 @@ export function EnrollmentTable({ students, sections }) {
     return true;
   });
 
+  const searchQ = search.trim().toLowerCase();
+
   const rows = students.filter((stu) => {
     const sec = stu.section_id ? sectionById[stu.section_id] : null;
     if (sec && sec.school_year !== schoolYear) return false;
@@ -55,6 +59,10 @@ export function EnrollmentTable({ students, sections }) {
       const s = sectionById[stu.section_id];
       if (!s || s.school_year !== schoolYear) return false;
     }
+    if (searchQ) {
+      const hay = `${stu.profiles?.first_name || ""} ${stu.profiles?.last_name || ""} ${stu.lrn || ""}`;
+      if (!hay.toLowerCase().includes(searchQ)) return false;
+    }
     return true;
   });
 
@@ -66,11 +74,21 @@ export function EnrollmentTable({ students, sections }) {
       male: inGrade.filter((r) => r.gender === "Male").length,
       female: inGrade.filter((r) => r.gender === "Female").length,
     };
-  }).filter((t) => t.total > 0 || gradeLevel === "all" || String(gradeLevel) === String(t.grade));
+  });
+
+  const filteredMale = rows.filter((r) => r.gender === "Male").length;
+  const filteredFemale = rows.filter((r) => r.gender === "Female").length;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name or LRN…"
+          className="w-full min-w-[14rem] sm:w-64"
+          aria-label="Search enrollment by name or LRN"
+        />
         <select
           value={schoolYear}
           onChange={(e) => {
@@ -108,7 +126,8 @@ export function EnrollmentTable({ students, sections }) {
           <option value="all">All sections</option>
           {filteredSections.map((s) => (
             <option key={s.id} value={s.id}>
-              G{s.grade_level} {s.section_name}
+              Grade {s.grade_level} · {s.section_name}
+              {s.track_strand ? ` · ${s.track_strand}` : ""}
             </option>
           ))}
         </select>
@@ -123,36 +142,37 @@ export function EnrollmentTable({ students, sections }) {
         </select>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 lg:gap-2.5">
         {totalsByGrade.map((t) => (
           <div
             key={t.grade}
-            className="rounded-xl border border-[#800000]/10 bg-white px-4 py-3 shadow-sm"
+            className="rounded-2xl border border-[#800000]/10 bg-white px-3 py-3 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]"
           >
-            <p className="text-xs font-semibold tracking-wide text-[#800000] uppercase">
+            <p className="text-[10px] font-semibold tracking-wide text-[#800000] uppercase sm:text-xs">
               Grade {t.grade}
             </p>
-            <p className="mt-1 text-2xl font-bold text-[#3d1212]">{t.total}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-1 text-xl font-bold text-[#3d1212] sm:text-2xl">
+              {t.total}
+            </p>
+            <p className="text-[10px] text-muted-foreground sm:text-xs">
               M {t.male} · F {t.female}
             </p>
           </div>
         ))}
-        {gradeLevel === "all" ? (
-          <div className="rounded-xl border border-[#ffd700]/40 bg-[#ffd700]/10 px-4 py-3">
-            <p className="text-xs font-semibold tracking-wide text-[#800000] uppercase">
-              Filtered total
-            </p>
-            <p className="mt-1 text-2xl font-bold text-[#3d1212]">{rows.length}</p>
-            <p className="text-xs text-muted-foreground">
-              M {rows.filter((r) => r.gender === "Male").length} · F{" "}
-              {rows.filter((r) => r.gender === "Female").length}
-            </p>
-          </div>
-        ) : null}
+        <div className="rounded-2xl border border-[#ffd700]/40 bg-[#ffd700]/10 px-3 py-3 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+          <p className="text-[10px] font-semibold tracking-wide text-[#800000] uppercase sm:text-xs">
+            Filtered total
+          </p>
+          <p className="mt-1 text-xl font-bold text-[#3d1212] sm:text-2xl">
+            {rows.length}
+          </p>
+          <p className="text-[10px] text-muted-foreground sm:text-xs">
+            M {filteredMale} · F {filteredFemale}
+          </p>
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         <Table>
           <TableHeader>
             <TableRow>

@@ -19,7 +19,7 @@ export default async function RegistrarRequestsPage() {
       role="registrar"
       profile={profile}
       title="Document Request Pipeline"
-      subtitle="Advance requests: Pending → Processing → Ready for Pickup."
+      subtitle="Pending → Ready for Pickup (SMS) → Already Claimed."
     >
       <DocumentRequestsAdmin requests={requests || []} />
     </AppShell>

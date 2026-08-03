@@ -14,8 +14,18 @@ export default async function RegistrarAcademicsPage() {
     { data: assignments },
     { data: students },
   ] = await Promise.all([
-    supabase.from("subjects").select("*").order("grade_level"),
-    supabase.from("sections").select("*").order("grade_level"),
+    supabase
+      .from("subjects")
+      .select(
+        "id, subject_name, grade_level, track_strand, department_id, written_weight, performance_weight, assessment_weight"
+      )
+      .order("grade_level"),
+    supabase
+      .from("sections")
+      .select(
+        "id, section_name, grade_level, school_year, track_strand, capacity, male_count, female_count, location"
+      )
+      .order("grade_level"),
     supabase
       .from("teachers")
       .select(
@@ -25,7 +35,7 @@ export default async function RegistrarAcademicsPage() {
     supabase
       .from("teacher_assignments")
       .select(
-        "*, teachers(id, teacher_id, profiles(first_name, last_name)), sections(section_name, grade_level), subjects(subject_name, grade_level)"
+        "id, teacher_id, section_id, subject_id, school_year, teachers(id, teacher_id, profiles(first_name, last_name)), sections(section_name, grade_level), subjects(subject_name, grade_level)"
       )
       .order("created_at", { ascending: false }),
     supabase
@@ -33,7 +43,9 @@ export default async function RegistrarAcademicsPage() {
       .select(
         "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name), sections(section_name, grade_level)"
       )
-      .order("lrn"),
+      .in("activation_status", ["active", "pending"])
+      .order("lrn")
+      .limit(500),
   ]);
 
   const activeTeachers = (teachers || []).filter(

@@ -1,22 +1,20 @@
 import { LayoutGrid } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { TermGradesPicker } from "@/components/student/TermGradesPicker";
-import { TermGradesTable } from "@/components/student/TermGradesTable";
+import { EvaluationProgressCard } from "@/components/evaluation/EvaluationProgressCard";
+import { StudentClassRecordSemestralView } from "@/components/student/StudentClassRecordSemestralView";
+import { getStudentSemestralGrades } from "@/actions/student-grades";
+import { getStudentGradesUnlockStatus } from "@/actions/evaluation";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
-import {
-  buildTermOptions,
-  parseTermOptionValue,
-  termLabel,
-  termOptionLabel,
-  termOptionValue,
-} from "@/lib/grades-terms";
+import { currentEvaluationTerm } from "@/lib/evaluation";
 
 export const metadata = { title: "My Grades" };
 
-export default async function StudentGradesPage({ searchParams }) {
-  const params = await searchParams;
-  const { supabase, profile } = await requireRole(["student", "student-enrolled"]);
+export default async function StudentGradesPage() {
+  const { supabase, profile } = await requireRole([
+    "student",
+    "student-enrolled",
+  ]);
 
   const { data: student } = await supabase
     .from("students")
@@ -26,72 +24,102 @@ export default async function StudentGradesPage({ searchParams }) {
     .eq("profile_id", profile.id)
     .maybeSingle();
 
-  const studentId = student?.id || "00000000-0000-0000-0000-000000000000";
+  const studentId = student?.id;
+  const schoolYear = student?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
+  const unlockTerm = currentEvaluationTerm();
 
-  const { data: grades } = await supabase
-    .from("grades")
-    .select("*, subjects(subject_name)")
-    .eq("student_id", studentId)
-    .order("school_year", { ascending: false })
-    .order("quarter")
-    .order("created_at");
+  const unlock = studentId
+    ? await getStudentGradesUnlockStatus({
+        schoolYear,
+        term: unlockTerm,
+      })
+    : { unlocked: false, progress: null };
 
-  const fallbackYear = student?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
-  const options = buildTermOptions(grades || [], fallbackYear);
-
-  const requested = parseTermOptionValue(params.termKey);
-  const selected =
-    (requested &&
-      options.find(
-        (o) => o.schoolYear === requested.schoolYear && o.term === requested.term
-      )) ||
-    options[0] || {
-      value: termOptionValue(1, fallbackYear),
-      label: termOptionLabel(1, fallbackYear),
-      schoolYear: fallbackYear,
-      term: 1,
-    };
-
-  const termGrades = (grades || []).filter(
-    (g) =>
-      g.school_year === selected.schoolYear &&
-      Number(g.quarter) === Number(selected.term)
-  );
+  const semestral = studentId
+    ? await getStudentSemestralGrades({ studentId, schoolYear })
+    : { rows: [], error: null };
 
   const sectionLabel = student?.sections
     ? `Grade ${student.sections.grade_level ?? student.grade_level ?? "—"} - ${student.sections.section_name}`
     : "Not yet assigned";
+
+  const progress = unlock.progress;
+  const unlocked = unlock.unlocked === true;
+  const rows = semestral.rows || [];
 
   return (
     <AppShell
       role="student"
       profile={profile}
       title="My Grades"
-      subtitle="Grades stay available every term until you graduate."
+      subtitle="Class record · live Written & Performance; exams unlock on display date, when finished, or when locked."
       studentAccess={{ activated: true, enrolled: true }}
     >
-      <div className="rounded-xl border border-[#800000]/10 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex items-center gap-2 border-b-2 border-[#800000] pb-2">
-          <LayoutGrid className="size-5 shrink-0 text-[#800000]" />
-          <h3 className="font-heading text-xl font-bold text-[#800000] sm:text-2xl">
-            {termLabel(selected.term)} Grades
-          </h3>
+      <div className="space-y-4">
+        <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+          <div className="portal-panel-head flex items-center gap-3 px-4 py-4 sm:px-6">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#800000]/8 text-[#800000]">
+              <LayoutGrid className="size-5" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+                Class record · student POV
+              </p>
+              <h3 className="font-heading text-xl font-bold text-[#3d1212] sm:text-2xl">
+                My Grades
+              </h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                SY {schoolYear} · your own row only
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 p-4 sm:p-6">
+            <EvaluationProgressCard
+              title={`Term ${unlockTerm} evaluation required`}
+              complete={unlocked}
+              totalCompleted={progress?.totalCompleted || 0}
+              totalRequired={progress?.totalRequired || 1}
+              items={[
+                {
+                  key: "system",
+                  label: "System / portal evaluation",
+                  done: progress?.systemDone,
+                },
+                ...(progress?.teachers || []).map((t) => ({
+                  key: t.key,
+                  label: `${t.subjectName} — ${t.teacherName || "Teacher"}`,
+                  done: t.done,
+                })),
+              ]}
+              ctaHref={unlock.evaluationHref || "/student/evaluation"}
+              ctaLabel="Complete evaluation to unlock grades"
+              lockedMessage="You cannot view grades until evaluations for this term are complete."
+            />
+
+            <p className="rounded-xl border border-[#800000]/08 bg-[#faf7f5]/70 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Section :</span>{" "}
+              <span className="font-semibold text-[#3d1212]">{sectionLabel}</span>
+            </p>
+
+            {semestral.error ? (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {semestral.error}
+              </p>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-4">
-          <TermGradesPicker options={options} selectedValue={selected.value} />
-        </div>
-
-        <p className="mt-4 mb-1 text-sm">
-          <span className="text-muted-foreground">Section :</span>{" "}
-          <span className="font-semibold text-[#3d1212]">{sectionLabel}</span>
-        </p>
-
-        <TermGradesTable
-          grades={termGrades}
-          term={selected.term}
-          emptyMessage="No subject grades posted for this term yet. Grades appear after your teachers save class records."
-        />
+        {unlocked ? (
+          <StudentClassRecordSemestralView
+            rows={rows}
+            emptyMessage="No class record scores yet. Written and Performance appear as your teacher encodes them."
+          />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-[#faf7f5] px-5 py-10 text-center text-sm text-muted-foreground">
+            Grades stay locked until you finish the required evaluations.
+          </div>
+        )}
       </div>
     </AppShell>
   );

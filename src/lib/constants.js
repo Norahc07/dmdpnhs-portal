@@ -4,6 +4,24 @@ export const SCHOOL_SHORT = "DMDPNHS";
 export const APP_NAME = "PastraPortal";
 export const SCHOOL_YEAR_DEFAULT = "2025-2026";
 
+/** Default classroom seat limit when sections.capacity is null */
+export const SECTION_CAPACITY_DEFAULT = 45;
+
+/** Next SY string, e.g. 2025-2026 → 2026-2027 */
+export function nextSchoolYear(schoolYear = SCHOOL_YEAR_DEFAULT) {
+  const parts = String(schoolYear || "").split("-").map((p) => Number(p));
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return "2026-2027";
+  }
+  return `${parts[0] + 1}-${parts[1] + 1}`;
+}
+
+/** Re-enrollment row statuses (enrollments.status) */
+export const ENROLLMENT_STATUSES = {
+  PENDING: "Pending Confirmation",
+  OFFICIAL: "Officially Enrolled",
+};
+
 /** Public portal URL used in SMS messages */
 export function portalBaseUrl() {
   return (
@@ -27,14 +45,40 @@ export const ROLE_HOME = {
   registrar: "/registrar",
 };
 
-export const DOCUMENT_TYPES = [
-  "Form 137",
-  "Certificate of Enrollment",
-  "Good Moral",
-  "Other",
+export const DOCUMENT_TYPES = ["SF9", "SF10", "Good Moral"];
+
+/** Request lifecycle: Pending → Ready for Pickup → Already Claimed */
+export const DOCUMENT_STATUSES = [
+  "Pending",
+  "Ready for Pickup",
+  "Already Claimed",
 ];
 
-export const DOCUMENT_STATUSES = ["Pending", "Processing", "Ready for Pickup"];
+/** Short labels shown next to document type */
+export const DOCUMENT_TYPE_HELP = {
+  SF9: "Report card (School Form 9)",
+  SF10: "Permanent record (School Form 10)",
+  "Good Moral": "Certificate of Good Moral Character",
+};
+
+/** Longer student-facing explanations */
+export const DOCUMENT_TYPE_INFO = [
+  {
+    type: "SF9",
+    title: "SF9 — Report Card",
+    body: "School Form 9 (also called Form 138) is your learner’s report card. It shows subject grades for the grading periods or school year.",
+  },
+  {
+    type: "SF10",
+    title: "SF10 — Permanent Record",
+    body: "School Form 10 (also called Form 137) is your permanent scholastic record. Schools often request it for transfer, enrollment, or further studies.",
+  },
+  {
+    type: "Good Moral",
+    title: "Good Moral Certificate",
+    body: "A Certificate of Good Moral Character confirms you are in good standing. It is commonly required for scholarships, transfer, or other school applications.",
+  },
+];
 
 export const GRADE_LEVELS = [7, 8, 9, 10, 11, 12];
 
@@ -77,22 +121,27 @@ export const QUARTERS = [1, 2, 3];
 /** Term codes: 1 = 1st Term, 2 = 2nd Term, 3 = Final Term */
 export const GRADE_TERM_CODES = [1, 2, 3];
 
-export const ATTENDANCE_STATUSES = ["present", "absent", "late"];
+export const ATTENDANCE_STATUSES = ["present", "absent", "late", "excused"];
 
 export const STATUS_BADGE_STYLES = {
   Pending: "bg-amber-100 text-amber-800 border-amber-200",
   Processing: "bg-sky-100 text-sky-800 border-sky-200",
   "Ready for Pickup": "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "Already Claimed": "bg-sky-100 text-sky-800 border-sky-200",
   pending: "bg-amber-100 text-amber-800 border-amber-200",
   incomplete: "bg-neutral-100 text-neutral-700 border-neutral-200",
   active: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  enrolled: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  remedial: "bg-orange-100 text-orange-800 border-orange-200",
+  promoted: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  remedial: "bg-amber-100 text-amber-900 border-amber-200",
   retained: "bg-rose-100 text-rose-800 border-rose-200",
-  promoted: "bg-blue-100 text-blue-800 border-blue-200",
+  enrolled: "bg-sky-100 text-sky-800 border-sky-200",
+  "Pending Confirmation": "bg-amber-100 text-amber-900 border-amber-200",
+  "Officially Enrolled": "bg-emerald-100 text-emerald-800 border-emerald-200",
   present: "bg-emerald-100 text-emerald-800 border-emerald-200",
   absent: "bg-rose-100 text-rose-800 border-rose-200",
   late: "bg-amber-100 text-amber-800 border-amber-200",
+  tardy: "bg-amber-100 text-amber-800 border-amber-200",
+  excused: "bg-sky-100 text-sky-800 border-sky-200",
   draft: "bg-neutral-100 text-neutral-700 border-neutral-200",
   submitted: "bg-sky-100 text-sky-800 border-sky-200",
   under_review: "bg-amber-100 text-amber-900 border-amber-200",

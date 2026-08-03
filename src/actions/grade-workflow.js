@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   normalizeComponentWeights,
-  resolveTermGrades,
+  resolveGradeForClassRecordTerm,
 } from "@/lib/class-record";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
 import {
@@ -15,7 +15,7 @@ import {
   canSubmitWorkflow,
   canTeacherEditWorkflow,
 } from "@/lib/grade-workflow";
-import { GRADE_TERMS } from "@/lib/grades-terms";
+import { normalizeGradeTerm, termLabel } from "@/lib/grades-terms";
 
 async function getAuthContext() {
   const supabase = await createClient();
@@ -38,7 +38,43 @@ async function writeAudit(admin, row) {
   await admin.from("grade_audit_logs").insert(row);
 }
 
-async function publishGradesFromRecord(admin, { assignment, data, schoolYear }) {
+async function loadClassRecordByAssignmentTerm(admin, assignmentId, term) {
+  const recordTerm = normalizeGradeTerm(term);
+  const withTerm = await admin
+    .from("class_records")
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .eq("term", recordTerm)
+    .maybeSingle();
+
+  if (!withTerm.error) return { record: withTerm.data, term: recordTerm };
+
+  if (
+    String(withTerm.error.message || "")
+      .toLowerCase()
+      .includes("term")
+  ) {
+    if (recordTerm !== 1) {
+      return {
+        error:
+          "Run supabase/class-records-term.sql to enable 2nd and Final Semestral class records.",
+      };
+    }
+    const legacy = await admin
+      .from("class_records")
+      .select("*")
+      .eq("assignment_id", assignmentId)
+      .maybeSingle();
+    return { record: legacy.data, term: 1 };
+  }
+
+  return { error: withTerm.error.message };
+}
+
+async function publishGradesFromRecord(
+  admin,
+  { assignment, data, schoolYear, term }
+) {
   const hps = data?.hps || {
     ww: [],
     pt: [],
@@ -46,40 +82,76 @@ async function publishGradesFromRecord(admin, { assignment, data, schoolYear }) 
   };
   const weights = normalizeComponentWeights(assignment.subjects || {});
   const studentRows = data?.students || {};
+  const recordTerm = normalizeGradeTerm(term);
   const gradeRows = [];
 
   for (const [studentId, studentRow] of Object.entries(studentRows)) {
-    const { term1, term2, finalTerm } = resolveTermGrades(
+    const grade = resolveGradeForClassRecordTerm(
       studentRow,
       hps,
-      weights
+      weights,
+      recordTerm
     );
-    const byTerm = { 1: term1, 2: term2, 3: finalTerm };
-    for (const term of GRADE_TERMS) {
-      const grade = byTerm[term.value];
-      if (grade == null) continue;
-      gradeRows.push({
-        student_id: studentId,
-        subject_id: assignment.subject_id,
-        school_year: schoolYear,
-        quarter: term.value,
-        final_transmuted_grade: grade,
-        written_scores: [],
-        performance_scores: [],
-        assessment_score: null,
-      });
-    }
+    if (grade == null) continue;
+    gradeRows.push({
+      student_id: studentId,
+      subject_id: assignment.subject_id,
+      school_year: schoolYear,
+      quarter: recordTerm,
+      final_transmuted_grade: grade,
+      written_scores: [],
+      performance_scores: [],
+      assessment_score: null,
+    });
   }
 
   if (!gradeRows.length) {
-    return { error: "No term grades to publish. Complete term scores first." };
+    return {
+      error: `No ${termLabel(recordTerm)} scores to publish. Complete the grade sheet first.`,
+    };
   }
 
   const { error } = await admin.from("grades").upsert(gradeRows, {
     onConflict: "student_id,subject_id,school_year,quarter",
   });
   if (error) return { error: error.message };
-  return { ok: true, count: gradeRows.length };
+  return { ok: true, count: gradeRows.length, term: recordTerm };
+}
+
+async function assertDeptHeadCanReviewAssignment(admin, reviewer, assignmentId) {
+  const { data: assignment } = await admin
+    .from("teacher_assignments")
+    .select(
+      "id, subject_id, subjects(id, subject_name, department_id, grade_level)"
+    )
+    .eq("id", assignmentId)
+    .maybeSingle();
+
+  if (!assignment) return { error: "Assignment not found." };
+
+  const subject = assignment.subjects || {};
+  if (subject.department_id && subject.department_id === reviewer.department_id) {
+    return { ok: true, assignment };
+  }
+
+  const { data: dept } = await admin
+    .from("departments")
+    .select("id, name, grade_level")
+    .eq("id", reviewer.department_id)
+    .maybeSingle();
+
+  if (
+    dept &&
+    subject.subject_name &&
+    String(dept.name).toLowerCase() === String(subject.subject_name).toLowerCase()
+  ) {
+    return { ok: true, assignment };
+  }
+
+  return {
+    error:
+      "This class record is outside your department. You can only validate grades for your subject department.",
+  };
 }
 
 function revalidateGradePaths(assignmentId) {
@@ -99,29 +171,48 @@ export async function createDepartment(form) {
 
   const name = String(form.name || "").trim();
   const band = String(form.band || "jhs").trim();
-  const description = String(form.description || "").trim() || null;
+  const gradeLevel = Number(form.gradeLevel);
+
   if (!name) return { error: "Department name is required." };
-  if (!["jhs", "shs", "all"].includes(band)) {
-    return { error: "Select a valid department band." };
+  if (!["jhs", "shs"].includes(band)) {
+    return { error: "Select Junior High or Senior High." };
+  }
+  const allowedGrades = band === "jhs" ? [7, 8, 9, 10] : [11, 12];
+  if (!allowedGrades.includes(gradeLevel)) {
+    return {
+      error:
+        band === "jhs"
+          ? "Select grade 7, 8, 9, or 10."
+          : "Select grade 11 or 12.",
+    };
   }
 
   const admin = createAdminClient();
-  const { error } = await admin.from("departments").insert({
-    name,
-    band,
-    description,
-  });
+  const { data, error } = await admin
+    .from("departments")
+    .insert({
+      name,
+      band,
+      grade_level: gradeLevel,
+      description: null,
+    })
+    .select("id, name, band, grade_level, description")
+    .single();
+
   if (error) return { error: error.message };
 
   revalidatePath("/registrar/teachers");
   revalidatePath("/registrar/academics");
-  return { ok: true };
+  return { ok: true, department: data };
 }
 
 export async function updateTeacherFacultyAssignment({
   teacherId,
-  departmentId,
+  subjectId,
+  band,
+  gradeLevel,
   facultyPosition,
+  departmentId: legacyDepartmentId,
   facultyDept,
 }) {
   const auth = await getAuthContext();
@@ -134,12 +225,74 @@ export async function updateTeacherFacultyAssignment({
   }
 
   const admin = createAdminClient();
+  let departmentId = legacyDepartmentId || null;
+  let subjectName = String(facultyDept || "").trim() || null;
+  const resolvedBand = String(band || "").trim();
+  const resolvedGrade = Number(gradeLevel);
+
+  if (subjectId) {
+    if (!["jhs", "shs"].includes(resolvedBand)) {
+      return { error: "Select Junior High or Senior High." };
+    }
+    const allowedGrades =
+      resolvedBand === "jhs" ? [7, 8, 9, 10] : [11, 12];
+    if (!allowedGrades.includes(resolvedGrade)) {
+      return { error: "Select a valid grade level for this band." };
+    }
+
+    const { data: subject, error: subjectError } = await admin
+      .from("subjects")
+      .select("id, subject_name, grade_level, department_id")
+      .eq("id", subjectId)
+      .maybeSingle();
+
+    if (subjectError) return { error: subjectError.message };
+    if (!subject) return { error: "Subject not found." };
+    if (Number(subject.grade_level) !== resolvedGrade) {
+      return { error: "Selected subject does not match the grade level." };
+    }
+
+    subjectName = subject.subject_name;
+    departmentId = subject.department_id || null;
+
+    if (!departmentId) {
+      const { data: existingDept } = await admin
+        .from("departments")
+        .select("id")
+        .eq("name", subject.subject_name)
+        .eq("band", resolvedBand)
+        .eq("grade_level", resolvedGrade)
+        .maybeSingle();
+
+      if (existingDept?.id) {
+        departmentId = existingDept.id;
+      } else {
+        const { data: createdDept, error: createError } = await admin
+          .from("departments")
+          .insert({
+            name: subject.subject_name,
+            band: resolvedBand,
+            grade_level: resolvedGrade,
+          })
+          .select("id")
+          .single();
+        if (createError) return { error: createError.message };
+        departmentId = createdDept.id;
+      }
+
+      await admin
+        .from("subjects")
+        .update({ department_id: departmentId })
+        .eq("id", subject.id);
+    }
+  }
+
   const { error } = await admin
     .from("teachers")
     .update({
       department_id: departmentId || null,
       faculty_position: position,
-      faculty_dept: String(facultyDept || "").trim() || null,
+      faculty_dept: subjectName,
     })
     .eq("id", teacherId);
 
@@ -148,10 +301,14 @@ export async function updateTeacherFacultyAssignment({
   revalidatePath("/registrar/teachers");
   revalidatePath("/teacher");
   revalidatePath("/teacher/validation");
-  return { ok: true };
+  return { ok: true, departmentId, subjectName };
 }
 
-export async function submitClassRecordForReview({ assignmentId, notes }) {
+export async function submitClassRecordForReview({
+  assignmentId,
+  notes,
+  term = 1,
+}) {
   const auth = await getAuthContext();
   if (auth.error) return auth;
   if (auth.profile.role !== "teacher") return { error: "Unauthorized" };
@@ -172,11 +329,9 @@ export async function submitClassRecordForReview({ assignmentId, notes }) {
   if (!assignment) return { error: "Assignment not found." };
 
   const admin = createAdminClient();
-  const { data: record } = await admin
-    .from("class_records")
-    .select("id, workflow_status, data")
-    .eq("assignment_id", assignmentId)
-    .maybeSingle();
+  const loaded = await loadClassRecordByAssignmentTerm(admin, assignmentId, term);
+  if (loaded.error) return loaded;
+  const record = loaded.record;
 
   if (!record) {
     return { error: "Save the class record before submitting for review." };
@@ -190,7 +345,7 @@ export async function submitClassRecordForReview({ assignmentId, notes }) {
   const { error } = await admin
     .from("class_records")
     .update({
-      workflow_status: GRADE_WORKFLOW.SUBMITTED,
+      workflow_status: GRADE_WORKFLOW.UNDER_REVIEW,
       submitted_at: new Date().toISOString(),
       submitted_by: auth.user.id,
       review_notes: notes ? String(notes).trim() : null,
@@ -207,34 +362,63 @@ export async function submitClassRecordForReview({ assignmentId, notes }) {
     actor_id: auth.user.id,
     action: "submit",
     notes: notes || null,
-    metadata: { from: record.workflow_status, to: GRADE_WORKFLOW.SUBMITTED },
+    metadata: {
+      from: record.workflow_status,
+      to: GRADE_WORKFLOW.UNDER_REVIEW,
+      term: loaded.term,
+    },
   });
 
   revalidateGradePaths(assignmentId);
-  return { ok: true };
+  return { ok: true, term: loaded.term };
 }
 
 export async function returnClassRecordToTeacher({
   assignmentId,
   notes,
+  term = 1,
 }) {
   const auth = await getAuthContext();
   if (auth.error) return auth;
-
-  const admin = createAdminClient();
-  const gate = await assertCanReviewAssignment(auth, admin, assignmentId);
-  if (gate.error) return gate;
-
-  const { record } = gate;
-  if (!canDeptHeadReview(record.workflow_status) && auth.profile.role !== "registrar") {
-    return { error: "This class record is not awaiting review." };
-  }
-  if (record.workflow_status === GRADE_WORKFLOW.LOCKED) {
-    return { error: "Locked grades cannot be returned. Unlock first." };
-  }
+  if (auth.profile.role !== "teacher") return { error: "Unauthorized" };
 
   const noteText = String(notes || "").trim();
-  if (!noteText) return { error: "Add a note explaining what to correct." };
+  if (!noteText) {
+    return { error: "Add a note explaining why the record is returned." };
+  }
+
+  const { data: reviewer } = await auth.supabase
+    .from("teachers")
+    .select("id, faculty_position, department_id")
+    .eq("profile_id", auth.user.id)
+    .maybeSingle();
+
+  if (
+    reviewer?.faculty_position !== "department_head" ||
+    !reviewer.department_id
+  ) {
+    return {
+      error: "Only a department head / committee can return class records.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const access = await assertDeptHeadCanReviewAssignment(
+    admin,
+    reviewer,
+    assignmentId
+  );
+  if (access.error) return access;
+
+  const loaded = await loadClassRecordByAssignmentTerm(admin, assignmentId, term);
+  if (loaded.error) return loaded;
+  const record = loaded.record;
+  if (!record) return { error: "Class record not found." };
+  if (!canDeptHeadReview(record.workflow_status)) {
+    return {
+      error: `Cannot return while status is "${record.workflow_status}".`,
+    };
+  }
 
   const { error } = await admin
     .from("class_records")
@@ -254,30 +438,55 @@ export async function returnClassRecordToTeacher({
     actor_id: auth.user.id,
     action: "return",
     notes: noteText,
-    metadata: { from: record.workflow_status, to: GRADE_WORKFLOW.RETURNED },
+    metadata: {
+      from: record.workflow_status,
+      to: GRADE_WORKFLOW.RETURNED,
+      term: loaded.term,
+    },
   });
 
   revalidateGradePaths(assignmentId);
-  return { ok: true };
+  return { ok: true, term: loaded.term };
 }
 
-export async function endorseClassRecord({ assignmentId, notes }) {
+export async function endorseClassRecord({ assignmentId, notes, term = 1 }) {
   const auth = await getAuthContext();
   if (auth.error) return auth;
+  if (auth.profile.role !== "teacher") return { error: "Unauthorized" };
+
+  const { data: reviewer } = await auth.supabase
+    .from("teachers")
+    .select("id, faculty_position, department_id")
+    .eq("profile_id", auth.user.id)
+    .maybeSingle();
+
+  if (
+    reviewer?.faculty_position !== "department_head" ||
+    !reviewer.department_id
+  ) {
+    return {
+      error: "Only a department head / committee can validate class records.",
+    };
+  }
 
   const admin = createAdminClient();
-  const gate = await assertCanReviewAssignment(auth, admin, assignmentId);
-  if (gate.error) return gate;
+  const access = await assertDeptHeadCanReviewAssignment(
+    admin,
+    reviewer,
+    assignmentId
+  );
+  if (access.error) return access;
 
-  const { record } = gate;
-  if (!canDeptHeadReview(record.workflow_status) && auth.profile.role !== "registrar") {
-    return { error: "This class record is not awaiting review." };
-  }
-  if (record.workflow_status === GRADE_WORKFLOW.LOCKED) {
-    return { error: "Already locked." };
+  const loaded = await loadClassRecordByAssignmentTerm(admin, assignmentId, term);
+  if (loaded.error) return loaded;
+  const record = loaded.record;
+  if (!record) return { error: "Class record not found." };
+  if (!canDeptHeadReview(record.workflow_status)) {
+    return {
+      error: `Cannot validate while status is "${record.workflow_status}".`,
+    };
   }
 
-  // Mark under_review then endorse (committee check complete)
   const { error } = await admin
     .from("class_records")
     .update({
@@ -296,14 +505,22 @@ export async function endorseClassRecord({ assignmentId, notes }) {
     actor_id: auth.user.id,
     action: "endorse",
     notes: notes || null,
-    metadata: { from: record.workflow_status, to: GRADE_WORKFLOW.ENDORSED },
+    metadata: {
+      from: record.workflow_status,
+      to: GRADE_WORKFLOW.ENDORSED,
+      term: loaded.term,
+    },
   });
 
   revalidateGradePaths(assignmentId);
-  return { ok: true };
+  return { ok: true, term: loaded.term };
 }
 
-export async function lockClassRecordGrades({ assignmentId, notes }) {
+export async function lockClassRecordGrades({
+  assignmentId,
+  notes,
+  term = 1,
+}) {
   const auth = await getAuthContext();
   if (auth.error) return auth;
   if (auth.profile.role !== "registrar") {
@@ -321,24 +538,19 @@ export async function lockClassRecordGrades({ assignmentId, notes }) {
 
   if (!assignment) return { error: "Assignment not found." };
 
-  const { data: record } = await admin
-    .from("class_records")
-    .select("*")
-    .eq("assignment_id", assignmentId)
-    .maybeSingle();
+  const loaded = await loadClassRecordByAssignmentTerm(admin, assignmentId, term);
+  if (loaded.error) return loaded;
+  const record = loaded.record;
 
   if (!record) return { error: "Class record not found." };
   if (record.workflow_status === GRADE_WORKFLOW.LOCKED) {
     return { error: "Already locked." };
   }
-  if (!canRegistrarLock(record.workflow_status) && record.workflow_status !== GRADE_WORKFLOW.ENDORSED) {
-    // Allow lock from endorsed; also allow submitted if no dept head yet (fallback)
-    if (record.workflow_status !== GRADE_WORKFLOW.SUBMITTED && record.workflow_status !== GRADE_WORKFLOW.ENDORSED) {
-      return {
-        error:
-          "Lock only after department head endorsement (or submitted if no head assigned).",
-      };
-    }
+  if (!canRegistrarLock(record.workflow_status)) {
+    return {
+      error:
+        "Lock only after the department head / committee validates this class record.",
+    };
   }
 
   const schoolYear =
@@ -351,6 +563,7 @@ export async function lockClassRecordGrades({ assignmentId, notes }) {
     assignment,
     data: record.data,
     schoolYear,
+    term: loaded.term,
   });
   if (published.error) return published;
 
@@ -376,14 +589,19 @@ export async function lockClassRecordGrades({ assignmentId, notes }) {
       from: record.workflow_status,
       to: GRADE_WORKFLOW.LOCKED,
       publishedRows: published.count,
+      term: loaded.term,
     },
   });
 
   revalidateGradePaths(assignmentId);
-  return { ok: true };
+  return { ok: true, term: loaded.term };
 }
 
-export async function unlockClassRecordGrades({ assignmentId, notes }) {
+export async function unlockClassRecordGrades({
+  assignmentId,
+  notes,
+  term = 1,
+}) {
   const auth = await getAuthContext();
   if (auth.error) return auth;
   if (auth.profile.role !== "registrar") {
@@ -394,11 +612,9 @@ export async function unlockClassRecordGrades({ assignmentId, notes }) {
   if (!noteText) return { error: "Add a reason for unlocking." };
 
   const admin = createAdminClient();
-  const { data: record } = await admin
-    .from("class_records")
-    .select("id, workflow_status")
-    .eq("assignment_id", assignmentId)
-    .maybeSingle();
+  const loaded = await loadClassRecordByAssignmentTerm(admin, assignmentId, term);
+  if (loaded.error) return loaded;
+  const record = loaded.record;
 
   if (!record) return { error: "Class record not found." };
   if (record.workflow_status !== GRADE_WORKFLOW.LOCKED) {
@@ -408,7 +624,7 @@ export async function unlockClassRecordGrades({ assignmentId, notes }) {
   const { error } = await admin
     .from("class_records")
     .update({
-      workflow_status: GRADE_WORKFLOW.RETURNED,
+      workflow_status: GRADE_WORKFLOW.ENDORSED,
       locked_at: null,
       locked_by: null,
       review_notes: noteText,
@@ -423,68 +639,15 @@ export async function unlockClassRecordGrades({ assignmentId, notes }) {
     actor_id: auth.user.id,
     action: "unlock",
     notes: noteText,
-    metadata: { from: GRADE_WORKFLOW.LOCKED, to: GRADE_WORKFLOW.RETURNED },
+    metadata: {
+      from: GRADE_WORKFLOW.LOCKED,
+      to: GRADE_WORKFLOW.ENDORSED,
+      term: loaded.term,
+    },
   });
 
   revalidateGradePaths(assignmentId);
-  return { ok: true };
-}
-
-async function assertCanReviewAssignment(auth, admin, assignmentId) {
-  if (auth.profile.role === "registrar") {
-    const { data: record } = await admin
-      .from("class_records")
-      .select("*")
-      .eq("assignment_id", assignmentId)
-      .maybeSingle();
-    if (!record) return { error: "Class record not found." };
-    return { record };
-  }
-
-  if (auth.profile.role !== "teacher") return { error: "Unauthorized" };
-
-  const { data: reviewer } = await admin
-    .from("teachers")
-    .select("id, department_id, faculty_position")
-    .eq("profile_id", auth.user.id)
-    .maybeSingle();
-
-  if (!reviewer) return { error: "Teacher account not found." };
-  if (reviewer.faculty_position !== "department_head") {
-    return {
-      error: "Only department heads (or the registrar) can validate grades.",
-    };
-  }
-  if (!reviewer.department_id) {
-    return { error: "You are not assigned to a department yet." };
-  }
-
-  const { data: assignment } = await admin
-    .from("teacher_assignments")
-    .select(
-      "id, teacher_id, teachers!inner(id, department_id)"
-    )
-    .eq("id", assignmentId)
-    .maybeSingle();
-
-  if (!assignment) return { error: "Assignment not found." };
-  if (assignment.teachers?.department_id !== reviewer.department_id) {
-    return {
-      error: "You can only validate grades within your department.",
-    };
-  }
-
-  const { data: record } = await admin
-    .from("class_records")
-    .select("*")
-    .eq("assignment_id", assignmentId)
-    .maybeSingle();
-
-  if (!record) return { error: "Class record not found." };
-
-  // Own class records: dept head shouldn't endorse their own as sole check —
-  // still allow but registrar lock remains required.
-  return { record, reviewer };
+  return { ok: true, term: loaded.term };
 }
 
 export { canTeacherEditWorkflow };

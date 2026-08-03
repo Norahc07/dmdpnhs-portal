@@ -31,34 +31,29 @@ export async function requireRole(allowedRoles) {
     redirect("/teacher/pending");
   }
 
+  let student = null;
   if (profile.role === "student" && !roles.includes("student-activating")) {
-    const { data: student } = await supabase
+    const { data } = await supabase
       .from("students")
       .select("activation_status, section_id, status")
       .eq("profile_id", user.id)
       .maybeSingle();
+    student = data;
 
     const activation = student?.activation_status || "active";
     if (activation === "incomplete") redirect("/student/activate");
-    // pending students may use temporary dashboard via requireRole("student")
-  }
 
-  if (profile.role === "student" && roles.includes("student-enrolled")) {
-    const { data: student } = await supabase
-      .from("students")
-      .select("activation_status, section_id, status")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-
-    if (student?.activation_status !== "active") {
-      redirect("/student?notice=activation");
+    if (roles.includes("student-enrolled")) {
+      if (student?.activation_status !== "active") {
+        redirect("/student?notice=activation");
+      }
+      const enrolled =
+        student?.status === "enrolled" ||
+        student?.status === "promoted" ||
+        Boolean(student?.section_id);
+      if (!enrolled) redirect("/student?notice=enrollment");
     }
-    const enrolled =
-      student?.status === "enrolled" ||
-      student?.status === "promoted" ||
-      Boolean(student?.section_id);
-    if (!enrolled) redirect("/student?notice=enrollment");
   }
 
-  return { supabase, user, profile };
+  return { supabase, user, profile, student };
 }

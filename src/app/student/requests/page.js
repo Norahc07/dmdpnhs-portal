@@ -24,7 +24,7 @@ export default async function StudentRequestsPage() {
 
   const { data: requests } = await supabase
     .from("document_requests")
-    .select("*")
+    .select("id, document_type, status, notes, requested_at")
     .eq("student_id", student?.id || "00000000-0000-0000-0000-000000000000")
     .order("requested_at", { ascending: false });
 
@@ -33,25 +33,33 @@ export default async function StudentRequestsPage() {
       role="student"
       profile={profile}
       title="Document Requests"
-      subtitle="Request Form 137, Certificate of Enrollment, or Good Moral."
+      subtitle="Request SF9, SF10, or Good Moral. You will be notified when it is Ready for Pickup."
     >
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         {student?.id ? (
           <DocumentRequestForm studentId={student.id} />
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="rounded-2xl border border-dashed border-[#800000]/20 bg-white px-4 py-8 text-sm text-muted-foreground shadow-[0_12px_28px_-20px_rgba(61,18,18,0.25)]">
             Student record not linked yet. Contact the registrar.
           </p>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-[#800000]/10 bg-white">
+        <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+          <div className="portal-panel-head px-4 py-3">
+            <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+              History
+            </p>
+            <h3 className="font-heading text-sm font-bold text-[#3d1212]">
+              Your document requests
+            </h3>
+          </div>
           <Table>
             <TableHeader>
-              <TableRow className="bg-[#800000]/5">
+              <TableRow className="border-[#800000]/10 hover:bg-transparent">
                 <TableHead>Document</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Requested</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>Reason</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -44,10 +44,11 @@ CREATE POLICY "teacher_assignments_registrar_write" ON public.teacher_assignment
     )
   );
 
--- One saved class record per teacher assignment (all tabs stored as JSON)
+-- One saved class record per teacher assignment + term
+-- (term column + UNIQUE(assignment_id, term) added in class-records-term.sql)
 CREATE TABLE IF NOT EXISTS public.class_records (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  assignment_id uuid NOT NULL UNIQUE
+  assignment_id uuid NOT NULL
     REFERENCES public.teacher_assignments(id) ON DELETE CASCADE,
   data jsonb NOT NULL DEFAULT '{}'::jsonb,
   updated_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,

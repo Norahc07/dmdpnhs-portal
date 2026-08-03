@@ -425,13 +425,13 @@ export function GradebookTable({
         </div>
       </div>
 
-      <div className="overflow-auto rounded-xl border border-[#800000]/10 bg-white">
+      <div className="overflow-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id} className="bg-[#800000]/5">
+              <TableRow key={hg.id} className="border-b border-[#800000]/10 bg-[#800000]/5 hover:bg-[#800000]/5">
                 {hg.headers.map((header) => (
-                  <TableHead key={header.id} className="whitespace-nowrap">
+                  <TableHead key={header.id} className="whitespace-nowrap text-[#3d1212]">
                     {header.isPlaceholder
                       ? null
                       : flexRender(

@@ -1,16 +1,10 @@
 import { LayoutGrid } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { TermGradesPicker } from "@/components/student/TermGradesPicker";
-import { TermGradesTable } from "@/components/student/TermGradesTable";
+import { ParentChildPicker } from "@/components/parent/ParentChildPicker";
+import { StudentClassRecordSemestralView } from "@/components/student/StudentClassRecordSemestralView";
+import { getStudentSemestralGrades } from "@/actions/student-grades";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
-import {
-  buildTermOptions,
-  parseTermOptionValue,
-  termLabel,
-  termOptionLabel,
-  termOptionValue,
-} from "@/lib/grades-terms";
 
 export const metadata = { title: "Child Grades" };
 
@@ -26,89 +20,101 @@ export default async function ParentGradesPage({ searchParams }) {
 
   const { data: links } = await supabase
     .from("parent_student_links")
-    .select("student_id")
+    .select(
+      "student_id, students(id, lrn, grade_level, profiles(first_name, last_name), sections(section_name, grade_level, school_year))"
+    )
     .eq("parent_id", parent?.id || "00000000-0000-0000-0000-000000000000");
 
-  const studentIds = (links || []).map((l) => l.student_id);
-
-  const { data: grades } = studentIds.length
-    ? await supabase
-        .from("grades")
-        .select(
-          "*, subjects(subject_name), students(lrn, profiles(first_name, last_name), sections(section_name, grade_level, school_year))"
-        )
-        .in("student_id", studentIds)
-        .order("school_year", { ascending: false })
-        .order("quarter")
-    : { data: [] };
-
-  const fallbackYear =
-    grades?.[0]?.students?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
-  const options = buildTermOptions(grades || [], fallbackYear);
-
-  const requested = parseTermOptionValue(params.termKey);
+  const children = (links || []).map((l) => l.students).filter(Boolean);
+  const requestedId = params.studentId;
   const selected =
-    (requested &&
-      options.find(
-        (o) => o.schoolYear === requested.schoolYear && o.term === requested.term
-      )) ||
-    options[0] || {
-      value: termOptionValue(1, fallbackYear),
-      label: termOptionLabel(1, fallbackYear),
-      schoolYear: fallbackYear,
-      term: 1,
-    };
+    children.find((c) => c.id === requestedId) || children[0] || null;
 
-  const termGrades = (grades || []).filter(
-    (g) =>
-      g.school_year === selected.schoolYear &&
-      Number(g.quarter) === Number(selected.term)
-  );
+  const schoolYear = selected?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
 
-  const sections = [
-    ...new Set(
-      termGrades
-        .map((g) =>
-          g.students?.sections
-            ? `Grade ${g.students.sections.grade_level} - ${g.students.sections.section_name}`
-            : null
-        )
-        .filter(Boolean)
-    ),
-  ];
+  const semestral = selected?.id
+    ? await getStudentSemestralGrades({
+        studentId: selected.id,
+        schoolYear,
+      })
+    : { rows: [] };
+
+  const sectionLabel = selected?.sections
+    ? `Grade ${selected.sections.grade_level ?? selected.grade_level ?? "—"} - ${selected.sections.section_name}`
+    : selected
+      ? `Grade ${selected.grade_level || "—"}`
+      : "Not yet assigned";
+
+  const childName = selected
+    ? `${selected.profiles?.last_name || "—"}, ${selected.profiles?.first_name || "—"}`
+    : null;
 
   return (
     <AppShell
       role="parent"
       profile={profile}
       title="Grades"
-      subtitle="Term grades for linked learners, kept by school year."
+      subtitle={
+        childName
+          ? `Class record for ${childName} — live WW/PT; exams gated until display date, finished, or locked.`
+          : "Grades for linked learners."
+      }
     >
-      <div className="rounded-xl border border-[#800000]/10 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex items-center gap-2 border-b-2 border-[#800000] pb-2">
-          <LayoutGrid className="size-5 shrink-0 text-[#800000]" />
-          <h3 className="font-heading text-xl font-bold text-[#800000] sm:text-2xl">
-            {termLabel(selected.term)} Grades
-          </h3>
-        </div>
+      <div className="space-y-4">
+        {children.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-white px-5 py-10 text-center text-sm text-muted-foreground shadow-[0_12px_28px_-20px_rgba(61,18,18,0.25)]">
+            No learners linked to this parent account yet.
+          </div>
+        ) : (
+          <>
+            <ParentChildPicker
+              childrenList={children}
+              selectedId={selected?.id}
+            />
 
-        <div className="mt-4">
-          <TermGradesPicker options={options} selectedValue={selected.value} />
-        </div>
+            <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+              <div className="portal-panel-head flex items-center gap-3 px-4 py-4 sm:px-6">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#800000]/8 text-[#800000]">
+                  <LayoutGrid className="size-5" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+                    Class record · parent POV
+                  </p>
+                  <h3 className="font-heading text-xl font-bold text-[#3d1212] sm:text-2xl">
+                    Learner grades
+                  </h3>
+                  {childName ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {childName}
+                      {selected?.lrn ? ` · LRN ${selected.lrn}` : ""} · SY{" "}
+                      {schoolYear}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="p-4 sm:p-6">
+                <p className="mb-4 rounded-xl border border-[#800000]/08 bg-[#faf7f5]/70 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Section :</span>{" "}
+                  <span className="font-semibold text-[#3d1212]">
+                    {sectionLabel}
+                  </span>
+                </p>
+                {semestral.error ? (
+                  <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {semestral.error}
+                  </p>
+                ) : null}
+              </div>
+            </div>
 
-        <p className="mt-4 mb-1 text-sm">
-          <span className="text-muted-foreground">Section :</span>{" "}
-          <span className="font-semibold text-[#3d1212]">
-            {sections.length ? sections.join(", ") : "—"}
-          </span>
-        </p>
-
-        <TermGradesTable
-          grades={termGrades}
-          term={selected.term}
-          showLearner
-          emptyMessage="No grades available for this term yet."
-        />
+            <StudentClassRecordSemestralView
+              rows={semestral.rows || []}
+              emptyMessage="No class record scores yet for this learner."
+              privacyLabel="This learner only"
+            />
+          </>
+        )}
       </div>
     </AppShell>
   );

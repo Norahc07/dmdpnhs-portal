@@ -28,7 +28,7 @@ const WHY_BUILT = [
   },
   {
     title: "DepEd-aligned classroom tools",
-    body: "Teachers record grades and attendance in one place; the registrar manages faculty approval, learner progression, documents, and school forms.",
+    body: "Teachers record grades and attendance in one place; the registrar manages faculty approval, learner progression, and document requests.",
   },
   {
     title: "One secure digital campus",
@@ -57,7 +57,8 @@ const GUIDES = [
       "Wait on the temporary dashboard while the registrar verifies your record and calls the parent number.",
       "After approval, you get an SMS; parents get their Access Code by SMS from DMDPNHS.",
       "Check My Grades and Attendance once you are activated and enrolled in a section/subjects.",
-      "Open Documents to request Form 137, Certificate of Enrollment, Good Moral, or Other.",
+      "Open Evaluation to rate the portal and each subject teacher every term.",
+      "Open Documents to request SF9, SF10, or Good Moral.",
     ],
   },
   {
@@ -84,7 +85,7 @@ const GUIDES = [
       "Wait on the pending page until the registrar approves your account.",
       "After approval, sign in and open the Teacher dashboard (maroon welcome overview).",
       "Use Gradebook to encode DepEd-weighted grades and optionally broadcast term grades via SMS to parents.",
-      "Use Attendance to mark present, absent, or late. Absences can trigger SMS to linked parents.",
+      "Use Attendance to mark present, absent, tardy, or excused by subject period. Absences can trigger SMS to linked parents.",
     ],
   },
   {
@@ -97,9 +98,9 @@ const GUIDES = [
       "Sign in with your registrar credentials and go to the Registrar dashboard.",
       "On Activations: review student Phase 2 details, call the parent number to confirm it works, then Verify & Approve.",
       "Approve or reject pending faculty on Faculty.",
-      "Manage learner status on Students (promote, transfer, retain, remedial).",
-      "Process document requests: Pending → Processing → Ready for Pickup.",
-      "Export school forms (SF1 / SF2 / SF5) from School Forms.",
+      "Manage learner status on Promotion (promote, transfer, retain, remedial).",
+      "Process document requests: Pending → Ready for Pickup → Already Claimed.",
+      "Lock & publish submitted class records on Grade Lock.",
     ],
   },
 ];
@@ -128,7 +129,7 @@ const CONNECTIONS = [
   {
     from: "Student",
     to: "Registrar",
-    text: "Submits document requests; the registrar advances status until Ready for Pickup.",
+    text: "Requests SF9, SF10, or Good Moral, then claims it when Ready for Pickup.",
   },
   {
     from: "Student",

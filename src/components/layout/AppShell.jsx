@@ -133,7 +133,8 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-[#f7f4f1]">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-[#800000]/10 bg-white md:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-[#800000]/10 bg-white shadow-[4px_0_24px_-20px_rgba(61,18,18,0.35)] md:flex">
+        <div className="h-[3px] w-full bg-linear-to-r from-[#800000] via-[#b33a3a] to-transparent" />
         <SidebarBody
           role={role}
           studentAccess={studentAccess}
@@ -231,16 +232,19 @@ export function AppShell({
       </div>
 
       <main className="min-h-screen md:ml-64">
-        <div className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <div className="px-4 py-4 sm:px-6 lg:px-8">
           {(title || subtitle) && (
-            <header className="mb-6">
+            <header className="mb-5">
+              <p className="portal-page-kicker">PastraPortal</p>
               {title && (
-                <h2 className="text-2xl font-semibold tracking-tight text-[#3d1212]">
+                <h2 className="mt-1 font-heading text-xl font-bold tracking-tight text-[#3d1212] sm:text-2xl">
                   {title}
                 </h2>
               )}
               {subtitle && (
-                <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                  {subtitle}
+                </p>
               )}
             </header>
           )}

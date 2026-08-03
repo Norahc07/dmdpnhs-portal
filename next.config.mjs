@@ -1,13 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // Persist Turbopack artifacts between restarts (faster cold starts).
-    turbopackFileSystemCacheForDev: true,
+    // Windows + long project paths: FS cache compaction can stall nav for minutes.
+    turbopackFileSystemCacheForDev: process.platform !== "win32",
     // Tree-shake barrel packages so each page compiles less code.
     optimizePackageImports: [
       "lucide-react",
       "@base-ui/react",
       "@tanstack/react-table",
+      "recharts",
     ],
     serverActions: {
       bodySizeLimit: "6mb",

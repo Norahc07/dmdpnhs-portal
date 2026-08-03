@@ -463,6 +463,127 @@ export async function approveStudentActivation({ studentId, approve }) {
   return { ok: true };
 }
 
+/** Registrar updates an activated (or listed) student + linked parent contacts */
+export async function updateActivatedStudent(form) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  const studentId = form.studentId;
+  const firstName = String(form.firstName || "").trim();
+  const lastName = String(form.lastName || "").trim();
+  const contactNumber = String(form.contactNumber || "").trim() || null;
+  const personalEmail = String(form.personalEmail || "").trim() || null;
+  const sectionId = form.sectionId || null;
+  const parentFirstName = String(form.parentFirstName || "").trim();
+  const parentLastName = String(form.parentLastName || "").trim();
+  const parentPhone = String(form.parentPhone || "").trim() || null;
+
+  if (!studentId) return { error: "Student id is required." };
+  if (!firstName || !lastName) {
+    return { error: "Student first and last name are required." };
+  }
+
+  const { data: student } = await admin
+    .from("students")
+    .select("id, profile_id, activation_status")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student) return { error: "Student not found." };
+
+  if (student.profile_id) {
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+      })
+      .eq("id", student.profile_id);
+    if (profileError) return { error: profileError.message };
+  }
+
+  const { error: studentError } = await admin
+    .from("students")
+    .update({
+      contact_number: contactNumber,
+      personal_email: personalEmail,
+      section_id: sectionId,
+      emergency_contact_number: parentPhone,
+    })
+    .eq("id", studentId);
+  if (studentError) return { error: studentError.message };
+
+  const { data: link } = await admin
+    .from("parent_student_links")
+    .select("parent_id, parents(id, profile_id)")
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  if (link?.parents?.id) {
+    if (parentPhone) {
+      await admin
+        .from("parents")
+        .update({ phone_number: parentPhone })
+        .eq("id", link.parents.id);
+    }
+    if (link.parents.profile_id && (parentFirstName || parentLastName)) {
+      const parentUpdate = {};
+      if (parentFirstName) parentUpdate.first_name = parentFirstName;
+      if (parentLastName) parentUpdate.last_name = parentLastName;
+      await admin
+        .from("profiles")
+        .update(parentUpdate)
+        .eq("id", link.parents.profile_id);
+    }
+  }
+
+  revalidatePath("/registrar/activations");
+  revalidatePath("/registrar/enrollment");
+  revalidatePath("/student");
+  return { ok: true };
+}
+
+/** Registrar permanently removes an activated student account */
+export async function deleteActivatedStudent(studentId) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  if (!studentId) return { error: "Student id is required." };
+
+  const { data: student } = await admin
+    .from("students")
+    .select("id, profile_id, activation_status")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student) return { error: "Student not found." };
+
+  await admin.from("parent_student_links").delete().eq("student_id", studentId);
+
+  await admin.from("grades").delete().eq("student_id", studentId);
+  await admin.from("attendance").delete().eq("student_id", studentId);
+
+  const { error: studentError } = await admin
+    .from("students")
+    .delete()
+    .eq("id", studentId);
+  if (studentError) return { error: studentError.message };
+
+  if (student.profile_id) {
+    await admin.from("profiles").delete().eq("id", student.profile_id);
+    try {
+      await admin.auth.admin.deleteUser(student.profile_id);
+    } catch {
+      /* auth user may already be gone */
+    }
+  }
+
+  revalidatePath("/registrar/activations");
+  revalidatePath("/registrar/enrollment");
+  revalidatePath("/registrar");
+  return { ok: true };
+}
+
 /** Registrar creates / enrolls a student stub (LRN + birthdate + placement) */
 export async function enrollStudentByRegistrar(form) {
   const gate = await requireRegistrar();
@@ -600,6 +721,88 @@ export async function createSection(form) {
   if (error) return { error: error.message };
   revalidatePath("/registrar/academics");
   revalidatePath("/registrar/enrollment");
+  return { ok: true };
+}
+
+function optionalInt(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function updateSection(form) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+
+  const id = form.id;
+  const sectionName = String(form.sectionName || "").trim();
+  const gradeLevel = Number(form.gradeLevel);
+  const schoolYear = String(form.schoolYear || SCHOOL_YEAR_DEFAULT).trim();
+  const adviserId = form.adviserId || null;
+  const trackStrand = String(form.trackStrand || "").trim() || null;
+  const location = String(form.location || "").trim() || null;
+  const capacity = optionalInt(form.capacity);
+  const maleCount = optionalInt(form.maleCount);
+  const femaleCount = optionalInt(form.femaleCount);
+
+  if (!id) return { error: "Section id is required." };
+  if (!sectionName) return { error: "Section name is required." };
+  if (![7, 8, 9, 10, 11, 12].includes(gradeLevel)) {
+    return { error: "Select a valid grade level." };
+  }
+
+  let adviserName = String(form.adviserName || "").trim() || null;
+  if (adviserId) {
+    const { data: teacher } = await gate.supabase
+      .from("teachers")
+      .select("profiles(first_name, last_name)")
+      .eq("id", adviserId)
+      .maybeSingle();
+    const full = `${teacher?.profiles?.first_name || ""} ${teacher?.profiles?.last_name || ""}`.trim();
+    if (full) adviserName = full;
+  }
+
+  const { error } = await gate.supabase
+    .from("sections")
+    .update({
+      section_name: sectionName,
+      grade_level: gradeLevel,
+      school_year: schoolYear,
+      adviser_id: adviserId,
+      adviser_name: adviserName,
+      track_strand: trackStrand,
+      location,
+      capacity,
+      male_count: maleCount,
+      female_count: femaleCount,
+    })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/registrar/academics");
+  revalidatePath("/registrar/enrollment");
+  return { ok: true };
+}
+
+export async function deleteSection(id) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  if (!id) return { error: "Section id is required." };
+
+  await gate.supabase
+    .from("students")
+    .update({ section_id: null })
+    .eq("section_id", id);
+
+  await gate.supabase.from("teacher_assignments").delete().eq("section_id", id);
+
+  const { error } = await gate.supabase.from("sections").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/registrar/academics");
+  revalidatePath("/registrar/enrollment");
+  revalidatePath("/registrar/teachers");
+  revalidatePath("/teacher");
   return { ok: true };
 }
 
