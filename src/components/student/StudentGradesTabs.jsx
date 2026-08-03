@@ -11,12 +11,13 @@ import {
 } from "@/components/ui/tabs";
 import { GRADE_TERMS, termLabel } from "@/lib/grades-terms";
 import { cn } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 /**
  * Student/parent grades hub:
  * - Class Record → WW / PT / Examinations (own row only)
  * - Grades → published subject grades (no component scores)
+ * Terms are always viewed one at a time (no "All").
  */
 export function StudentGradesTabs({
   classRecordRows = [],
@@ -25,20 +26,6 @@ export function StudentGradesTabs({
   classRecordEmpty = "No class record scores yet for you.",
   gradesEmpty = "No published subject grades yet.",
 }) {
-  const [termFilter, setTermFilter] = useState("all");
-
-  const classRecordFiltered = useMemo(() => {
-    if (termFilter === "all") return classRecordRows;
-    const t = Number(termFilter);
-    return classRecordRows.filter((r) => Number(r.term) === t);
-  }, [classRecordRows, termFilter]);
-
-  const gradesFiltered = useMemo(() => {
-    if (termFilter === "all") return subjectGradeRows;
-    const t = Number(termFilter);
-    return subjectGradeRows.filter((r) => Number(r.term) === t);
-  }, [subjectGradeRows, termFilter]);
-
   const termsPresent = useMemo(() => {
     const set = new Set([
       ...classRecordRows.map((r) => Number(r.term)),
@@ -47,81 +34,148 @@ export function StudentGradesTabs({
     return GRADE_TERMS.filter((t) => set.has(t.value));
   }, [classRecordRows, subjectGradeRows]);
 
+  const defaultTerm = String(termsPresent[0]?.value || 1);
+  const [termFilter, setTermFilter] = useState(defaultTerm);
+
+  useEffect(() => {
+    if (!termsPresent.length) return;
+    const stillValid = termsPresent.some((t) => String(t.value) === termFilter);
+    if (!stillValid) setTermFilter(String(termsPresent[0].value));
+  }, [termsPresent, termFilter]);
+
+  const selectedTerm = Number(termFilter) || Number(defaultTerm) || 1;
+
+  const classRecordFiltered = useMemo(
+    () => classRecordRows.filter((r) => Number(r.term) === selectedTerm),
+    [classRecordRows, selectedTerm]
+  );
+
+  const gradesFiltered = useMemo(
+    () => subjectGradeRows.filter((r) => Number(r.term) === selectedTerm),
+    [subjectGradeRows, selectedTerm]
+  );
+
+  const classCount = classRecordFiltered.length;
+  const gradeCount = gradesFiltered.length;
+  const selectedLabel = termLabel(selectedTerm);
+
   return (
-    <Tabs defaultValue="class-record" className="gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TabsList className="h-auto w-full justify-start gap-1 rounded-2xl border border-[#800000]/10 bg-white p-1.5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)] sm:w-auto">
-          <TabsTrigger
-            value="class-record"
-            className="h-9 gap-1.5 rounded-xl px-3 text-[#4a1515]/80 data-active:bg-[#800000]/10 data-active:font-semibold data-active:text-[#800000] data-active:shadow-none data-active:ring-1 data-active:ring-[#800000]/12"
+    <Tabs defaultValue="class-record" className="gap-5">
+      <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.28)]">
+        <div className="border-b border-[#800000]/08 bg-linear-to-b from-[#faf7f5] to-white px-3 py-3 sm:px-4">
+          <TabsList
+            className={cn(
+              "group/tabs-list h-11 w-full max-w-md gap-0.5 rounded-xl p-1",
+              "bg-[#800000]/6 text-[#4a1515]/70 shadow-none"
+            )}
           >
-            <BookOpenCheck className="size-3.5" />
-            Class Record
-          </TabsTrigger>
-          <TabsTrigger
-            value="grades"
-            className="h-9 gap-1.5 rounded-xl px-3 text-[#4a1515]/80 data-active:bg-[#800000]/10 data-active:font-semibold data-active:text-[#800000] data-active:shadow-none data-active:ring-1 data-active:ring-[#800000]/12"
-          >
-            <LayoutGrid className="size-3.5" />
-            Grades
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger
+              value="class-record"
+              className={cn(
+                "group h-full flex-1 gap-2 rounded-[10px] px-3 text-[13px] font-medium",
+                "transition-[color,background-color,box-shadow] duration-200 ease-out",
+                "hover:text-[#3d1212]",
+                "data-active:bg-white data-active:font-semibold data-active:text-[#800000]",
+                "data-active:shadow-[0_1px_3px_rgba(61,18,18,0.12),0_0_0_1px_rgba(128,0,0,0.06)]",
+                "data-active:ring-0"
+              )}
+            >
+              <BookOpenCheck className="size-3.5 opacity-80" />
+              <span>Class Record</span>
+              <CountBadge value={classCount} />
+            </TabsTrigger>
+            <TabsTrigger
+              value="grades"
+              className={cn(
+                "group h-full flex-1 gap-2 rounded-[10px] px-3 text-[13px] font-medium",
+                "transition-[color,background-color,box-shadow] duration-200 ease-out",
+                "hover:text-[#3d1212]",
+                "data-active:bg-white data-active:font-semibold data-active:text-[#800000]",
+                "data-active:shadow-[0_1px_3px_rgba(61,18,18,0.12),0_0_0_1px_rgba(128,0,0,0.06)]",
+                "data-active:ring-0"
+              )}
+            >
+              <LayoutGrid className="size-3.5 opacity-80" />
+              <span>Grades</span>
+              <CountBadge value={gradeCount} />
+            </TabsTrigger>
+          </TabsList>
 
-        {termsPresent.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            <TermChip
-              active={termFilter === "all"}
-              onClick={() => setTermFilter("all")}
-              label="All terms"
+          {termsPresent.length > 0 ? (
+            <div
+              role="tablist"
+              aria-label="Select term"
+              className="mt-3 flex items-center gap-1 overflow-x-auto pb-0.5"
+            >
+              <span className="mr-1 shrink-0 text-[10px] font-semibold tracking-[0.14em] text-[#800000]/55 uppercase">
+                Term
+              </span>
+              {termsPresent.map((t) => (
+                <TermChip
+                  key={t.value}
+                  active={selectedTerm === t.value}
+                  onClick={() => setTermFilter(String(t.value))}
+                  label={t.shortLabel}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="p-3 sm:p-4">
+          <TabsContent value="class-record" className="mt-0 space-y-3 outline-none">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Written Works, Performance Tasks, and Examinations —{" "}
+              <span className="font-medium text-[#3d1212]">your scores only</span>
+              {" · "}
+              <span className="font-medium text-[#800000]">{selectedLabel}</span>
+              {classCount > 0 ? (
+                <span className="text-[#800000]/50">
+                  {" "}
+                  · {classCount} subject{classCount === 1 ? "" : "s"}
+                </span>
+              ) : null}
+            </p>
+            <StudentClassRecordSemestralView
+              rows={classRecordFiltered}
+              emptyMessage={`No class record scores for ${selectedLabel} yet.`}
+              privacyLabel={privacyLabel}
             />
-            {termsPresent.map((t) => (
-              <TermChip
-                key={t.value}
-                active={termFilter === String(t.value)}
-                onClick={() => setTermFilter(String(t.value))}
-                label={t.shortLabel}
-              />
-            ))}
-          </div>
-        ) : null}
+          </TabsContent>
+
+          <TabsContent value="grades" className="mt-0 space-y-3 outline-none">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Published subject grades for{" "}
+              <span className="font-medium text-[#800000]">{selectedLabel}</span>
+              . Open{" "}
+              <span className="font-medium text-[#3d1212]">Class Record</span> for
+              component scores
+              {gradeCount > 0 ? (
+                <span className="text-[#800000]/50">
+                  {" "}
+                  · {gradeCount} entr{gradeCount === 1 ? "y" : "ies"}
+                </span>
+              ) : null}
+            </p>
+            <SemestralGradesTable
+              rows={gradesFiltered}
+              emptyMessage={`No published grades for ${selectedLabel} yet.`}
+              gradeColumnLabel={selectedLabel}
+              showTermColumn={false}
+            />
+          </TabsContent>
+        </div>
       </div>
-
-      <TabsContent value="class-record" className="space-y-3">
-        <p className="rounded-xl border border-[#800000]/08 bg-[#faf7f5]/70 px-3 py-2 text-xs text-muted-foreground">
-          Written Works, Performance Tasks, and Examinations from your class
-          record — <span className="font-semibold text-[#3d1212]">your row only</span>
-          . Classmates are never shown.
-        </p>
-        <StudentClassRecordSemestralView
-          rows={classRecordFiltered}
-          emptyMessage={
-            termFilter === "all"
-              ? classRecordEmpty
-              : `No class record scores for ${termLabel(termFilter)} yet.`
-          }
-          privacyLabel={privacyLabel}
-        />
-      </TabsContent>
-
-      <TabsContent value="grades" className="space-y-3">
-        <p className="rounded-xl border border-[#800000]/08 bg-[#faf7f5]/70 px-3 py-2 text-xs text-muted-foreground">
-          Published subject grades (term / semestral). Component scores stay in
-          the Class Record tab.
-        </p>
-        <SemestralGradesTable
-          rows={gradesFiltered}
-          emptyMessage={
-            termFilter === "all"
-              ? gradesEmpty
-              : `No published grades for ${termLabel(termFilter)} yet.`
-          }
-          gradeColumnLabel={
-            termFilter === "all" ? "Grade" : termLabel(termFilter)
-          }
-          showTermColumn={termFilter === "all"}
-        />
-      </TabsContent>
     </Tabs>
+  );
+}
+
+function CountBadge({ value }) {
+  if (!value) return null;
+  return (
+    <span className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[#800000]/8 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#800000] group-data-active:bg-[#800000]/12">
+      {value}
+    </span>
   );
 }
 
@@ -129,12 +183,14 @@ function TermChip({ active, onClick, label }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={cn(
-        "rounded-full px-3 py-1 text-[11px] font-semibold ring-1 transition",
+        "relative shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors duration-150",
         active
-          ? "bg-[#800000] text-white ring-[#800000]"
-          : "bg-white text-[#800000] ring-[#800000]/20 hover:bg-[#800000]/5"
+          ? "bg-[#800000] text-white shadow-sm"
+          : "text-[#4a1515]/75 hover:bg-[#800000]/7 hover:text-[#800000]"
       )}
     >
       {label}
