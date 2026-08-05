@@ -107,7 +107,7 @@ export default async function RegistrarTeachersPage() {
       role="registrar"
       profile={profile}
       title="Faculty directory"
-      subtitle="Approve teachers and assign departments, positions, and teaching loads."
+      subtitle="Add faculty, approve self-registrations, and assign departments, positions, and teaching loads."
     >
       <FacultyDirectory
         teachers={teachersRes.data || []}

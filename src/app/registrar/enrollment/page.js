@@ -13,9 +13,9 @@ export default async function RegistrarEnrollmentPage() {
       .select(
         "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name)"
       )
-      .in("activation_status", ["active", "pending"])
+      .in("activation_status", ["active", "pending", "incomplete"])
       .order("grade_level")
-      .limit(800),
+      .limit(1200),
     supabase
       .from("sections")
       .select(
@@ -29,7 +29,7 @@ export default async function RegistrarEnrollmentPage() {
       role="registrar"
       profile={profile}
       title="School year enrollment"
-      subtitle="Filter by school year, grade level, section, and gender. Totals per grade included."
+      subtitle="Enroll learners for activation, then filter by school year, grade, section, and status."
     >
       <EnrollmentTable
         students={students || []}

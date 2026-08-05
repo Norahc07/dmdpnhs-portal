@@ -11,11 +11,28 @@ import {
   SCHOOL_SHORT,
   SCHOOL_YEAR_DEFAULT,
   studentEmailFromLrn,
+  teacherIdYearCode,
 } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
+import { FACULTY_POSITIONS } from "@/lib/grade-workflow";
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+async function generateTeacherId(admin) {
+  const year = teacherIdYearCode();
+  for (let i = 0; i < 40; i += 1) {
+    const suffix = String(Math.floor(10000 + Math.random() * 90000));
+    const teacherId = `T${year}-${suffix}`;
+    const { data } = await admin
+      .from("teachers")
+      .select("id")
+      .eq("teacher_id", teacherId)
+      .maybeSingle();
+    if (!data) return teacherId;
+  }
+  throw new Error("Unable to generate a unique Teacher ID");
 }
 
 /** Parent Access Code: P{YY}-{XXXXX} — mirrors Teacher ID pattern */
@@ -661,7 +678,135 @@ export async function enrollStudentByRegistrar(form) {
   revalidatePath("/registrar/students");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/registrar/activations");
-  return { ok: true };
+  revalidatePath("/registrar/academics");
+  return {
+    ok: true,
+    message: `Enrolled LRN ${lrn}. Student can activate at /register/student using LRN + birthdate.`,
+    lrn,
+  };
+}
+
+/**
+ * Registrar creates a teacher account (active by default) so they can sign in
+ * without waiting for self-registration approval.
+ */
+export async function createTeacherByRegistrar(form) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  const firstName = String(form.firstName || "").trim();
+  const lastName = String(form.lastName || "").trim();
+  const email = String(form.email || "").trim().toLowerCase();
+  const facultyDept = String(form.facultyDept || "").trim() || null;
+  const departmentId = form.departmentId || null;
+  const facultyPosition = String(form.facultyPosition || "teacher").trim();
+  const tempPassword = String(form.password || "").trim();
+  const password =
+    tempPassword.length >= 8
+      ? tempPassword
+      : `Teach-${crypto.randomUUID().slice(0, 10)}!`;
+
+  const allowedPositions = new Set(FACULTY_POSITIONS.map((p) => p.value));
+  const position = allowedPositions.has(facultyPosition)
+    ? facultyPosition
+    : "teacher";
+
+  if (!firstName || !lastName) {
+    return { error: "First and last name are required." };
+  }
+  if (!email || !email.includes("@")) {
+    return { error: "Enter a valid email address." };
+  }
+
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (existingProfile) {
+    return { error: "A user with this email already exists." };
+  }
+
+  let teacherId;
+  try {
+    teacherId = await generateTeacherId(admin);
+  } catch (err) {
+    return { error: err?.message || "Could not generate Teacher ID." };
+  }
+
+  const { data: created, error: createError } =
+    await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        role: "teacher",
+        first_name: firstName,
+        last_name: lastName,
+      },
+    });
+
+  if (createError) return { error: createError.message };
+  const userId = created.user.id;
+
+  const { error: profileError } = await admin.from("profiles").insert({
+    id: userId,
+    role: "teacher",
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    status: "active",
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(userId);
+    return { error: profileError.message };
+  }
+
+  const teacherPayload = {
+    profile_id: userId,
+    teacher_id: teacherId,
+    faculty_dept: facultyDept,
+    faculty_position: position,
+    units: 0,
+  };
+  if (departmentId) teacherPayload.department_id = departmentId;
+
+  const { error: teacherError } = await admin
+    .from("teachers")
+    .insert(teacherPayload);
+
+  if (teacherError) {
+    // Retry without optional columns if schema is older
+    if (/department_id|faculty_position/i.test(teacherError.message || "")) {
+      const { error: retryErr } = await admin.from("teachers").insert({
+        profile_id: userId,
+        teacher_id: teacherId,
+        faculty_dept: facultyDept,
+        units: 0,
+      });
+      if (retryErr) {
+        await admin.from("profiles").delete().eq("id", userId);
+        await admin.auth.admin.deleteUser(userId);
+        return { error: retryErr.message };
+      }
+    } else {
+      await admin.from("profiles").delete().eq("id", userId);
+      await admin.auth.admin.deleteUser(userId);
+      return { error: teacherError.message };
+    }
+  }
+
+  revalidatePath("/registrar/teachers");
+  revalidatePath("/registrar/academics");
+  return {
+    ok: true,
+    teacherId,
+    email,
+    temporaryPassword: password,
+    message: `Teacher ${teacherId} created and active. They can sign in with email or Teacher ID.`,
+  };
 }
 
 export async function createSubject(form) {

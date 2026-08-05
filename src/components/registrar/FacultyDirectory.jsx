@@ -2,16 +2,28 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ClipboardList, Plus, Users, X } from "lucide-react";
+import { Building2, ClipboardList, Plus, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   createDepartment,
   updateTeacherFacultyAssignment,
 } from "@/actions/grade-workflow";
-import { assignTeacher } from "@/actions/activation";
+import {
+  assignTeacher,
+  createTeacherByRegistrar,
+} from "@/actions/activation";
 import { PendingTeachersTable } from "@/components/registrar/RegistrarPanels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -874,6 +886,9 @@ export function FacultyDirectory({
   const [approvedSearch, setApprovedSearch] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [addTeacherOpen, setAddTeacherOpen] = useState(false);
+  const [addTeacherError, setAddTeacherError] = useState("");
+  const [createdTeacherCreds, setCreatedTeacherCreds] = useState(null);
 
   useEffect(() => {
     setDeptList(departments);
@@ -1233,8 +1248,55 @@ export function FacultyDirectory({
     });
   }
 
+  function submitAddTeacher(formData) {
+    setAddTeacherError("");
+    setCreatedTeacherCreds(null);
+    startTransition(async () => {
+      const result = await createTeacherByRegistrar(
+        Object.fromEntries(formData)
+      );
+      if (result?.error) {
+        setAddTeacherError(result.error);
+        toast.error(result.error);
+        return;
+      }
+      setCreatedTeacherCreds({
+        teacherId: result.teacherId,
+        email: result.email,
+        temporaryPassword: result.temporaryPassword,
+      });
+      toast.success(result.message || "Teacher created.");
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="rounded-2xl border border-[#800000]/10 bg-white px-4 py-3 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.28)] sm:max-w-xl">
+          <p className="text-sm font-semibold text-[#3d1212]">
+            Add faculty accounts
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Create a teacher so they can sign in immediately with email or
+            Teacher ID. Self-registered teachers still appear under Pending
+            approvals.
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            setAddTeacherError("");
+            setCreatedTeacherCreds(null);
+            setAddTeacherOpen(true);
+          }}
+          className="bg-[#800000] hover:bg-[#6a0000]"
+        >
+          <UserPlus className="size-4" />
+          Add teacher
+        </Button>
+      </div>
+
       <Tabs defaultValue="pending" className="w-full">
         <TabsList
           variant="line"
@@ -1589,6 +1651,150 @@ export function FacultyDirectory({
         }}
         onSubmit={saveDepartment}
       />
+
+      <Dialog
+        open={addTeacherOpen}
+        onOpenChange={(open) => {
+          setAddTeacherOpen(open);
+          if (!open) {
+            setAddTeacherError("");
+            setCreatedTeacherCreds(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add teacher</DialogTitle>
+            <DialogDescription>
+              Creates an active faculty account. Share the Teacher ID / email
+              and temporary password so they can sign in at /login/teacher.
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdTeacherCreds ? (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
+                <p className="font-semibold">Teacher created</p>
+                <p className="mt-2 font-mono text-xs">
+                  Teacher ID: {createdTeacherCreds.teacherId}
+                </p>
+                <p className="font-mono text-xs">
+                  Email: {createdTeacherCreds.email}
+                </p>
+                <p className="font-mono text-xs">
+                  Temp password: {createdTeacherCreds.temporaryPassword}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  className="bg-[#800000] hover:bg-[#6a0000]"
+                  onClick={() => {
+                    setAddTeacherOpen(false);
+                    setCreatedTeacherCreds(null);
+                  }}
+                >
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <form
+              className="grid gap-3 sm:grid-cols-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitAddTeacher(new FormData(e.currentTarget));
+              }}
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="teacher-first">First name</Label>
+                <Input id="teacher-first" name="firstName" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="teacher-last">Last name</Label>
+                <Input id="teacher-last" name="lastName" required />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="teacher-email">Email</Label>
+                <Input
+                  id="teacher-email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="name@dmdpnhs.edu.ph"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="teacher-dept">Department</Label>
+                <select
+                  id="teacher-dept"
+                  name="departmentId"
+                  defaultValue=""
+                  className={selectClass}
+                >
+                  <option value="">— Optional —</option>
+                  {deptList.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                      {d.band ? ` · ${bandLabel[d.band] || d.band}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="teacher-position">Position</Label>
+                <select
+                  id="teacher-position"
+                  name="facultyPosition"
+                  defaultValue="teacher"
+                  className={selectClass}
+                >
+                  {FACULTY_POSITIONS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="teacher-password">
+                  Temporary password (optional)
+                </Label>
+                <Input
+                  id="teacher-password"
+                  name="password"
+                  type="text"
+                  minLength={8}
+                  placeholder="Leave blank to auto-generate"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Minimum 8 characters if you set one. Otherwise a secure temp
+                  password is generated.
+                </p>
+              </div>
+              {addTeacherError ? (
+                <p className="text-sm text-rose-700 sm:col-span-2">
+                  {addTeacherError}
+                </p>
+              ) : null}
+              <DialogFooter className="sm:col-span-2">
+                <DialogClose
+                  render={<Button type="button" variant="outline" />}
+                >
+                  Cancel
+                </DialogClose>
+                <Button
+                  type="submit"
+                  disabled={pending}
+                  className="bg-[#800000] hover:bg-[#6a0000]"
+                >
+                  {pending ? "Creating…" : "Create teacher"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
