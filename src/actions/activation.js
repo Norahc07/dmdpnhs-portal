@@ -71,6 +71,21 @@ async function requireRegistrar() {
   return { supabase, user, admin: createAdminClient() };
 }
 
+async function assertSectionMatchesGrade(admin, sectionId, gradeLevel) {
+  if (!sectionId) return null;
+  const { data, error } = await admin
+    .from("sections")
+    .select("id, grade_level")
+    .eq("id", sectionId)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!data) return { error: "Section not found." };
+  if (Number(data.grade_level) !== Number(gradeLevel)) {
+    return { error: "Choose a section that matches the selected grade level." };
+  }
+  return null;
+}
+
 async function findParentByPhone(admin, phone) {
   const digits = normalizePhone(phone);
   if (digits.length < 10) return null;
@@ -144,6 +159,12 @@ export async function submitStudentActivation(form) {
   if (!sectionId) {
     return { error: "Select your section." };
   }
+  const sectionGate = await assertSectionMatchesGrade(
+    admin,
+    sectionId,
+    gradeLevel
+  );
+  if (sectionGate?.error) return sectionGate;
   if (!contactNumber || normalizePhone(contactNumber).length < 10) {
     return { error: "Enter a valid contact number. This is required for SMS notices." };
   }
@@ -406,10 +427,17 @@ export async function updateActivatedStudent(form) {
 
   const { data: student } = await admin
     .from("students")
-    .select("id, profile_id, activation_status")
+    .select("id, profile_id, activation_status, grade_level")
     .eq("id", studentId)
     .maybeSingle();
   if (!student) return { error: "Student not found." };
+
+  const sectionGate = await assertSectionMatchesGrade(
+    admin,
+    sectionId,
+    student.grade_level
+  );
+  if (sectionGate?.error) return sectionGate;
 
   if (student.profile_id) {
     const { error: profileError } = await admin
@@ -523,6 +551,12 @@ export async function enrollStudentByRegistrar(form) {
   if (![7, 8, 9, 10, 11, 12].includes(gradeLevel)) {
     return { error: "Select a valid grade level." };
   }
+  const sectionGate = await assertSectionMatchesGrade(
+    admin,
+    sectionId,
+    gradeLevel
+  );
+  if (sectionGate?.error) return sectionGate;
 
   const email = studentEmailFromLrn(lrn);
 

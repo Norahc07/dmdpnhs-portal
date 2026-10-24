@@ -901,6 +901,8 @@ export function AcademicsManager({
   const [enrollGrade, setEnrollGrade] = useState("all");
   const [enrollSection, setEnrollSection] = useState("all");
   const [enrollQ, setEnrollQ] = useState("");
+  const [enrollFormGrade, setEnrollFormGrade] = useState("7");
+  const [enrollFormSection, setEnrollFormSection] = useState("");
 
   const [assignBand, setAssignBand] = useState("jhs"); // jhs | shs
   const [assignGrade, setAssignGrade] = useState("7");
@@ -1050,6 +1052,10 @@ export function AcademicsManager({
 
   function openModal(type) {
     setFormError("");
+    if (type === "enroll") {
+      setEnrollFormGrade("7");
+      setEnrollFormSection("");
+    }
     setModal(type);
   }
 
@@ -1886,7 +1892,11 @@ export function AcademicsManager({
                   <Label>Grade level</Label>
                   <select
                     name="gradeLevel"
-                    defaultValue="7"
+                    value={enrollFormGrade}
+                    onChange={(e) => {
+                      setEnrollFormGrade(e.target.value);
+                      setEnrollFormSection("");
+                    }}
                     className={selectClass}
                   >
                     {GRADE_LEVELS.map((g) => (
@@ -1898,14 +1908,32 @@ export function AcademicsManager({
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Section</Label>
-                  <select name="sectionId" defaultValue="" className={selectClass}>
+                  <select
+                    name="sectionId"
+                    value={enrollFormSection}
+                    onChange={(e) => setEnrollFormSection(e.target.value)}
+                    className={selectClass}
+                  >
                     <option value="">— Assign later —</option>
-                    {sections.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        Grade {s.grade_level} · {s.section_name} ({s.school_year})
-                      </option>
-                    ))}
+                    {sections
+                      .filter(
+                        (s) =>
+                          String(s.grade_level) === String(enrollFormGrade)
+                      )
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.section_name} ({s.school_year})
+                          {s.track_strand ? ` · ${s.track_strand}` : ""}
+                        </option>
+                      ))}
                   </select>
+                  {!sections.some(
+                    (s) => String(s.grade_level) === String(enrollFormGrade)
+                  ) ? (
+                    <p className="text-xs text-muted-foreground">
+                      No sections for Grade {enrollFormGrade} yet.
+                    </p>
+                  ) : null}
                 </div>
                 {formError ? (
                   <p className="text-sm text-rose-700 sm:col-span-2">{formError}</p>

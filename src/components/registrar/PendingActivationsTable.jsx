@@ -346,12 +346,18 @@ function StudentEditSheet({
                 className={selectClass}
               >
                 <option value="">— Unassigned —</option>
-                {sections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    Grade {s.grade_level} · {s.section_name}
-                    {s.school_year ? ` (${s.school_year})` : ""}
-                  </option>
-                ))}
+                {sections
+                  .filter(
+                    (s) =>
+                      !student.grade_level ||
+                      String(s.grade_level) === String(student.grade_level)
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.section_name}
+                      {s.school_year ? ` (${s.school_year})` : ""}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="rounded-xl border border-[#800000]/10 bg-[#faf7f5] p-3.5 space-y-3">
@@ -682,6 +688,7 @@ export function PendingActivationsTable({
   activatedRows = [],
   sections = [],
   rows,
+  loadError = "",
 }) {
   const [pendingList, setPendingList] = useState(
     pendingRows.length ? pendingRows : rows || []
@@ -797,6 +804,11 @@ export function PendingActivationsTable({
 
   return (
     <div className="space-y-4">
+      {loadError ? (
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {loadError}
+        </p>
+      ) : null}
       <Tabs defaultValue="pending" className="w-full">
         <TabsList
           variant="line"

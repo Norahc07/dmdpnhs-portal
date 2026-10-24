@@ -50,6 +50,8 @@ export function EnrollmentTable({ students, sections }) {
   const [pending, startTransition] = useTransition();
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  const [formGrade, setFormGrade] = useState("7");
+  const [formSection, setFormSection] = useState("");
 
   const schoolYears = useMemo(() => {
     const years = new Set(sections.map((s) => s.school_year).filter(Boolean));
@@ -80,13 +82,15 @@ export function EnrollmentTable({ students, sections }) {
 
   const enrollSections = useMemo(() => {
     return sections
-      .filter((s) => s.school_year === SCHOOL_YEAR_DEFAULT)
-      .sort(
-        (a, b) =>
-          Number(a.grade_level) - Number(b.grade_level) ||
-          String(a.section_name).localeCompare(String(b.section_name))
+      .filter(
+        (s) =>
+          s.school_year === SCHOOL_YEAR_DEFAULT &&
+          String(s.grade_level) === String(formGrade)
+      )
+      .sort((a, b) =>
+        String(a.section_name).localeCompare(String(b.section_name))
       );
-  }, [sections]);
+  }, [sections, formGrade]);
 
   const searchQ = search.trim().toLowerCase();
 
@@ -179,6 +183,8 @@ export function EnrollmentTable({ students, sections }) {
           type="button"
           onClick={() => {
             setFormError("");
+            setFormGrade("7");
+            setFormSection("");
             setEnrollOpen(true);
           }}
           className="bg-[#800000] hover:bg-[#6a0000]"
@@ -410,7 +416,11 @@ export function EnrollmentTable({ students, sections }) {
               <select
                 id="enroll-grade"
                 name="gradeLevel"
-                defaultValue="7"
+                value={formGrade}
+                onChange={(e) => {
+                  setFormGrade(e.target.value);
+                  setFormSection("");
+                }}
                 className={selectClass}
               >
                 {GRADE_LEVELS.map((g) => (
@@ -425,16 +435,23 @@ export function EnrollmentTable({ students, sections }) {
               <select
                 id="enroll-section"
                 name="sectionId"
-                defaultValue=""
+                value={formSection}
+                onChange={(e) => setFormSection(e.target.value)}
                 className={selectClass}
               >
                 <option value="">— Assign later —</option>
                 {enrollSections.map((s) => (
                   <option key={s.id} value={s.id}>
-                    Grade {s.grade_level} · {s.section_name} ({s.school_year})
+                    {s.section_name} ({s.school_year})
+                    {s.track_strand ? ` · ${s.track_strand}` : ""}
                   </option>
                 ))}
               </select>
+              {!enrollSections.length ? (
+                <p className="text-xs text-muted-foreground">
+                  No sections for Grade {formGrade} yet.
+                </p>
+              ) : null}
             </div>
             {formError ? (
               <p className="text-sm text-rose-700 sm:col-span-2">{formError}</p>

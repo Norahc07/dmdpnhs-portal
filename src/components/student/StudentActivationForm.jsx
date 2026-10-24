@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { submitStudentActivation } from "@/actions/activation";
 import { ProfilePicturePicker } from "@/components/profile/ProfilePicturePicker";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,31 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
   const [gradeLevel, setGradeLevel] = useState(
     String(initial?.gradeLevel || sections[0]?.grade_level || "7")
   );
+  const [sectionId, setSectionId] = useState(() => {
+    const grade = String(
+      initial?.gradeLevel || sections[0]?.grade_level || "7"
+    );
+    const match = sections.find(
+      (s) =>
+        s.id === initial?.sectionId && String(s.grade_level) === grade
+    );
+    return match?.id || "";
+  });
 
   const filteredSections = useMemo(
     () =>
       sections.filter((s) => String(s.grade_level) === String(gradeLevel)),
     [sections, gradeLevel]
   );
+
+  useEffect(() => {
+    if (
+      sectionId &&
+      !filteredSections.some((s) => String(s.id) === String(sectionId))
+    ) {
+      setSectionId("");
+    }
+  }, [filteredSections, sectionId]);
 
   function onSubmit(e) {
     e.preventDefault();
@@ -134,11 +153,14 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
               id="sectionId"
               name="sectionId"
               required
-              defaultValue={initial?.sectionId || ""}
+              value={sectionId}
+              onChange={(e) => setSectionId(e.target.value)}
               className="flex h-9 w-full rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
-              <option value="" disabled>
-                Select section
+              <option value="">
+                {filteredSections.length
+                  ? "Select section"
+                  : "No sections for this grade"}
               </option>
               {filteredSections.map((s) => (
                 <option key={s.id} value={s.id}>
