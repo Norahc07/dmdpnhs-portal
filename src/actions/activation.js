@@ -68,7 +68,48 @@ async function requireRegistrar() {
     .single();
 
   if (me?.role !== "registrar") return { error: "Registrar only" };
-  return { supabase, user, admin: createAdminClient() };
+  let admin = null;
+  try {
+    admin = createAdminClient();
+  } catch {
+    admin = null;
+  }
+  return { supabase, user, admin, db: admin || supabase };
+}
+
+async function loadStudentById(db, studentId, extraFields = "") {
+  const id = String(studentId || "").trim();
+  if (!id) return { error: "Student is required." };
+
+  const fields = [
+    "id",
+    "profile_id",
+    "activation_status",
+    "section_id",
+    "status",
+    "lrn",
+    "contact_number",
+    "parent_access_code_shown",
+    "emergency_contact_number",
+    extraFields,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const { data, error } = await db
+    .from("students")
+    .select(fields)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) return { error: "Student not found." };
+  return { student: data };
+}
+
+function parentPhoneFromEmbed(parent) {
+  const row = Array.isArray(parent) ? parent[0] : parent;
+  return row?.phone_number || "";
 }
 
 async function assertSectionMatchesGrade(admin, sectionId, gradeLevel) {
@@ -274,23 +315,20 @@ export async function submitStudentActivation(form) {
 export async function approveStudentActivation({ studentId, approve }) {
   const gate = await requireRegistrar();
   if (gate.error) return gate;
-  const { admin } = gate;
+  const { admin, supabase, db } = gate;
 
-  const { data: student } = await admin
-    .from("students")
-    .select(
-      `id, profile_id, activation_status, section_id, status, lrn, contact_number,
-       parent_access_code_shown, emergency_contact_number,
-       profiles(first_name, last_name),
-       sections(section_name, grade_level)`
-    )
-    .eq("id", studentId)
-    .maybeSingle();
+  let loaded = await loadStudentById(db, studentId);
+  if (loaded.error && supabase && db !== supabase) {
+    loaded = await loadStudentById(supabase, studentId);
+  }
+  if (loaded.error) return loaded;
+  const student = loaded.student;
 
-  if (!student) return { error: "Student not found" };
   if (student.activation_status !== "pending") {
     return { error: "Student is not awaiting activation approval." };
   }
+
+  const writer = admin || supabase;
 
   if (approve) {
     const isEnrolled =
@@ -305,20 +343,39 @@ export async function approveStudentActivation({ studentId, approve }) {
       };
     }
 
-    const { data: link } = await admin
+    let parentPhone = student.emergency_contact_number || "";
+    const { data: links } = await writer
       .from("parent_student_links")
       .select("parent_id, parents(id, access_code, phone_number)")
-      .eq("student_id", studentId)
-      .maybeSingle();
+      .eq("student_id", student.id)
+      .limit(5);
+    for (const link of links || []) {
+      const phone = parentPhoneFromEmbed(link.parents);
+      if (phone) {
+        parentPhone = phone;
+        break;
+      }
+    }
+    if ((!parentPhone || normalizePhone(parentPhone).length < 10) && student.parent_access_code_shown) {
+      const { data: parentByCode } = await writer
+        .from("parents")
+        .select("phone_number")
+        .eq("access_code", student.parent_access_code_shown)
+        .maybeSingle();
+      if (parentByCode?.phone_number) parentPhone = parentByCode.phone_number;
+    }
 
-    const parentPhone =
-      link?.parents?.phone_number || student.emergency_contact_number;
-    const studentName = [
-      student.profiles?.first_name,
-      student.profiles?.last_name,
-    ]
-      .filter(Boolean)
-      .join(" ");
+    let studentName = "";
+    if (student.profile_id) {
+      const { data: profile } = await writer
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", student.profile_id)
+        .maybeSingle();
+      studentName = [profile?.first_name, profile?.last_name]
+        .filter(Boolean)
+        .join(" ");
+    }
 
     if (!parentPhone || normalizePhone(parentPhone).length < 10) {
       return {
@@ -326,16 +383,17 @@ export async function approveStudentActivation({ studentId, approve }) {
           "Parent contact number is missing. Call and verify the parent number before approving.",
       };
     }
-    await admin
+    const { error: activateError } = await writer
       .from("students")
       .update({
         activation_status: "active",
         status: "enrolled",
       })
-      .eq("id", studentId);
+      .eq("id", student.id);
+    if (activateError) return { error: activateError.message };
 
     if (student.profile_id) {
-      await admin
+      await writer
         .from("profiles")
         .update({ status: "active" })
         .eq("id", student.profile_id);
@@ -366,16 +424,16 @@ export async function approveStudentActivation({ studentId, approve }) {
       }
     }
   } else {
-    await admin
+    const { error: returnError } = await writer
       .from("students")
       .update({
         activation_status: "incomplete",
-        // Keep contact details so student can correct and resubmit Phase 2
       })
-      .eq("id", studentId);
+      .eq("id", student.id);
+    if (returnError) return { error: returnError.message };
 
     if (student.profile_id) {
-      await admin
+      await writer
         .from("profiles")
         .update({ status: "pending" })
         .eq("id", student.profile_id);
