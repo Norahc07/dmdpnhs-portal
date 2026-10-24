@@ -102,6 +102,7 @@ export function EducatorResetPasswordForm() {
                 name="password"
                 type="password"
                 autoComplete="new-password"
+                placeholder="Enter a new password"
                 minLength={8}
                 required
                 className={inputClass}
@@ -117,6 +118,7 @@ export function EducatorResetPasswordForm() {
                 name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
+                placeholder="Re-enter the new password"
                 minLength={8}
                 required
                 className={inputClass}

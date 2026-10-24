@@ -159,6 +159,7 @@ export function TeacherClassEventManager({ sections = [], managedEvents = [] }) 
             <Input
               id="class-event-date"
               type="date"
+              placeholder="YYYY-MM-DD"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
               required
@@ -170,6 +171,7 @@ export function TeacherClassEventManager({ sections = [], managedEvents = [] }) 
               <Input
                 id="class-event-start"
                 type="time"
+                placeholder="HH:MM"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
               />
@@ -179,6 +181,7 @@ export function TeacherClassEventManager({ sections = [], managedEvents = [] }) 
               <Input
                 id="class-event-end"
                 type="time"
+                placeholder="HH:MM"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
               />
@@ -191,6 +194,7 @@ export function TeacherClassEventManager({ sections = [], managedEvents = [] }) 
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              placeholder="Details students should know…"
             />
           </div>
           <div className="sm:col-span-2">

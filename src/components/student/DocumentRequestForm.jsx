@@ -81,7 +81,7 @@ export function DocumentRequestForm({ studentId }) {
         <Label>Document type</Label>
         <Select value={documentType} onValueChange={setDocumentType}>
           <SelectTrigger className="w-full">
-            <SelectValue />
+            <SelectValue placeholder="Select document type" />
           </SelectTrigger>
           <SelectContent>
             {DOCUMENT_TYPES.map((t) => (

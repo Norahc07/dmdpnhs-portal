@@ -647,6 +647,7 @@ function InputDataTab({ metadata, students, onChange, termLockedLabel, readOnly 
             </span>
             <Input
               type="date"
+              placeholder="YYYY-MM-DD"
               value={String(metadata.examRevealDate || "").slice(0, 10)}
               onChange={(event) => onChange("examRevealDate", event.target.value)}
               disabled={readOnly}
@@ -862,6 +863,7 @@ function GradeSheet({
                     min="0"
                     value={value}
                     disabled={readOnly}
+                    placeholder="0"
                     onChange={(e) => onHpsChange("ww", index, e.target.value)}
                     className={scoreInputClass()}
                   />
@@ -877,6 +879,7 @@ function GradeSheet({
                     min="0"
                     value={value}
                     disabled={readOnly}
+                    placeholder="0"
                     onChange={(e) => onHpsChange("pt", index, e.target.value)}
                     className={scoreInputClass()}
                   />
@@ -892,6 +895,7 @@ function GradeSheet({
                     min="0"
                     value={hps.exams[exam]}
                     disabled={readOnly}
+                    placeholder="0"
                     onChange={(e) => onHpsChange("exams", exam, e.target.value)}
                     className={scoreInputClass()}
                   />
@@ -1084,7 +1088,7 @@ function TermGradesTab({
                         max="100"
                         value={value}
                         disabled={readOnly}
-                        placeholder={computed != null ? String(computed) : ""}
+                        placeholder={computed != null ? String(computed) : "0"}
                         onChange={(e) =>
                           onScoreChange(
                             student.id,

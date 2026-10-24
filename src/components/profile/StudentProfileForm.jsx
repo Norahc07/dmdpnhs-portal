@@ -8,7 +8,6 @@ import { ChangePasswordForm } from "@/components/student/ChangePasswordForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { cn } from "@/lib/utils";
 
 function buildFormState(profile, student) {
@@ -21,8 +20,7 @@ function buildFormState(profile, student) {
     address: student?.address || "",
     emergencyContactName: student?.emergency_contact_name || "",
     emergencyContactNumber: student?.emergency_contact_number || "",
-    parentEmail: student?.parent_email || "",
-    parentEmailNone: !String(student?.parent_email || "").trim(),
+    emergencyContactAddress: student?.emergency_contact_address || "",
   };
 }
 
@@ -259,6 +257,7 @@ export function StudentProfileForm({
                   id="gradeLevel"
                   value={gradeLevel}
                   disabled
+                  placeholder="Assigned by registrar"
                   className="bg-muted/40"
                 />
               </div>
@@ -268,6 +267,7 @@ export function StudentProfileForm({
                   id="section"
                   value={sectionName}
                   disabled
+                  placeholder="Assigned by registrar"
                   className="bg-muted/40"
                 />
               </div>
@@ -277,6 +277,7 @@ export function StudentProfileForm({
                   id="schoolYear"
                   value={schoolYear}
                   disabled
+                  placeholder="e.g. 2025-2026"
                   className="bg-muted/40"
                 />
               </div>
@@ -351,7 +352,7 @@ export function StudentProfileForm({
           </div>
           <div className="space-y-1">
             <Label htmlFor="emergencyContactName">
-              Emergency / parent contact name
+              Parent / guardian name
             </Label>
             <Input
               id="emergencyContactName"
@@ -364,7 +365,7 @@ export function StudentProfileForm({
           </div>
           <div className="space-y-1">
             <Label htmlFor="emergencyContactNumber">
-              Emergency / parent contact number
+              Parent / guardian contact number
             </Label>
             <Input
               id="emergencyContactNumber"
@@ -377,28 +378,24 @@ export function StudentProfileForm({
               className={cn(locked && "bg-muted/40")}
             />
             <p className="text-[11px] text-muted-foreground">
-              Changing this number updates guardian SMS alerts for absences and
-              grades.
+              Changing this number updates SMS alerts for absences and grades.
             </p>
           </div>
-          <OptionalEmailField
-            className="sm:col-span-2"
-            id="parentEmail"
-            name="parentEmail"
-            label="Parent / guardian email"
-            placeholder="parent@email.com"
-            disabled={locked}
-            value={values.parentEmail}
-            none={Boolean(values.parentEmailNone)}
-            onChange={(next) => setField("parentEmail", next)}
-            onNoneChange={(next) => {
-              setDraft((prev) => ({
-                ...prev,
-                parentEmailNone: next,
-                parentEmail: next ? "" : prev.parentEmail,
-              }));
-            }}
-          />
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="emergencyContactAddress">
+              Parent / guardian address
+            </Label>
+            <Input
+              id="emergencyContactAddress"
+              disabled={locked}
+              placeholder="House No., Street, Barangay, City"
+              value={values.emergencyContactAddress}
+              onChange={(e) =>
+                setField("emergencyContactAddress", e.target.value)
+              }
+              className={cn(locked && "bg-muted/40")}
+            />
+          </div>
         </div>
       </section>
     </form>
@@ -412,7 +409,7 @@ export function StudentProfileForm({
             Change the password used with your LRN
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Enter your current password, then choose a new one.
+            Enter your current password, then choose and confirm a new one.
           </p>
         </div>
         <div className="p-4 sm:p-5">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { KeyRound, UserRound } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { PushNotificationManager } from "@/components/notifications/PushNotificationManager";
 import { requireRole } from "@/lib/auth-guard";
 
 export const metadata = { title: "Account Settings" };
@@ -72,6 +73,8 @@ export default async function StudentSettingsPage() {
           </p>
         </section>
 
+        <div className="space-y-3">
+        <PushNotificationManager variant="card" />
         <section className="space-y-3">
           <Link
             href="/student/profile"
@@ -104,6 +107,7 @@ export default async function StudentSettingsPage() {
             </div>
           </Link>
         </section>
+        </div>
       </div>
     </AppShell>
   );

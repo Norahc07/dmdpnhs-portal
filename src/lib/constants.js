@@ -176,29 +176,18 @@ export const STATUS_BADGE_STYLES = {
   locked: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
-/** Shared year suffix for Teacher / Parent IDs, e.g. 2026 → "26" */
+/** Shared year suffix for Teacher IDs, e.g. 2026 → "26" */
 export function teacherIdYearCode(date = new Date()) {
   return String(date.getFullYear()).slice(-2);
 }
-
-export const parentIdYearCode = teacherIdYearCode;
 
 /** Example Teacher ID format for UI copy, e.g. T26-12345 */
 export function teacherIdFormatExample(date = new Date()) {
   return `T${teacherIdYearCode(date)}-12345`;
 }
 
-/** Example Parent Access Code, e.g. P26-12345 */
-export function parentAccessCodeFormatExample(date = new Date()) {
-  return `P${parentIdYearCode(date)}-12345`;
-}
-
 export function studentEmailFromLrn(lrn) {
   return `${lrn}@student.dmdpnhs.edu.ph`;
-}
-
-export function parentEmailFromCode(accessCode) {
-  return `${accessCode.toLowerCase()}@parent.dmdpnhs.edu.ph`;
 }
 
 export function formatBirthdatePassword(birthdate) {

@@ -161,7 +161,6 @@ function revalidateGradePaths(assignmentId) {
   revalidatePath("/registrar/grades");
   revalidatePath("/registrar/teachers");
   revalidatePath("/student/grades");
-  revalidatePath("/parent/grades");
 }
 
 export async function createDepartment(form) {

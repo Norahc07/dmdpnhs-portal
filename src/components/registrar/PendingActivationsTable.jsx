@@ -21,7 +21,6 @@ import {
   deleteActivatedStudent,
   updateActivatedStudent,
 } from "@/actions/activation";
-import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -184,20 +183,16 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
             />
             <DetailRow label="Section" value={sectionLabel(student)} />
             <DetailRow
-              label="Emergency contact"
+              label="Parent / guardian"
               value={
                 student.parent_name || student.parent_phone
-                  ? `${student.parent_name || "Parent"} · ${student.parent_phone || "—"}`
+                  ? `${student.parent_name || "Contact"} · ${student.parent_phone || "—"}`
                   : null
               }
             />
             <DetailRow
-              label="Parent / guardian email"
-              value={student.parent_email || "None"}
-            />
-            <DetailRow
-              label="Parent code"
-              value={student.parent_access_code_shown}
+              label="Parent / guardian address"
+              value={student.parent_address || null}
             />
             <DetailRow label="Status" value={student.activation_status} />
           </dl>
@@ -252,9 +247,8 @@ function StudentEditSheet({
   const [parentFirstName, setParentFirstName] = useState(parentParts.first);
   const [parentLastName, setParentLastName] = useState(parentParts.last);
   const [parentPhone, setParentPhone] = useState(student?.parent_phone || "");
-  const [parentEmail, setParentEmail] = useState(student?.parent_email || "");
-  const [parentEmailNone, setParentEmailNone] = useState(
-    !String(student?.parent_email || "").trim()
+  const [parentAddress, setParentAddress] = useState(
+    student?.parent_address || ""
   );
 
   useEffect(() => {
@@ -268,8 +262,7 @@ function StudentEditSheet({
     setParentFirstName(parts.first);
     setParentLastName(parts.last);
     setParentPhone(student.parent_phone || "");
-    setParentEmail(student.parent_email || "");
-    setParentEmailNone(!String(student.parent_email || "").trim());
+    setParentAddress(student.parent_address || "");
   }, [open, student]);
 
   return (
@@ -279,7 +272,7 @@ function StudentEditSheet({
       eyebrow="Edit student"
       title={student ? studentFullName(student) : "Student"}
       subtitle={student?.lrn ? `LRN ${student.lrn}` : undefined}
-      description="Update learner and emergency contact details."
+      description="Update learner and parent/guardian contact details."
       closeLabel="Close edit student"
     >
       {student ? (
@@ -298,8 +291,7 @@ function StudentEditSheet({
               parentFirstName,
               parentLastName,
               parentPhone,
-              parentEmail,
-              parentEmailNone,
+              parentAddress,
             });
           }}
         >
@@ -311,6 +303,7 @@ function StudentEditSheet({
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
+                  placeholder="e.g. Juan"
                 />
               </div>
               <div className="space-y-1.5">
@@ -319,6 +312,7 @@ function StudentEditSheet({
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
+                  placeholder="e.g. Dela Cruz"
                 />
               </div>
             </div>
@@ -336,6 +330,7 @@ function StudentEditSheet({
                 type="email"
                 value={personalEmail}
                 onChange={(e) => setPersonalEmail(e.target.value)}
+                placeholder="you@email.com"
               />
             </div>
             <div className="space-y-1.5">
@@ -362,51 +357,42 @@ function StudentEditSheet({
             </div>
             <div className="rounded-xl border border-[#800000]/10 bg-[#faf7f5] p-3.5 space-y-3">
               <p className="text-xs font-semibold tracking-wide text-[#800000] uppercase">
-                Emergency contact (parent)
+                Parent / guardian
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Parent first name</Label>
+                  <Label>First name</Label>
                   <Input
                     value={parentFirstName}
                     onChange={(e) => setParentFirstName(e.target.value)}
+                    placeholder="e.g. Maria"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Parent last name</Label>
+                  <Label>Last name</Label>
                   <Input
                     value={parentLastName}
                     onChange={(e) => setParentLastName(e.target.value)}
+                    placeholder="e.g. Dela Cruz"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Parent phone</Label>
+                <Label>Contact number</Label>
                 <Input
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
                   placeholder="09XXXXXXXXX"
                 />
               </div>
-              <OptionalEmailField
-                id="registrarParentEmail"
-                name="parentEmail"
-                label="Parent / guardian email"
-                placeholder="parent@email.com"
-                value={parentEmail}
-                none={parentEmailNone}
-                onChange={setParentEmail}
-                onNoneChange={(next) => {
-                  setParentEmailNone(next);
-                  if (next) setParentEmail("");
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Parent code:{" "}
-                <span className="font-mono font-semibold text-[#3d1212]">
-                  {student.parent_access_code_shown || "—"}
-                </span>
-              </p>
+              <div className="space-y-1.5">
+                <Label>Address</Label>
+                <Input
+                  value={parentAddress}
+                  onChange={(e) => setParentAddress(e.target.value)}
+                  placeholder="House No., Street, Barangay, City"
+                />
+              </div>
             </div>
             {error ? <p className="text-sm text-rose-700">{error}</p> : null}
           </div>
@@ -447,10 +433,7 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
               </TableHead>
               <TableHead className="font-semibold text-[#3d1212]">LRN</TableHead>
               <TableHead className="font-semibold text-[#3d1212]">
-                Parent
-              </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
-                Parent code
+                Parent / guardian
               </TableHead>
               <TableHead className="font-semibold text-[#3d1212]">
                 Section
@@ -466,7 +449,7 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
           <TableBody>
             {isEmpty ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="h-56 p-0">
+                <TableCell colSpan={6} className="h-56 p-0">
                   <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
                     <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
                       <Users className="size-7" />
@@ -477,7 +460,8 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
                       </p>
                       <p className="max-w-md text-sm text-muted-foreground">
                         Newly enrolled or registered learners appear here.
-                        Verify &amp; Approve after they submit guardian details.
+                        Verify &amp; Approve after they submit emergency contact
+                        details.
                       </p>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
@@ -514,11 +498,6 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
                       <Phone className="size-3 shrink-0" />
                       {row.parent_phone || "—"}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="rounded-md bg-[#ffd700]/15 px-2 py-1 font-mono text-xs font-semibold text-[#3d1212]">
-                      {row.parent_access_code_shown || "—"}
-                    </span>
                   </TableCell>
                   <TableCell className="text-sm">{sectionLabel(row)}</TableCell>
                   <TableCell>
@@ -771,9 +750,7 @@ export function PendingActivationsTable({
                 },
                 parent_name: `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim(),
                 parent_phone: payload.parentPhone || "",
-                parent_email: payload.parentEmailNone
-                  ? ""
-                  : payload.parentEmail || "",
+                parent_address: payload.parentAddress || "",
               }
             : row
         )

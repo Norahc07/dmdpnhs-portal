@@ -31,6 +31,7 @@ ALTER TABLE students ADD COLUMN IF NOT EXISTS personal_email text;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS address text;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS emergency_contact_name text;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS emergency_contact_number text;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS emergency_contact_address text;
 ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_access_code_shown text;
 
 -- Parent extras (1 parent per student activation)

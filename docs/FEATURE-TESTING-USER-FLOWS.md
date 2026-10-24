@@ -25,6 +25,7 @@ Run these in the **Supabase SQL Editor** if they are not applied yet (order matt
 5. `supabase/seed-walkthrough-demo.sql` (demo logins)
 6. `supabase/section-secretary.sql`
 7. `supabase/announcements.sql`
+7b. `supabase/push-subscriptions.sql` (phone notification-bar alerts)
 8. `supabase/student-documents.sql`
 9. `supabase/evaluations-upgrade.sql` then `supabase/evaluations-v2-types.sql` then `supabase/evaluations-self-student.sql`
 10. `supabase/calendar-teacher-events.sql` (if teacher class events fail to save)

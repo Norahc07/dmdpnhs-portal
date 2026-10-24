@@ -61,7 +61,7 @@ export function AnnouncementComposer({
           toast.success(
             initialPost?.id
               ? "Announcement updated."
-              : "Announcement posted to the selected sections."
+              : "Posted. Students in those sections get an in-app notice and a phone alert if they enabled it."
           );
           if (!initialPost?.id) {
             form.reset();

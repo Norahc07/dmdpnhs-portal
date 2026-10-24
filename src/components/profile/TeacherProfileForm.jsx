@@ -257,6 +257,7 @@ export function TeacherProfileForm({ profile, teacher }) {
               <Input
                 id="birthdate"
                 type="date"
+                placeholder="YYYY-MM-DD"
                 disabled={locked}
                 value={values.birthdate}
                 onChange={(e) => setField("birthdate", e.target.value)}

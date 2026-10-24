@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { SCHOOL_SHORT } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
-import { parseOptionalEmail } from "@/lib/optional-email";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -54,63 +53,15 @@ function extensionFor(type) {
   return "jpg";
 }
 
-/**
- * When parent/emergency phone changes: update the linked guardian contact
- * and SMS that absence/grade alerts will go to the new number.
- */
-async function updateGuardianPhoneForStudent({
-  admin,
-  studentId,
-  studentName,
-  newPhone,
-}) {
+async function notifyEmergencyPhoneChange({ studentName, newPhone }) {
   const digits = normalizePhone(newPhone);
   if (digits.length < 10) {
-    return { error: "Enter a valid parent contact number." };
+    return { error: "Enter a valid emergency contact number." };
   }
-
-  const { data: link } = await admin
-    .from("parent_student_links")
-    .select("parent_id, parents(id, phone_number)")
-    .eq("student_id", studentId)
-    .maybeSingle();
-
-  let parent = link?.parents || null;
-
-  if (!parent) {
-    const { data: student } = await admin
-      .from("students")
-      .select("parent_access_code_shown")
-      .eq("id", studentId)
-      .maybeSingle();
-
-    if (student?.parent_access_code_shown) {
-      const { data: byCode } = await admin
-        .from("parents")
-        .select("id, phone_number")
-        .eq("access_code", student.parent_access_code_shown)
-        .maybeSingle();
-      parent = byCode;
-    }
-  }
-
-  if (!parent?.id) {
-    return {
-      skipped: true,
-      reason: "no_parent_linked",
-    };
-  }
-
-  const { error: parentUpdateError } = await admin
-    .from("parents")
-    .update({ phone_number: newPhone })
-    .eq("id", parent.id);
-
-  if (parentUpdateError) return { error: parentUpdateError.message };
 
   const sms = await sendSMS({
     recipient: newPhone,
-    message: `${SCHOOL_SHORT}: Guardian contact number updated for ${studentName || "your child"}. Absence and grade SMS alerts will be sent to this number.`,
+    message: `${SCHOOL_SHORT}: Emergency contact number updated for ${studentName || "a learner"}. Absence and grade SMS alerts will be sent to this number.`,
     triggerType: "activation",
   });
 
@@ -218,6 +169,9 @@ export async function updateStudentProfile(payload) {
   const emergencyContactNumber = String(
     payload.emergencyContactNumber || ""
   ).trim();
+  const emergencyContactAddress = String(
+    payload.emergencyContactAddress || ""
+  ).trim();
 
   if (!firstName || !lastName) {
     return { error: "First and last name are required." };
@@ -230,7 +184,7 @@ export async function updateStudentProfile(payload) {
 
   const { data: student } = await admin
     .from("students")
-    .select("id, emergency_contact_number, parent_access_code_shown")
+    .select("id, emergency_contact_number")
     .eq("profile_id", auth.user.id)
     .maybeSingle();
 
@@ -256,43 +210,35 @@ export async function updateStudentProfile(payload) {
 
   if (profileError) return { error: profileError.message };
 
-  const { error: studentError } = await admin
+  const studentPatch = {
+    contact_number: contactNumber,
+    personal_email: personalEmail || null,
+    address: address || null,
+    emergency_contact_name: emergencyContactName || null,
+    emergency_contact_number: emergencyContactNumber || null,
+    emergency_contact_address: emergencyContactAddress || null,
+  };
+  let { error: studentError } = await admin
     .from("students")
-    .update({
-      contact_number: contactNumber,
-      personal_email: personalEmail || null,
-      address: address || null,
-      emergency_contact_name: emergencyContactName || null,
-      emergency_contact_number: emergencyContactNumber || null,
-    })
+    .update(studentPatch)
     .eq("profile_id", auth.user.id);
+  if (studentError && /emergency_contact_address/i.test(studentError.message || "")) {
+    delete studentPatch.emergency_contact_address;
+    const retry = await admin
+      .from("students")
+      .update(studentPatch)
+      .eq("profile_id", auth.user.id);
+    studentError = retry.error;
+  }
 
   if (studentError) return { error: studentError.message };
-
-  const parentEmail = parseOptionalEmail({
-    email: payload.parentEmail,
-    none: payload.parentEmailNone,
-  });
-  const { data: parentLink } = await admin
-    .from("parent_student_links")
-    .select("parent_id")
-    .eq("student_id", student.id)
-    .maybeSingle();
-  if (parentLink?.parent_id) {
-    await admin
-      .from("parents")
-      .update({ email: parentEmail })
-      .eq("id", parentLink.parent_id);
-  }
 
   let parentAccessUpdated = false;
   let parentSmsSent = false;
 
   if (parentPhoneChanged) {
     const studentName = [firstName, lastName].filter(Boolean).join(" ");
-    const rotated = await updateGuardianPhoneForStudent({
-      admin,
-      studentId: student.id,
+    const rotated = await notifyEmergencyPhoneChange({
       studentName,
       newPhone: emergencyContactNumber,
     });

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
+import { PushNotificationManager } from "@/components/notifications/PushNotificationManager";
 import { MarkNotificationsReadButton } from "@/components/student/MarkNotificationsReadButton";
 import { listStudentNotifications } from "@/actions/announcements";
 import { requireRole } from "@/lib/auth-guard";
@@ -26,6 +27,9 @@ export default async function StudentNotificationsPage() {
       subtitle="Unread teacher posts and portal notices for your section."
       studentAccess={studentAccess}
     >
+      <div className="mb-4">
+        <PushNotificationManager variant="card" />
+      </div>
       <section className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         <div className="portal-panel-head flex flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div>

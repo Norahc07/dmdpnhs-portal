@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { StudentActivationForm } from "@/components/student/StudentActivationForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { parentAccessCodeFormatExample } from "@/lib/constants";
 
 export const metadata = { title: "Complete Profile" };
 
@@ -33,6 +32,12 @@ export default async function StudentActivatePage() {
   if (student.activation_status === "pending") redirect("/student?notice=pending");
   if (student.activation_status === "active") redirect("/student");
 
+  const guardianParts = String(student.emergency_contact_name || "")
+    .trim()
+    .split(/\s+/);
+  const parentLastName = guardianParts.length > 1 ? guardianParts.pop() : "";
+  const parentFirstName = guardianParts.join(" ");
+
   const { data: sections } = await supabase
     .from("sections")
     .select("id, section_name, grade_level, school_year")
@@ -53,9 +58,8 @@ export default async function StudentActivatePage() {
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               LRN {student.lrn}. After you submit, the registrar will verify your
-              record and call your parent number. When approved, parents receive
-              an Access Code like {parentAccessCodeFormatExample()} via SMS from
-              DMDPNHS.
+              record and may call the parent/guardian contact number. When
+              approved you can use the student portal.
             </p>
           </CardHeader>
           <CardContent>
@@ -73,6 +77,10 @@ export default async function StudentActivatePage() {
                 contactNumber: student.contact_number || "",
                 personalEmail: student.personal_email || "",
                 address: student.address || "",
+                parentFirstName,
+                parentLastName,
+                parentPhone: student.emergency_contact_number || "",
+                parentAddress: student.emergency_contact_address || "",
               }}
             />
             <form action={logout} className="mt-6">

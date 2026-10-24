@@ -17,7 +17,7 @@ export default async function TeacherPasswordPage() {
       title="Change Password"
       subtitle="Use your current password, then set a new one for email or Teacher ID sign-in."
     >
-      <ChangePasswordForm />
+      <ChangePasswordForm audience="teacher" />
     </AppShell>
   );
 }

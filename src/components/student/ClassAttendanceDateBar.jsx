@@ -54,6 +54,7 @@ export function ClassAttendanceDateBar({
               value={date}
               disabled={pending}
               onChange={(e) => onDateChange(e.target.value)}
+              placeholder="YYYY-MM-DD"
               className="w-auto min-w-44"
             />
           </div>

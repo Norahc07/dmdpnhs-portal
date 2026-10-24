@@ -651,7 +651,7 @@ export function PromotionManager({ sections = [] }) {
           <Label className="text-xs">EOSY status</Label>
           <Select value={eosyFilter} onValueChange={setEosyFilter} items={EOSY_FILTERS}>
             <SelectTrigger className="w-[10.5rem]">
-              <SelectValue />
+              <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
               {EOSY_FILTERS.map((f) => (
@@ -670,7 +670,7 @@ export function PromotionManager({ sections = [] }) {
             items={ENROLL_FILTERS}
           >
             <SelectTrigger className="w-[12.5rem]">
-              <SelectValue />
+              <SelectValue placeholder="All enrollment" />
             </SelectTrigger>
             <SelectContent>
               {ENROLL_FILTERS.map((f) => (

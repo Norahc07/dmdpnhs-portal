@@ -9,6 +9,7 @@ import { PortalNav } from "@/components/layout/PortalNav";
 import { APP_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { LogOut } from "lucide-react";
+import { PushNotificationManager } from "@/components/notifications/PushNotificationManager";
 
 function MenuToggle({ open, onClick, className }) {
   return (
@@ -271,6 +272,7 @@ export function AppShell({
           {children}
         </div>
       </main>
+      {role === "student" ? <PushNotificationManager /> : null}
     </div>
   );
 }

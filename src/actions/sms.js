@@ -5,16 +5,20 @@ import { createClient } from "@/lib/supabase/server";
 import { sendSMS } from "@/lib/semaphore";
 import { SCHOOL_SHORT } from "@/lib/constants";
 
-async function getParentPhonesForStudent(studentId) {
-  const admin = createAdminClient();
+async function getAlertPhonesForStudent(admin, studentId) {
   const { data } = await admin
-    .from("parent_student_links")
-    .select("parents(phone_number, access_code)")
-    .eq("student_id", studentId);
+    .from("students")
+    .select("contact_number, emergency_contact_number")
+    .eq("id", studentId)
+    .maybeSingle();
 
-  return (data || [])
-    .map((row) => row.parents?.phone_number)
-    .filter(Boolean);
+  return [
+    ...new Set(
+      [data?.emergency_contact_number, data?.contact_number]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    ),
+  ];
 }
 
 export async function sendAbsenceAlert({ studentId, date }) {
@@ -35,10 +39,10 @@ export async function sendAbsenceAlert({ studentId, date }) {
   });
 
   const message = `Good day. ${name} was marked absent today, ${formattedDate}. - ${SCHOOL_SHORT}`;
-  const phones = await getParentPhonesForStudent(studentId);
+  const phones = await getAlertPhonesForStudent(admin, studentId);
 
   if (!phones.length) {
-    return { ok: false, error: "No parent phone numbers linked" };
+    return { ok: false, error: "No emergency or student contact number on file" };
   }
 
   const results = [];
@@ -90,7 +94,7 @@ export async function broadcastQuarterlyGrades({
 
     const name = `${student.profiles?.first_name || ""} ${student.profiles?.last_name || ""}`.trim();
     const message = `Good day. ${name}'s Q${quarter} grade in ${subject?.subject_name || "subject"} is ${tg}. - ${SCHOOL_SHORT}`;
-    const phones = await getParentPhonesForStudent(student.id);
+    const phones = await getAlertPhonesForStudent(admin, student.id);
 
     for (const phone of phones) {
       const result = await sendSMS({

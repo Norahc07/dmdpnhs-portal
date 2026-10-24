@@ -6,7 +6,6 @@ import { ProfilePicturePicker } from "@/components/profile/ProfilePicturePicker"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { GRADE_LEVELS, SCHOOL_SHORT } from "@/lib/constants";
 
 export function StudentActivationForm({ initial, sections = [], profile }) {
@@ -87,9 +86,9 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p className="font-semibold">Important — contact numbers</p>
         <p className="mt-1 text-amber-900/90">
-          Use working mobile numbers for you and your parent/guardian. The
+          Use working mobile numbers for you and your emergency contact. The
           registrar will call to verify before activating your account.{" "}
-          {SCHOOL_SHORT} uses the parent/guardian number for absence and grade
+          {SCHOOL_SHORT} uses the emergency contact number for absence and grade
           SMS alerts after verification.
         </p>
       </div>
@@ -211,11 +210,11 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
 
       <section className="space-y-4">
         <h2 className="font-heading text-lg font-bold text-[#3d1212]">
-          Emergency / parent contact
+          Parent / guardian
         </h2>
         <p className="text-sm text-muted-foreground">
-          Provide parent or guardian details for emergencies and Parent Portal
-          access (grades &amp; attendance monitoring).
+          Name, contact number, and address for school notices. There is no
+          parent portal login.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -239,7 +238,7 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="parentPhone">Parent contact number</Label>
+            <Label htmlFor="parentPhone">Parent / guardian contact number</Label>
             <Input
               id="parentPhone"
               name="parentPhone"
@@ -248,14 +247,6 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
               defaultValue={initial?.parentPhone || ""}
             />
           </div>
-          <OptionalEmailField
-            id="parentEmail"
-            name="parentEmail"
-            label="Parent / guardian email"
-            placeholder="parent@email.com"
-            defaultValue={initial?.parentEmail || ""}
-            defaultNone={Boolean(initial?.parentEmailNone)}
-          />
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="parentAddress">Parent / guardian address</Label>
             <Input

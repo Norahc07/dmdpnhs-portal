@@ -253,6 +253,7 @@ export function SubjectWeightsEditor({
                   type="number"
                   min="0"
                   max="100"
+                  placeholder="0"
                   value={weights[field.key]}
                   onChange={(e) => setField(field.key, e.target.value)}
                   className={cn(

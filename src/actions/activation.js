@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   formatBirthdatePassword,
   isSeniorHighGrade,
-  parentIdYearCode,
   portalBaseUrl,
   SCHOOL_SHORT,
   SCHOOL_YEAR_DEFAULT,
@@ -16,7 +15,6 @@ import {
 } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
 import { FACULTY_POSITIONS } from "@/lib/grade-workflow";
-import { parseOptionalEmail } from "@/lib/optional-email";
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
@@ -35,23 +33,6 @@ async function generateTeacherId(admin) {
     if (!data) return teacherId;
   }
   throw new Error("Unable to generate a unique Teacher ID");
-}
-
-/** Parent Access Code: P{YY}-{XXXXX} — mirrors Teacher ID pattern */
-export async function generateParentAccessCode(admin) {
-  const year = parentIdYearCode();
-
-  for (let i = 0; i < 40; i += 1) {
-    const suffix = String(Math.floor(10000 + Math.random() * 90000));
-    const code = `P${year}-${suffix}`;
-    const { data } = await admin
-      .from("parents")
-      .select("id")
-      .eq("access_code", code)
-      .maybeSingle();
-    if (!data) return code;
-  }
-  throw new Error("Unable to generate a unique Parent Access Code");
 }
 
 async function requireRegistrar() {
@@ -107,11 +88,6 @@ async function loadStudentById(db, studentId, extraFields = "") {
   return { student: data };
 }
 
-function parentPhoneFromEmbed(parent) {
-  const row = Array.isArray(parent) ? parent[0] : parent;
-  return row?.phone_number || "";
-}
-
 async function assertSectionMatchesGrade(admin, sectionId, gradeLevel) {
   if (!sectionId) return null;
   const { data, error } = await admin
@@ -127,23 +103,8 @@ async function assertSectionMatchesGrade(admin, sectionId, gradeLevel) {
   return null;
 }
 
-async function findParentByPhone(admin, phone) {
-  const digits = normalizePhone(phone);
-  if (digits.length < 10) return null;
-
-  const { data } = await admin
-    .from("parents")
-    .select("id, access_code, phone_number, profile_id, profiles(first_name, last_name, email)")
-    .not("phone_number", "is", null);
-
-  return (
-    (data || []).find((p) => normalizePhone(p.phone_number) === digits) || null
-  );
-}
-
 /**
- * Phase 2 — Student completes personal data + parent/guardian emergency contacts.
- * Creates or links a guardian contact record (no parent portal login).
+ * Phase 2 — Student completes personal data and an emergency contact.
  * Registrar must verify before the student portal is fully activated.
  */
 export async function submitStudentActivation(form) {
@@ -184,12 +145,7 @@ export async function submitStudentActivation(form) {
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
-  const parentEmail = parseOptionalEmail({
-    email: form.parentEmail,
-    none: form.parentEmailNone,
-  });
   const parentAddress = String(form.parentAddress || "").trim();
-  const parentRelationship = String(form.parentRelationship || "Guardian").trim();
 
   if (!firstName || !lastName) {
     return { error: "Enter your first and last name." };
@@ -212,64 +168,21 @@ export async function submitStudentActivation(form) {
   if (!address) {
     return { error: "Enter your home address." };
   }
-  if (!emergencyName || !emergencyNumber) {
-    return { error: "Enter emergency contact name and number." };
-  }
-  if (!parentFirstName || !parentLastName || !parentPhone) {
+  const guardianName =
+    `${parentFirstName} ${parentLastName}`.trim() || emergencyName;
+  const guardianPhone = parentPhone || emergencyNumber;
+  const guardianAddress = parentAddress || emergencyAddress;
+  if (!guardianName || !guardianPhone) {
     return {
-      error:
-        "Enter parent/guardian full name and contact number.",
+      error: "Enter parent/guardian full name and contact number.",
     };
   }
-  if (normalizePhone(parentPhone).length < 10) {
+  if (normalizePhone(guardianPhone).length < 10) {
     return { error: "Enter a valid parent/guardian contact number." };
   }
-
-  const existingParent = await findParentByPhone(admin, parentPhone);
-  let accessCode = existingParent?.access_code || null;
-  let parentRowId = existingParent?.id || null;
-
-  if (!existingParent) {
-    accessCode = await generateParentAccessCode(admin);
-    const { data: parentRow, error: parentInsertError } = await admin
-      .from("parents")
-      .insert({
-        access_code: accessCode,
-        phone_number: parentPhone,
-        email: parentEmail,
-        relationship: parentRelationship,
-      })
-      .select("id, access_code")
-      .single();
-
-    if (parentInsertError) return { error: parentInsertError.message };
-    parentRowId = parentRow.id;
-    accessCode = parentRow.access_code || accessCode;
-  } else {
-    await admin
-      .from("parents")
-      .update({
-        phone_number: parentPhone,
-        email: parentEmail,
-        relationship: parentRelationship,
-      })
-      .eq("id", existingParent.id);
-
-    if (existingParent.profile_id) {
-      await admin
-        .from("profiles")
-        .update({
-          first_name: parentFirstName,
-          last_name: parentLastName,
-        })
-        .eq("id", existingParent.profile_id);
-    }
+  if (!guardianAddress) {
+    return { error: "Enter parent/guardian address." };
   }
-
-  await admin.from("parent_student_links").upsert({
-    parent_id: parentRowId,
-    student_id: student.id,
-  });
 
   await admin
     .from("profiles")
@@ -287,22 +200,27 @@ export async function submitStudentActivation(form) {
     address,
     grade_level: gradeLevel,
     section_id: sectionId,
-    emergency_contact_name: emergencyName,
-    emergency_contact_number: emergencyNumber,
-    parent_access_code_shown: accessCode,
+    emergency_contact_name: guardianName,
+    emergency_contact_number: guardianPhone,
+    emergency_contact_address: guardianAddress,
+    parent_access_code_shown: null,
     activation_status: "pending",
     status: "enrolled",
   };
 
-  // Store parent address in emergency address field when provided
-  if (emergencyAddress || parentAddress) {
-    // Keep emergency name/number as primary; address may be appended in notes via address field only for student
-  }
-
-  const { error: updateError } = await admin
+  let { error: updateError } = await admin
     .from("students")
     .update(studentUpdate)
     .eq("id", student.id);
+
+  if (updateError && /emergency_contact_address/i.test(updateError.message || "")) {
+    delete studentUpdate.emergency_contact_address;
+    const retry = await admin
+      .from("students")
+      .update(studentUpdate)
+      .eq("id", student.id);
+    updateError = retry.error;
+  }
 
   if (updateError) return { error: updateError.message };
 
@@ -343,27 +261,7 @@ export async function approveStudentActivation({ studentId, approve }) {
       };
     }
 
-    let parentPhone = student.emergency_contact_number || "";
-    const { data: links } = await writer
-      .from("parent_student_links")
-      .select("parent_id, parents(id, access_code, phone_number)")
-      .eq("student_id", student.id)
-      .limit(5);
-    for (const link of links || []) {
-      const phone = parentPhoneFromEmbed(link.parents);
-      if (phone) {
-        parentPhone = phone;
-        break;
-      }
-    }
-    if ((!parentPhone || normalizePhone(parentPhone).length < 10) && student.parent_access_code_shown) {
-      const { data: parentByCode } = await writer
-        .from("parents")
-        .select("phone_number")
-        .eq("access_code", student.parent_access_code_shown)
-        .maybeSingle();
-      if (parentByCode?.phone_number) parentPhone = parentByCode.phone_number;
-    }
+    const parentPhone = student.emergency_contact_number || "";
 
     let studentName = "";
     if (student.profile_id) {
@@ -380,7 +278,7 @@ export async function approveStudentActivation({ studentId, approve }) {
     if (!parentPhone || normalizePhone(parentPhone).length < 10) {
       return {
         error:
-          "Parent contact number is missing. Call and verify the parent number before approving.",
+          "Parent/guardian contact number is missing. Call and verify it before approving.",
       };
     }
     const { error: activateError } = await writer
@@ -405,7 +303,7 @@ export async function approveStudentActivation({ studentId, approve }) {
     try {
       await sendSMS({
         recipient: parentPhone,
-        message: `${SCHOOL_SHORT}: ${studentName || "Your child"}'s student portal is activated. You will receive SMS alerts for absences and grade updates on this number. Keep it updated with the school.`,
+        message: `${SCHOOL_SHORT}: ${studentName || "A learner"}'s student portal is activated. You will receive SMS alerts for absences and grade updates on this number.`,
         triggerType: "activation",
       });
     } catch {
@@ -473,10 +371,7 @@ export async function updateActivatedStudent(form) {
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim() || null;
-  const parentEmail = parseOptionalEmail({
-    email: form.parentEmail,
-    none: form.parentEmailNone,
-  });
+  const parentAddress = String(form.parentAddress || "").trim() || null;
 
   if (!studentId) return { error: "Student id is required." };
   if (!firstName || !lastName) {
@@ -508,37 +403,28 @@ export async function updateActivatedStudent(form) {
     if (profileError) return { error: profileError.message };
   }
 
-  const { error: studentError } = await admin
+  const studentPatch = {
+    contact_number: contactNumber,
+    personal_email: personalEmail,
+    section_id: sectionId,
+    emergency_contact_name:
+      `${parentFirstName} ${parentLastName}`.trim() || null,
+    emergency_contact_number: parentPhone,
+    emergency_contact_address: parentAddress,
+  };
+  let { error: studentError } = await admin
     .from("students")
-    .update({
-      contact_number: contactNumber,
-      personal_email: personalEmail,
-      section_id: sectionId,
-      emergency_contact_number: parentPhone,
-    })
+    .update(studentPatch)
     .eq("id", studentId);
-  if (studentError) return { error: studentError.message };
-
-  const { data: link } = await admin
-    .from("parent_student_links")
-    .select("parent_id, parents(id, profile_id)")
-    .eq("student_id", studentId)
-    .maybeSingle();
-
-  if (link?.parents?.id) {
-    const parentPatch = { email: parentEmail };
-    if (parentPhone) parentPatch.phone_number = parentPhone;
-    await admin.from("parents").update(parentPatch).eq("id", link.parents.id);
-    if (link.parents.profile_id && (parentFirstName || parentLastName)) {
-      const parentUpdate = {};
-      if (parentFirstName) parentUpdate.first_name = parentFirstName;
-      if (parentLastName) parentUpdate.last_name = parentLastName;
-      await admin
-        .from("profiles")
-        .update(parentUpdate)
-        .eq("id", link.parents.profile_id);
-    }
+  if (studentError && /emergency_contact_address/i.test(studentError.message || "")) {
+    delete studentPatch.emergency_contact_address;
+    const retry = await admin
+      .from("students")
+      .update(studentPatch)
+      .eq("id", studentId);
+    studentError = retry.error;
   }
+  if (studentError) return { error: studentError.message };
 
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
@@ -600,6 +486,10 @@ export async function enrollStudentByRegistrar(form) {
   const gender = String(form.gender || "Male").trim();
   const gradeLevel = Number(form.gradeLevel);
   const sectionId = form.sectionId || null;
+  const parentFirstName = String(form.parentFirstName || "").trim();
+  const parentLastName = String(form.parentLastName || "").trim();
+  const parentPhone = String(form.parentPhone || "").trim();
+  const parentAddress = String(form.parentAddress || "").trim();
   const password = formatBirthdatePassword(birthdate);
 
   if (!/^\d{12}$/.test(lrn)) return { error: "LRN must be exactly 12 digits." };
@@ -615,6 +505,9 @@ export async function enrollStudentByRegistrar(form) {
     gradeLevel
   );
   if (sectionGate?.error) return sectionGate;
+  if (parentPhone && normalizePhone(parentPhone).length < 10) {
+    return { error: "Enter a valid parent/guardian contact number." };
+  }
 
   const email = studentEmailFromLrn(lrn);
 
@@ -650,7 +543,7 @@ export async function enrollStudentByRegistrar(form) {
     return { error: profileError.message };
   }
 
-  const { error: studentError } = await admin.from("students").insert({
+  const studentInsert = {
     profile_id: userId,
     lrn,
     birthdate,
@@ -659,7 +552,21 @@ export async function enrollStudentByRegistrar(form) {
     section_id: sectionId,
     status: "enrolled",
     activation_status: "incomplete",
-  });
+    emergency_contact_name:
+      `${parentFirstName} ${parentLastName}`.trim() || null,
+    emergency_contact_number: parentPhone || null,
+    emergency_contact_address: parentAddress || null,
+  };
+
+  let { error: studentError } = await admin
+    .from("students")
+    .insert(studentInsert);
+
+  if (studentError && /emergency_contact_address/i.test(studentError.message || "")) {
+    delete studentInsert.emergency_contact_address;
+    const retry = await admin.from("students").insert(studentInsert);
+    studentError = retry.error;
+  }
 
   if (studentError) {
     await admin.from("profiles").delete().eq("id", userId);

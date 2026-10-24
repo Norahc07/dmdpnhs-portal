@@ -167,7 +167,6 @@ export async function saveGradeRecord({
 
   revalidatePath("/teacher/gradebook");
   revalidatePath("/student/grades");
-  revalidatePath("/parent/grades");
   return { data: result.data, computed };
 }
 
@@ -559,14 +558,6 @@ export async function updateDocumentRequestStatus({ id, status, notes }) {
         student?.contact_number,
         student?.emergency_contact_number,
       ].filter(Boolean);
-
-      const { data: links } = await admin
-        .from("parent_student_links")
-        .select("parents(phone_number)")
-        .eq("student_id", data.student_id)
-        .limit(1);
-      const parentPhone = links?.[0]?.parents?.phone_number;
-      if (parentPhone) phones.push(parentPhone);
 
       const unique = [...new Set(phones.map((p) => String(p).trim()).filter(Boolean))];
       for (const recipient of unique) {

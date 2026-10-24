@@ -427,6 +427,7 @@ function EditSectionModal({
             value={sectionName}
             onChange={(e) => setSectionName(e.target.value)}
             required
+            placeholder="e.g. Rose"
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -450,6 +451,7 @@ function EditSectionModal({
               value={schoolYear}
               onChange={(e) => setSchoolYear(e.target.value)}
               required
+              placeholder="e.g. 2025-2026"
             />
           </div>
         </div>
@@ -477,6 +479,7 @@ function EditSectionModal({
               min="0"
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
+              placeholder="e.g. 40"
             />
           </div>
           <div className="space-y-1.5">
@@ -486,6 +489,7 @@ function EditSectionModal({
               min="0"
               value={maleCount}
               onChange={(e) => setMaleCount(e.target.value)}
+              placeholder="e.g. 20"
             />
           </div>
           <div className="space-y-1.5">
@@ -495,6 +499,7 @@ function EditSectionModal({
               min="0"
               value={femaleCount}
               onChange={(e) => setFemaleCount(e.target.value)}
+              placeholder="e.g. 20"
             />
           </div>
         </div>
@@ -620,6 +625,7 @@ function AddSubjectModal({ defaultBand, defaultGrade, pending, formError, onSubm
                 type="number"
                 min="0"
                 max="100"
+                placeholder="0"
                 value={weights.written}
                 onChange={(e) =>
                   setWeights((w) => ({ ...w, written: Number(e.target.value) }))
@@ -633,6 +639,7 @@ function AddSubjectModal({ defaultBand, defaultGrade, pending, formError, onSubm
                 type="number"
                 min="0"
                 max="100"
+                placeholder="0"
                 value={weights.performance}
                 onChange={(e) =>
                   setWeights((w) => ({
@@ -646,6 +653,7 @@ function AddSubjectModal({ defaultBand, defaultGrade, pending, formError, onSubm
             <div className="space-y-1">
               <Label className="text-xs">Examinations %</Label>
               <Input
+                placeholder="0"
                 type="number"
                 min="0"
                 max="100"
@@ -1905,6 +1913,25 @@ export function AcademicsManager({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Parent / guardian first name</Label>
+                  <Input name="parentFirstName" placeholder="e.g. Maria" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Parent / guardian last name</Label>
+                  <Input name="parentLastName" placeholder="e.g. Dela Cruz" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Parent / guardian contact number</Label>
+                  <Input name="parentPhone" placeholder="09XXXXXXXXX" />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Parent / guardian address</Label>
+                  <Input
+                    name="parentAddress"
+                    placeholder="House No., Street, Barangay, City"
+                  />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Section</Label>

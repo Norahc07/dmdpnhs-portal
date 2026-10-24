@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function ParentEvaluationPage() {
+export default function ParentLayout() {
   redirect("/");
 }

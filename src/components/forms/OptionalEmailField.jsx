@@ -84,6 +84,7 @@ export function OptionalEmailField({
             disabled
             readOnly
             value="None"
+            placeholder="None"
             className="bg-muted/40"
           />
         </>

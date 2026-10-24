@@ -385,7 +385,13 @@ export function EnrollmentTable({ students, sections }) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="enroll-birthdate">Birthdate</Label>
-              <Input id="enroll-birthdate" name="birthdate" type="date" required />
+              <Input
+                id="enroll-birthdate"
+                name="birthdate"
+                type="date"
+                required
+                placeholder="YYYY-MM-DD"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="enroll-first">First name</Label>
@@ -429,6 +435,46 @@ export function EnrollmentTable({ students, sections }) {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="enroll-parent-first">
+                Parent / guardian first name
+              </Label>
+              <Input
+                id="enroll-parent-first"
+                name="parentFirstName"
+                placeholder="e.g. Maria"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="enroll-parent-last">
+                Parent / guardian last name
+              </Label>
+              <Input
+                id="enroll-parent-last"
+                name="parentLastName"
+                placeholder="e.g. Dela Cruz"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="enroll-parent-phone">
+                Parent / guardian contact number
+              </Label>
+              <Input
+                id="enroll-parent-phone"
+                name="parentPhone"
+                placeholder="09XXXXXXXXX"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="enroll-parent-address">
+                Parent / guardian address
+              </Label>
+              <Input
+                id="enroll-parent-address"
+                name="parentAddress"
+                placeholder="House No., Street, Barangay, City"
+              />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="enroll-section">Section (optional)</Label>

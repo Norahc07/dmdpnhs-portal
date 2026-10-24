@@ -245,7 +245,6 @@ export async function submitExcuseLetter(attendanceId, formData) {
 
   revalidatePath("/student/attendance");
   revalidatePath("/teacher/attendance");
-  revalidatePath("/parent/attendance");
   return { data };
 }
 

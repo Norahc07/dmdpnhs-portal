@@ -15,7 +15,7 @@ export default async function StudentPasswordPage() {
       subtitle="Use your current password, then set a new one for LRN sign-in."
       studentAccess={studentAccess}
     >
-      <ChangePasswordForm />
+      <ChangePasswordForm audience="student" />
     </AppShell>
   );
 }

@@ -320,7 +320,7 @@ export function EvaluationFormPanel({
                 <Label>Term</Label>
                 <Select value={term} onValueChange={setTerm} items={termItems}>
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="Select term" />
                   </SelectTrigger>
                   <SelectContent>
                     {termItems.map((t) => (

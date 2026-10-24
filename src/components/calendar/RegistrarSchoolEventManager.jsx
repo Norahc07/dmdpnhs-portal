@@ -151,7 +151,7 @@ export function RegistrarSchoolEventManager({ managedEvents = [] }) {
                 items={TYPE_OPTIONS}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   {TYPE_OPTIONS.map((t) => (
@@ -167,6 +167,7 @@ export function RegistrarSchoolEventManager({ managedEvents = [] }) {
               <Input
                 id="event-date"
                 type="date"
+                placeholder="YYYY-MM-DD"
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
                 required
@@ -180,6 +181,7 @@ export function RegistrarSchoolEventManager({ managedEvents = [] }) {
               <Input
                 id="start-time"
                 type="time"
+                placeholder="HH:MM"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
               />
@@ -189,6 +191,7 @@ export function RegistrarSchoolEventManager({ managedEvents = [] }) {
               <Input
                 id="end-time"
                 type="time"
+                placeholder="HH:MM"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
               />
@@ -203,7 +206,7 @@ export function RegistrarSchoolEventManager({ managedEvents = [] }) {
               items={AUDIENCE_OPTIONS}
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select audience" />
               </SelectTrigger>
               <SelectContent>
                 {AUDIENCE_OPTIONS.map((a) => (

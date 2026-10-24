@@ -4,7 +4,6 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  parentEmailFromCode,
   SCHOOL_YEAR_DEFAULT,
   studentEmailFromLrn,
 } from "@/lib/constants";
@@ -358,61 +357,14 @@ export async function forceUserTestingDemoAccounts() {
     });
   }
 
-  const parentCode = "P26-10001";
-  const parentEmail = parentEmailFromCode(parentCode);
-  const parentProfileId = await forceAuthUser(admin, {
-    email: parentEmail,
-    password: parentCode,
-    role: "parent",
-    first_name: "Rosa",
-    last_name: "Dela Cruz",
-  });
-
   const studentIds = {};
   for (const row of STUDENT_ROWS) {
     studentIds[row.lrn] = await upsertStudentRow(admin, sectionId, row);
   }
 
-  const { data: parentRow } = await admin
-    .from("parents")
-    .select("id")
-    .eq("access_code", parentCode)
-    .maybeSingle();
-
-  let parentId = parentRow?.id;
-  if (!parentId) {
-    const { data: inserted, error } = await admin
-      .from("parents")
-      .insert({
-        profile_id: parentProfileId,
-        access_code: parentCode,
-        phone_number: "09181234567",
-        relationship: "Mother",
-        email: "rosa.delacruz@email.com",
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(`parent: ${error.message}`);
-    parentId = inserted.id;
-  } else {
-    await admin
-      .from("parents")
-      .update({ profile_id: parentProfileId, phone_number: "09181234567" })
-      .eq("id", parentId);
-  }
-
-  const juanId = studentIds["111111111111"];
-  if (juanId && parentId) {
-    await admin.from("parent_student_links").upsert(
-      { parent_id: parentId, student_id: juanId },
-      { onConflict: "parent_id,student_id", ignoreDuplicates: true }
-    );
-  }
-
   const checks = {
     registrar: registrarId,
     teacher: teacherId,
-    parent: parentProfileId,
     students: Object.keys(studentIds).length,
     sectionId,
     lrns: DEMO_LRNS,

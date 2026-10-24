@@ -97,7 +97,7 @@ export function GradebookWorkspace({
             onValueChange={(v) => updateParam("quarter", v)}
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select quarter" />
             </SelectTrigger>
             <SelectContent>
               {quarterItems.map((q) => (

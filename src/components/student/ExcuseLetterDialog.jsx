@@ -72,7 +72,7 @@ export function ExcuseLetterDialog({
             <Label>Reason</Label>
             <Select value={reasonType} onValueChange={setReasonType}>
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select reason" />
               </SelectTrigger>
               <SelectContent>
                 {EXCUSE_REASON_TYPES.map((r) => (

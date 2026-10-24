@@ -1823,11 +1823,21 @@ export function FacultyDirectory({
             >
                 <div className="space-y-1.5">
                 <Label htmlFor="teacher-first">First name</Label>
-                <Input id="teacher-first" name="firstName" required />
+                <Input
+                  id="teacher-first"
+                  name="firstName"
+                  required
+                  placeholder="e.g. Ana"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="teacher-last">Last name</Label>
-                <Input id="teacher-last" name="lastName" required />
+                <Input
+                  id="teacher-last"
+                  name="lastName"
+                  required
+                  placeholder="e.g. Reyes"
+                />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="teacher-email">Email</Label>
@@ -1943,6 +1953,7 @@ export function FacultyDirectory({
                   id="edit-teacher-first"
                   name="firstName"
                   required
+                  placeholder="e.g. Ana"
                   defaultValue={editTeacher.profiles?.first_name || ""}
                 />
               </div>
@@ -1952,6 +1963,7 @@ export function FacultyDirectory({
                   id="edit-teacher-last"
                   name="lastName"
                   required
+                  placeholder="e.g. Reyes"
                   defaultValue={editTeacher.profiles?.last_name || ""}
                 />
               </div>
@@ -1962,6 +1974,7 @@ export function FacultyDirectory({
                   name="email"
                   type="email"
                   required
+                  placeholder="name@dmdpnhs.edu.ph"
                   defaultValue={editTeacher.profiles?.email || ""}
                 />
               </div>

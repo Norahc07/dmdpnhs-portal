@@ -346,13 +346,6 @@ export async function resetStaffPassword(form) {
   return { ok: true, message: "Password updated. You can sign in now." };
 }
 
-export async function loginParent() {
-  return {
-    error:
-      "The parent portal is no longer available. Grades and attendance are in the student portal.",
-  };
-}
-
 /**
  * Faculty login accepts:
  * - email + password, OR
@@ -536,6 +529,7 @@ export async function changeAccountPassword({
   const home = profile.role === "teacher" ? "/teacher" : "/student";
   revalidatePath(`${home}/password`);
   revalidatePath(`${home}/settings`);
+  revalidatePath(`${home}/profile`);
   return { ok: true };
 }
 

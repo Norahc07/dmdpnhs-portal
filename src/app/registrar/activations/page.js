@@ -5,17 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Student Activations" };
 
-function normalizeParentEmbed(raw) {
-  if (!raw) return null;
-  return Array.isArray(raw) ? raw[0] || null : raw;
-}
-
-function parentDisplayName(parent) {
-  if (!parent) return "";
-  const profile = normalizeParentEmbed(parent.profiles);
-  return `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
-}
-
 function isAwaitingActivation(student) {
   const status = String(student?.activation_status || "")
     .trim()
@@ -29,7 +18,7 @@ function isActivated(student) {
 
 async function fetchStudents(db) {
   const attempts = [
-    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, parent_access_code_shown, profile_id, profiles(first_name, last_name, email, status)",
+    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, emergency_contact_name, emergency_contact_number, emergency_contact_address, profile_id, profiles(first_name, last_name, email, status)",
     "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profile_id, profiles(first_name, last_name, email, status)",
     "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profile_id, profiles(first_name, last_name)",
     "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profile_id",
@@ -82,74 +71,15 @@ function attachSections(students, sections) {
   }));
 }
 
-async function withParentInfo(db, students) {
-  const list = students || [];
-  if (!list.length) return [];
-
-  const studentIds = list.map((s) => s.id).filter(Boolean);
-  const accessCodes = [
-    ...new Set(list.map((s) => s.parent_access_code_shown).filter(Boolean)),
-  ];
-
-  let links = [];
-  let parentsByCode = [];
-  try {
-    const [linksRes, parentsRes] = await Promise.all([
-      studentIds.length
-        ? db
-            .from("parent_student_links")
-            .select(
-              "student_id, parents(id, phone_number, email, access_code, profile_id, profiles(first_name, last_name))"
-            )
-            .in("student_id", studentIds)
-        : Promise.resolve({ data: [] }),
-      accessCodes.length
-        ? db
-            .from("parents")
-            .select(
-              "id, phone_number, email, access_code, profile_id, profiles(first_name, last_name)"
-            )
-            .in("access_code", accessCodes)
-        : Promise.resolve({ data: [] }),
-    ]);
-    links = linksRes.data || [];
-    parentsByCode = parentsRes.data || [];
-  } catch {
-    links = [];
-    parentsByCode = [];
-  }
-
-  const parentByStudentId = new Map();
-  for (const link of links || []) {
-    const parent = normalizeParentEmbed(link.parents);
-    if (link.student_id && parent) {
-      parentByStudentId.set(link.student_id, parent);
-    }
-  }
-
-  const parentByAccessCode = new Map();
-  for (const parent of parentsByCode || []) {
-    if (parent?.access_code) {
-      parentByAccessCode.set(parent.access_code, parent);
-    }
-  }
-
-  return list.map((stu) => {
-    const parent =
-      parentByStudentId.get(stu.id) ||
-      parentByAccessCode.get(stu.parent_access_code_shown) ||
-      null;
-
-    return {
-      ...stu,
-      parent_name: parentDisplayName(parent),
-      parent_phone: parent?.phone_number || "",
-      parent_email: parent?.email || "",
-      parent_access_code_shown:
-        stu.parent_access_code_shown || parent?.access_code || "",
-      parent_id: parent?.id || null,
-    };
-  });
+function withEmergencyContact(students) {
+  return (students || []).map((stu) => ({
+    ...stu,
+    parent_name: stu.emergency_contact_name || "",
+    parent_phone: stu.emergency_contact_number || "",
+    parent_address: stu.emergency_contact_address || "",
+    parent_email: "",
+    parent_access_code_shown: "",
+  }));
 }
 
 export default async function RegistrarActivationsPage() {
@@ -189,19 +119,15 @@ export default async function RegistrarActivationsPage() {
 
   const awaiting = students.filter(isAwaitingActivation);
   const activated = students.filter(isActivated);
-
-  const dbForParents = admin || supabase;
-  const [pendingRows, activatedRows] = await Promise.all([
-    withParentInfo(dbForParents, awaiting),
-    withParentInfo(dbForParents, activated),
-  ]);
+  const pendingRows = withEmergencyContact(awaiting);
+  const activatedRows = withEmergencyContact(activated);
 
   return (
     <AppShell
       role="registrar"
       profile={profile}
       title="Student activations"
-      subtitle="Newly enrolled or registered learners stay here until they submit personal/guardian details and you Verify & Approve. Call the parent/guardian number before approving."
+      subtitle="Newly enrolled or registered learners stay here until they submit personal and emergency contact details and you Verify & Approve."
     >
       <PendingActivationsTable
         pendingRows={pendingRows}

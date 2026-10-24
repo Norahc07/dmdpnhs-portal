@@ -1,20 +1,29 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { StudentProfileForm } from "@/components/profile/StudentProfileForm";
 import { requireRole } from "@/lib/auth-guard";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Profile · Student" };
 
 export default async function StudentProfilePage() {
   const { supabase, profile, studentAccess } = await requireRole("student");
 
-  const { data: studentRow } = await supabase
+  let studentQuery = await supabase
     .from("students")
     .select(
-      "id, lrn, grade_level, section_id, status, activation_status, contact_number, personal_email, address, emergency_contact_name, emergency_contact_number"
+      "id, lrn, grade_level, section_id, status, activation_status, contact_number, personal_email, address, emergency_contact_name, emergency_contact_number, emergency_contact_address"
     )
     .eq("profile_id", profile.id)
     .maybeSingle();
+  if (studentQuery.error) {
+    studentQuery = await supabase
+      .from("students")
+      .select(
+        "id, lrn, grade_level, section_id, status, activation_status, contact_number, personal_email, address, emergency_contact_name, emergency_contact_number"
+      )
+      .eq("profile_id", profile.id)
+      .maybeSingle();
+  }
+  const studentRow = studentQuery.data;
 
   let section = null;
   if (studentRow?.section_id) {
@@ -25,22 +34,8 @@ export default async function StudentProfilePage() {
       .maybeSingle();
     section = data;
   }
-  let parentEmail = "";
-  if (studentRow?.id) {
-    const admin = createAdminClient();
-    const { data: link } = await admin
-      .from("parent_student_links")
-      .select("parents(email)")
-      .eq("student_id", studentRow.id)
-      .maybeSingle();
-    const parent = Array.isArray(link?.parents)
-      ? link.parents[0]
-      : link?.parents;
-    parentEmail = parent?.email || "";
-  }
-
   const student = studentRow
-    ? { ...studentRow, sections: section, parent_email: parentEmail }
+    ? { ...studentRow, sections: section }
     : null;
 
   const activated = student?.activation_status === "active";

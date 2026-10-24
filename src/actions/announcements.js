@@ -10,6 +10,10 @@ import {
   loadTeacherHandledSections,
   mapAnnouncementRow,
 } from "@/lib/announcements";
+import {
+  announcementPushPayload,
+  sendWebPushToProfileIds,
+} from "@/lib/web-push";
 
 const SELECT_POST = `
   id, teacher_id, author_profile_id, post_type, title, body, created_at, updated_at,
@@ -161,11 +165,11 @@ async function uploadAttachments(admin, announcementId, files) {
   return saved;
 }
 
-async function notifyTargetStudents(admin, announcementId, sectionIds) {
+async function notifyTargetStudents(admin, announcementId, sectionIds, post) {
   if (!sectionIds.length) return;
   const { data: students } = await admin
     .from("students")
-    .select("id")
+    .select("id, profile_id")
     .in("section_id", sectionIds)
     .eq("activation_status", "active");
 
@@ -181,6 +185,20 @@ async function notifyTargetStudents(admin, announcementId, sectionIds) {
   if (error && !isAnnouncementTableMissing(error)) {
     console.error("[announcements] notify", error.message);
   }
+
+  const profileIds = (students || [])
+    .map((student) => student.profile_id)
+    .filter(Boolean);
+  await sendWebPushToProfileIds(
+    admin,
+    profileIds,
+    announcementPushPayload({
+      id: announcementId,
+      title: post?.title,
+      body: post?.body,
+      postType: post?.postType,
+    })
+  );
 }
 
 export async function createAnnouncement(formData) {
@@ -241,8 +259,13 @@ export async function createAnnouncement(formData) {
     if (attachError) return missingHint(attachError);
   }
 
-  await notifyTargetStudents(auth.admin, post.id, sectionIds);
+  await notifyTargetStudents(auth.admin, post.id, sectionIds, {
+    title,
+    body,
+    postType,
+  });
   revalidateAnnouncementPaths();
+  revalidatePath("/student/notifications");
   return { ok: true, id: post.id };
 }
 
@@ -317,7 +340,11 @@ export async function updateAnnouncement(formData) {
 
   const addedSections = sectionIds.filter((sectionId) => !previousIds.has(sectionId));
   if (addedSections.length) {
-    await notifyTargetStudents(auth.admin, id, addedSections);
+    await notifyTargetStudents(auth.admin, id, addedSections, {
+      title,
+      body,
+      postType,
+    });
   }
 
   revalidateAnnouncementPaths();

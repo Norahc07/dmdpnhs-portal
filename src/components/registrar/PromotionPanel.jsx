@@ -130,7 +130,7 @@ export function PromotionPanel({ students, sections }) {
           <Label>Status</Label>
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select status" />
             </SelectTrigger>
             <SelectContent>
               {["promoted", "enrolled", "retained", "remedial"].map((s) => (
