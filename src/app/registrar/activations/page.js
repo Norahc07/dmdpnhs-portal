@@ -85,27 +85,46 @@ export default async function RegistrarActivationsPage() {
 
   const selectFields =
     "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, parent_access_code_shown, profiles(first_name, last_name, email, status), sections(section_name, grade_level, school_year)";
+  const selectFallback =
+    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profiles(first_name, last_name, email, status), sections(section_name, grade_level, school_year)";
 
-  const [{ data: pending }, { data: activated }, { data: sections }] =
-    await Promise.all([
+  async function loadByStatus(statuses, limit) {
+    const query = (fields) =>
       admin
         .from("students")
-        .select(selectFields)
-        .eq("activation_status", "pending")
+        .select(fields)
+        .in("activation_status", statuses)
         .order("lrn")
-        .limit(200),
-      admin
-        .from("students")
-        .select(selectFields)
-        .eq("activation_status", "active")
-        .order("lrn")
-        .limit(150),
-      admin
-        .from("sections")
-        .select("id, section_name, grade_level, school_year")
-        .order("grade_level")
-        .order("section_name"),
-    ]);
+        .limit(limit);
+
+    let result = await query(selectFields);
+    if (result.error) {
+      result = await query(selectFallback);
+    }
+    if (result.error) {
+      console.error("[activations]", statuses, result.error.message);
+      return [];
+    }
+    const rows = result.data || [];
+    return [...rows].sort((a, b) => {
+      const rank = (status) => (status === "pending" ? 0 : 1);
+      return (
+        rank(a.activation_status) - rank(b.activation_status) ||
+        String(a.lrn || "").localeCompare(String(b.lrn || ""))
+      );
+    });
+  }
+
+  const [pending, activated, sectionsRes] = await Promise.all([
+    loadByStatus(["pending", "incomplete"], 400),
+    loadByStatus(["active"], 150),
+    admin
+      .from("sections")
+      .select("id, section_name, grade_level, school_year")
+      .order("grade_level")
+      .order("section_name"),
+  ]);
+  const sections = sectionsRes.data;
 
   const [pendingRows, activatedRows] = await Promise.all([
     withParentInfo(admin, pending),
@@ -117,7 +136,7 @@ export default async function RegistrarActivationsPage() {
       role="registrar"
       profile={profile}
       title="Student activations"
-      subtitle="Call the parent/guardian number to confirm it is real, verify personal details, then Verify & Approve. DMDPNHS notifies the student and sends guardian SMS alerts to this number."
+      subtitle="Newly enrolled or registered learners stay here until they submit personal/guardian details and you Verify & Approve. Call the parent/guardian number before approving."
     >
       <PendingActivationsTable
         pendingRows={pendingRows}

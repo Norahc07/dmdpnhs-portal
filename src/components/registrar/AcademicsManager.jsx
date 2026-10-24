@@ -1834,8 +1834,9 @@ export function AcademicsManager({
               <DialogHeader>
                 <DialogTitle>Enroll student</DialogTitle>
                 <DialogDescription>
-                  Creates an enrolled, already-active student. They sign in with
-                  LRN and birthdate (YYYYMMDD) as the password.
+                  Creates an enrolled student in Awaiting until they submit
+                  personal/guardian details and you verify them. Sign-in is LRN
+                  and birthdate (YYYYMMDD).
                 </DialogDescription>
               </DialogHeader>
               <form

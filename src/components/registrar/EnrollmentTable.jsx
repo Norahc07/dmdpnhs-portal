@@ -166,11 +166,12 @@ export function EnrollmentTable({ students, sections }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="rounded-2xl border border-[#800000]/10 bg-white px-4 py-3 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.28)] sm:max-w-xl">
           <p className="text-sm font-semibold text-[#3d1212]">
-            Enroll and activate learners
+            Enroll learners
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Creating a student also activates their portal. They sign in with
-            LRN and birthdate as password (YYYYMMDD). Incomplete stubs:{" "}
+            New students appear under Activations → Awaiting until they submit
+            personal/guardian details and you verify them. Sign-in is LRN and
+            birthdate (YYYYMMDD). Incomplete stubs:{" "}
             <span className="font-semibold text-[#800000]">{incompleteCount}</span>
           </p>
         </div>

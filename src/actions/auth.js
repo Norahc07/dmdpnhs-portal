@@ -242,6 +242,8 @@ export async function registerStudent(form) {
   }
 
   revalidatePath("/student/activate");
+  revalidatePath("/registrar/activations");
+  revalidatePath("/registrar");
   redirect("/student/activate");
 }
 

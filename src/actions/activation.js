@@ -550,7 +550,7 @@ export async function enrollStudentByRegistrar(form) {
     first_name: firstName,
     last_name: lastName,
     email,
-    status: "active",
+    status: "pending",
   });
 
   if (profileError) {
@@ -566,7 +566,7 @@ export async function enrollStudentByRegistrar(form) {
     grade_level: gradeLevel,
     section_id: sectionId,
     status: "enrolled",
-    activation_status: "active",
+    activation_status: "incomplete",
   });
 
   if (studentError) {
@@ -581,7 +581,7 @@ export async function enrollStudentByRegistrar(form) {
   revalidatePath("/registrar/academics");
   return {
     ok: true,
-    message: `Enrolled and activated LRN ${lrn}. Sign in at Student Login with LRN and birthdate (YYYYMMDD) as the password.`,
+    message: `Enrolled LRN ${lrn}. They appear under Awaiting students until personal/guardian details are submitted and you verify them. Sign-in: LRN and birthdate (YYYYMMDD).`,
     lrn,
   };
 }

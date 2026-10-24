@@ -95,7 +95,7 @@ export async function getRegistrarDashboardAnalytics(
     supabase
       .from("students")
       .select("*", { count: "exact", head: true })
-      .eq("activation_status", "pending"),
+      .in("activation_status", ["pending", "incomplete"]),
     supabase
       .from("class_records")
       .select("*", { count: "exact", head: true })

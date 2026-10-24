@@ -470,8 +470,8 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
                         No students awaiting activation
                       </p>
                       <p className="max-w-md text-sm text-muted-foreground">
-                        When learners finish registration, their requests will
-                        appear here for you to approve or return.
+                        Newly enrolled or registered learners appear here.
+                        Verify &amp; Approve after they submit guardian details.
                       </p>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
@@ -526,26 +526,32 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="inline-flex gap-2">
-                      <Button
-                        size="sm"
-                        disabled={pending}
-                        className="bg-[#800000] hover:bg-[#6a0000]"
-                        onClick={() => onApprove(row.id)}
-                      >
-                        <CheckCircle2 className="size-3.5" />
-                        Verify &amp; Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={pending}
-                        onClick={() => onReturn(row.id)}
-                      >
-                        <RotateCcw className="size-3.5" />
-                        Return
-                      </Button>
-                    </div>
+                    {row.activation_status === "pending" ? (
+                      <div className="inline-flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={pending}
+                          className="bg-[#800000] hover:bg-[#6a0000]"
+                          onClick={() => onApprove(row.id)}
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                          Verify &amp; Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={pending}
+                          onClick={() => onReturn(row.id)}
+                        >
+                          <RotateCcw className="size-3.5" />
+                          Return
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Waiting for student details
+                      </p>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -823,7 +829,8 @@ export function PendingActivationsTable({
                   Pending approvals
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Call the parent number to confirm it works, then Approve.
+                  Incomplete = still filling details. Pending = ready to call
+                  the parent number and Approve.
                 </p>
               </div>
             </div>

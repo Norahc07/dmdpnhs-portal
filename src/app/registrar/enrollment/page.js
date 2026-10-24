@@ -31,7 +31,7 @@ export default async function RegistrarEnrollmentPage() {
       role="registrar"
       profile={profile}
       title="School year enrollment"
-      subtitle="Add a learner to enroll and activate them immediately. Filter by school year, grade, section, and status."
+      subtitle="Add a learner to the school year. They stay in Awaiting students until details are submitted and you verify the account."
     >
       <EnrollmentTable
         students={students || []}
