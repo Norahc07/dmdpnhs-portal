@@ -6,6 +6,7 @@ import { ProfilePicturePicker } from "@/components/profile/ProfilePicturePicker"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { GRADE_LEVELS, SCHOOL_SHORT } from "@/lib/constants";
 
 export function StudentActivationForm({ initial, sections = [], profile }) {
@@ -225,16 +226,14 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
               defaultValue={initial?.parentPhone || ""}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="parentEmail">Parent email (optional)</Label>
-            <Input
-              id="parentEmail"
-              name="parentEmail"
-              type="email"
-              placeholder="parent@email.com"
-              defaultValue={initial?.parentEmail || ""}
-            />
-          </div>
+          <OptionalEmailField
+            id="parentEmail"
+            name="parentEmail"
+            label="Parent / guardian email"
+            placeholder="parent@email.com"
+            defaultValue={initial?.parentEmail || ""}
+            defaultNone={Boolean(initial?.parentEmailNone)}
+          />
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="parentAddress">Parent / guardian address</Label>
             <Input

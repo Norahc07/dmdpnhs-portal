@@ -2,7 +2,17 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ClipboardList, Plus, UserPlus, Users, X } from "lucide-react";
+import {
+  Building2,
+  ClipboardList,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   createDepartment,
@@ -11,6 +21,8 @@ import {
 import {
   assignTeacher,
   createTeacherByRegistrar,
+  deleteTeacherByRegistrar,
+  updateTeacherByRegistrar,
 } from "@/actions/activation";
 import { PendingTeachersTable } from "@/components/registrar/RegistrarPanels";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +59,13 @@ import {
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { SearchInput } from "@/components/ui/search-input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-9 text-sm";
@@ -730,11 +749,14 @@ function TeachersTable({
   assignmentsByTeacher,
   emptyMessage,
   onAssign,
+  onEdit,
+  onDelete,
   loadBand = null, // jhs | shs | null (show all loads)
   actionLabel = "Assign",
   showActions = true,
 }) {
-  const colCount = showActions ? 7 : 6;
+  const hasMenu = showActions && (onAssign || onEdit || onDelete);
+  const colCount = hasMenu ? 7 : 6;
   return (
     <FixedTable minWidth={showActions ? "56rem" : "50rem"}>
       <colgroup>
@@ -744,7 +766,7 @@ function TeachersTable({
         <col className="w-[9.5rem]" />
         <col className="w-[6.5rem]" />
         <col />
-        {showActions ? <col className="w-[6.5rem]" /> : null}
+        {hasMenu ? <col className="w-[7.5rem]" /> : null}
       </colgroup>
       <TableHeader>
         <TableRow>
@@ -754,7 +776,7 @@ function TeachersTable({
           <TableHead>Position</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Sections / subjects</TableHead>
-          {showActions ? (
+          {hasMenu ? (
             <TableHead className="text-right">Actions</TableHead>
           ) : null}
         </TableRow>
@@ -841,17 +863,49 @@ function TeachersTable({
                   </ul>
                 )}
               </TableCell>
-              {showActions ? (
+              {hasMenu ? (
                 <TableCell className="text-right">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="border-[#800000]/20 text-[#800000]"
-                    onClick={() => onAssign?.(t)}
-                  >
-                    {actionLabel}
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground"
+                          aria-label={`Actions for ${fullName || t.teacher_id}`}
+                        />
+                      }
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-40">
+                      {onAssign ? (
+                        <DropdownMenuItem onClick={() => onAssign(t)}>
+                          <ClipboardList className="size-4" />
+                          {actionLabel} load
+                        </DropdownMenuItem>
+                      ) : null}
+                      {onEdit ? (
+                        <DropdownMenuItem onClick={() => onEdit(t)}>
+                          <Pencil className="size-4" />
+                          Edit teacher
+                        </DropdownMenuItem>
+                      ) : null}
+                      {onDelete ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => onDelete(t)}
+                          >
+                            <Trash2 className="size-4" />
+                            Remove teacher
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               ) : null}
             </TableRow>
@@ -889,6 +943,9 @@ export function FacultyDirectory({
   const [addTeacherOpen, setAddTeacherOpen] = useState(false);
   const [addTeacherError, setAddTeacherError] = useState("");
   const [createdTeacherCreds, setCreatedTeacherCreds] = useState(null);
+  const [editTeacher, setEditTeacher] = useState(null);
+  const [editTeacherError, setEditTeacherError] = useState("");
+  const [deleteTeacher, setDeleteTeacher] = useState(null);
 
   useEffect(() => {
     setDeptList(departments);
@@ -1270,6 +1327,53 @@ export function FacultyDirectory({
     });
   }
 
+  function openEdit(teacher) {
+    setEditTeacherError("");
+    setError("");
+    setEditTeacher(teacher);
+  }
+
+  function submitEditTeacher(formData) {
+    if (!editTeacher?.id) return;
+    setEditTeacherError("");
+    startTransition(async () => {
+      const result = await updateTeacherByRegistrar({
+        id: editTeacher.id,
+        ...Object.fromEntries(formData),
+      });
+      if (result?.error) {
+        setEditTeacherError(result.error);
+        toast.error(result.error);
+        return;
+      }
+      toast.success(result.message || "Teacher updated.");
+      setEditTeacher(null);
+      router.refresh();
+    });
+  }
+
+  function confirmDeleteTeacher() {
+    if (!deleteTeacher?.id) return;
+    setError("");
+    startTransition(async () => {
+      const result = await deleteTeacherByRegistrar(deleteTeacher.id);
+      if (result?.error) {
+        setError(result.error);
+        toast.error(result.error);
+        return;
+      }
+      setRows((list) => list.filter((row) => row.id !== deleteTeacher.id));
+      setLoadsByTeacher((map) => {
+        const next = { ...map };
+        delete next[deleteTeacher.id];
+        return next;
+      });
+      toast.success(result.message || "Teacher removed.");
+      setDeleteTeacher(null);
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1278,9 +1382,9 @@ export function FacultyDirectory({
             Add faculty accounts
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Create a teacher so they can sign in immediately with email or
-            Teacher ID. Self-registered teachers still appear under Pending
-            approvals.
+            Create, edit, or remove faculty accounts. New teachers can sign in
+            immediately with email or Teacher ID. Self-registered teachers still
+            appear under Pending approvals.
           </p>
         </div>
         <Button
@@ -1405,7 +1509,13 @@ export function FacultyDirectory({
                 ? "No approved faculty match your filters."
                 : "No approved teachers yet."
             }
-            showActions={false}
+            actionLabel="Assign"
+            onAssign={openAssign}
+            onEdit={openEdit}
+            onDelete={(teacher) => {
+              setError("");
+              setDeleteTeacher(teacher);
+            }}
           />
         </TabsContent>
 
@@ -1613,6 +1723,11 @@ export function FacultyDirectory({
                     : `No ${assignmentBand === "shs" ? "Senior High" : "Junior High"} faculty with matching section/subject loads yet.`
               }
               onAssign={openAssign}
+              onEdit={openEdit}
+              onDelete={(teacher) => {
+                setError("");
+                setDeleteTeacher(teacher);
+              }}
             />
           </div>
         </TabsContent>
@@ -1793,6 +1908,178 @@ export function FacultyDirectory({
                 </DialogFooter>
               </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editTeacher)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditTeacher(null);
+            setEditTeacherError("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit teacher</DialogTitle>
+            <DialogDescription>
+              Update name, email, department, position, or set a new password.
+              Teacher ID stays {editTeacher?.teacher_id || "the same"}.
+            </DialogDescription>
+          </DialogHeader>
+          {editTeacher ? (
+            <form
+              key={editTeacher.id}
+              className="grid gap-3 sm:grid-cols-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitEditTeacher(new FormData(e.currentTarget));
+              }}
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-teacher-first">First name</Label>
+                <Input
+                  id="edit-teacher-first"
+                  name="firstName"
+                  required
+                  defaultValue={editTeacher.profiles?.first_name || ""}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-teacher-last">Last name</Label>
+                <Input
+                  id="edit-teacher-last"
+                  name="lastName"
+                  required
+                  defaultValue={editTeacher.profiles?.last_name || ""}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="edit-teacher-email">Email</Label>
+                <Input
+                  id="edit-teacher-email"
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={editTeacher.profiles?.email || ""}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-teacher-dept">Department</Label>
+                <select
+                  id="edit-teacher-dept"
+                  name="departmentId"
+                  defaultValue={editTeacher.department_id || ""}
+                  className={selectClass}
+                >
+                  <option value="">— Optional —</option>
+                  {deptList.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                      {d.band ? ` · ${bandLabel[d.band] || d.band}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-teacher-position">Position</Label>
+                <select
+                  id="edit-teacher-position"
+                  name="facultyPosition"
+                  defaultValue={editTeacher.faculty_position || "teacher"}
+                  className={selectClass}
+                >
+                  {FACULTY_POSITIONS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="edit-teacher-password">
+                  New password (optional)
+                </Label>
+                <Input
+                  id="edit-teacher-password"
+                  name="password"
+                  type="text"
+                  minLength={8}
+                  placeholder="Leave blank to keep the current password"
+                />
+              </div>
+              {editTeacherError ? (
+                <p className="text-sm text-rose-700 sm:col-span-2">
+                  {editTeacherError}
+                </p>
+              ) : null}
+              <DialogFooter className="sm:col-span-2">
+                <DialogClose
+                  render={<Button type="button" variant="outline" />}
+                >
+                  Cancel
+                </DialogClose>
+                <Button
+                  type="submit"
+                  disabled={pending}
+                  className="bg-[#800000] hover:bg-[#6a0000]"
+                >
+                  {pending ? "Saving…" : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTeacher)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTeacher(null);
+            setError("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove teacher</DialogTitle>
+            <DialogDescription>
+              This permanently deletes the faculty account, sign-in access, and
+              teaching loads. Advisory sections are unassigned. This cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Teacher ID:{" "}
+              <span className="font-mono font-semibold text-[#3d1212]">
+                {deleteTeacher?.teacher_id || "—"}
+              </span>
+            </p>
+            <p>
+              Name:{" "}
+              <span className="font-semibold text-[#3d1212]">
+                {`${deleteTeacher?.profiles?.first_name || ""} ${deleteTeacher?.profiles?.last_name || ""}`.trim() ||
+                  "—"}
+              </span>
+            </p>
+            {error ? <p className="text-rose-700">{error}</p> : null}
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>
+              Cancel
+            </DialogClose>
+            <Button
+              type="button"
+              disabled={pending}
+              className="bg-rose-700 text-white hover:bg-rose-800"
+              onClick={confirmDeleteTeacher}
+            >
+              {pending ? "Removing…" : "Remove teacher"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

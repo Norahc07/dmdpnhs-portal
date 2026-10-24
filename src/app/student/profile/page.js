@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { StudentProfileForm } from "@/components/profile/StudentProfileForm";
 import { requireRole } from "@/lib/auth-guard";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "Profile · Student" };
 
@@ -24,8 +25,22 @@ export default async function StudentProfilePage() {
       .maybeSingle();
     section = data;
   }
+  let parentEmail = "";
+  if (studentRow?.id) {
+    const admin = createAdminClient();
+    const { data: link } = await admin
+      .from("parent_student_links")
+      .select("parents(email)")
+      .eq("student_id", studentRow.id)
+      .maybeSingle();
+    const parent = Array.isArray(link?.parents)
+      ? link.parents[0]
+      : link?.parents;
+    parentEmail = parent?.email || "";
+  }
+
   const student = studentRow
-    ? { ...studentRow, sections: section }
+    ? { ...studentRow, sections: section, parent_email: parentEmail }
     : null;
 
   const activated = student?.activation_status === "active";

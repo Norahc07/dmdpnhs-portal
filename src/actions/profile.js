@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { SCHOOL_SHORT } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
+import { parseOptionalEmail } from "@/lib/optional-email";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -267,6 +268,22 @@ export async function updateStudentProfile(payload) {
     .eq("profile_id", auth.user.id);
 
   if (studentError) return { error: studentError.message };
+
+  const parentEmail = parseOptionalEmail({
+    email: payload.parentEmail,
+    none: payload.parentEmailNone,
+  });
+  const { data: parentLink } = await admin
+    .from("parent_student_links")
+    .select("parent_id")
+    .eq("student_id", student.id)
+    .maybeSingle();
+  if (parentLink?.parent_id) {
+    await admin
+      .from("parents")
+      .update({ email: parentEmail })
+      .eq("id", parentLink.parent_id);
+  }
 
   let parentAccessUpdated = false;
   let parentSmsSent = false;

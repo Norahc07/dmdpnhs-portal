@@ -32,7 +32,7 @@ async function withParentInfo(admin, students) {
       ? admin
           .from("parent_student_links")
           .select(
-            "student_id, parents(id, phone_number, access_code, profile_id, profiles(first_name, last_name))"
+            "student_id, parents(id, phone_number, email, access_code, profile_id, profiles(first_name, last_name))"
           )
           .in("student_id", studentIds)
       : Promise.resolve({ data: [] }),
@@ -40,7 +40,7 @@ async function withParentInfo(admin, students) {
       ? admin
           .from("parents")
           .select(
-            "id, phone_number, access_code, profile_id, profiles(first_name, last_name)"
+            "id, phone_number, email, access_code, profile_id, profiles(first_name, last_name)"
           )
           .in("access_code", accessCodes)
       : Promise.resolve({ data: [] }),
@@ -71,6 +71,7 @@ async function withParentInfo(admin, students) {
       ...stu,
       parent_name: parentDisplayName(parent),
       parent_phone: parent?.phone_number || "",
+      parent_email: parent?.email || "",
       parent_access_code_shown:
         stu.parent_access_code_shown || parent?.access_code || "",
       parent_id: parent?.id || null,

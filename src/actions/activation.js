@@ -16,6 +16,7 @@ import {
 } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
 import { FACULTY_POSITIONS } from "@/lib/grade-workflow";
+import { parseOptionalEmail } from "@/lib/optional-email";
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
@@ -127,7 +128,10 @@ export async function submitStudentActivation(form) {
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
-  const parentEmail = String(form.parentEmail || "").trim().toLowerCase();
+  const parentEmail = parseOptionalEmail({
+    email: form.parentEmail,
+    none: form.parentEmailNone,
+  });
   const parentAddress = String(form.parentAddress || "").trim();
   const parentRelationship = String(form.parentRelationship || "Guardian").trim();
 
@@ -170,7 +174,7 @@ export async function submitStudentActivation(form) {
       .insert({
         access_code: accessCode,
         phone_number: parentPhone,
-        email: parentEmail || null,
+        email: parentEmail,
         relationship: parentRelationship,
       })
       .select("id, access_code")
@@ -184,7 +188,7 @@ export async function submitStudentActivation(form) {
       .from("parents")
       .update({
         phone_number: parentPhone,
-        email: parentEmail || existingParent.email || null,
+        email: parentEmail,
         relationship: parentRelationship,
       })
       .eq("id", existingParent.id);
@@ -390,6 +394,10 @@ export async function updateActivatedStudent(form) {
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim() || null;
+  const parentEmail = parseOptionalEmail({
+    email: form.parentEmail,
+    none: form.parentEmailNone,
+  });
 
   if (!studentId) return { error: "Student id is required." };
   if (!firstName || !lastName) {
@@ -432,12 +440,9 @@ export async function updateActivatedStudent(form) {
     .maybeSingle();
 
   if (link?.parents?.id) {
-    if (parentPhone) {
-      await admin
-        .from("parents")
-        .update({ phone_number: parentPhone })
-        .eq("id", link.parents.id);
-    }
+    const parentPatch = { email: parentEmail };
+    if (parentPhone) parentPatch.phone_number = parentPhone;
+    await admin.from("parents").update(parentPatch).eq("id", link.parents.id);
     if (link.parents.profile_id && (parentFirstName || parentLastName)) {
       const parentUpdate = {};
       if (parentFirstName) parentUpdate.first_name = parentFirstName;
@@ -701,6 +706,162 @@ export async function createTeacherByRegistrar(form) {
     email,
     temporaryPassword: password,
     message: `Teacher ${teacherId} created and active. They can sign in with email or Teacher ID.`,
+  };
+}
+
+/** Registrar updates teacher profile, sign-in email, optional password, and faculty post. */
+export async function updateTeacherByRegistrar(form) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  const id = String(form.id || form.teacherRowId || "").trim();
+  const firstName = String(form.firstName || "").trim();
+  const lastName = String(form.lastName || "").trim();
+  const email = String(form.email || "").trim().toLowerCase();
+  const facultyDept = String(form.facultyDept || "").trim() || null;
+  const departmentId = form.departmentId || null;
+  const facultyPosition = String(form.facultyPosition || "teacher").trim();
+  const nextPassword = String(form.password || "").trim();
+
+  const allowedPositions = new Set(FACULTY_POSITIONS.map((p) => p.value));
+  const position = allowedPositions.has(facultyPosition)
+    ? facultyPosition
+    : "teacher";
+
+  if (!id) return { error: "Teacher is required." };
+  if (!firstName || !lastName) {
+    return { error: "First and last name are required." };
+  }
+  if (!email || !email.includes("@")) {
+    return { error: "Enter a valid email address." };
+  }
+  if (nextPassword && nextPassword.length < 8) {
+    return { error: "New password must be at least 8 characters." };
+  }
+
+  const { data: teacher } = await admin
+    .from("teachers")
+    .select("id, profile_id, teacher_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!teacher?.profile_id) return { error: "Teacher not found." };
+
+  const { data: emailOwner } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (emailOwner?.id && emailOwner.id !== teacher.profile_id) {
+    return { error: "A user with this email already exists." };
+  }
+
+  const authPatch = {
+    email,
+    email_confirm: true,
+    user_metadata: {
+      role: "teacher",
+      first_name: firstName,
+      last_name: lastName,
+    },
+  };
+  if (nextPassword) authPatch.password = nextPassword;
+
+  const { error: authError } = await admin.auth.admin.updateUserById(
+    teacher.profile_id,
+    authPatch
+  );
+  if (authError) return { error: authError.message };
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({
+      first_name: firstName,
+      last_name: lastName,
+      email,
+    })
+    .eq("id", teacher.profile_id);
+  if (profileError) return { error: profileError.message };
+
+  const teacherPatch = {
+    faculty_dept: facultyDept,
+    faculty_position: position,
+    department_id: departmentId || null,
+  };
+  const { error: teacherError } = await admin
+    .from("teachers")
+    .update(teacherPatch)
+    .eq("id", teacher.id);
+
+  if (
+    teacherError &&
+    /department_id|faculty_position/i.test(teacherError.message || "")
+  ) {
+    const { error: retryErr } = await admin
+      .from("teachers")
+      .update({ faculty_dept: facultyDept })
+      .eq("id", teacher.id);
+    if (retryErr) return { error: retryErr.message };
+  } else if (teacherError) {
+    return { error: teacherError.message };
+  }
+
+  revalidatePath("/registrar/teachers");
+  revalidatePath("/registrar/academics");
+  revalidatePath("/teacher");
+  return {
+    ok: true,
+    message: nextPassword
+      ? `Updated ${teacher.teacher_id}. Share the new password if you changed it.`
+      : `Updated ${teacher.teacher_id}.`,
+  };
+}
+
+/** Registrar permanently removes a teacher account and teaching loads. */
+export async function deleteTeacherByRegistrar(teacherId) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  const id = String(teacherId || "").trim();
+  if (!id) return { error: "Teacher is required." };
+
+  const { data: teacher } = await admin
+    .from("teachers")
+    .select("id, profile_id, teacher_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!teacher) return { error: "Teacher not found." };
+
+  await admin.from("sections").update({ adviser_id: null }).eq("adviser_id", id);
+  await admin.from("teacher_assignments").delete().eq("teacher_id", id);
+  await admin.from("announcements").delete().eq("teacher_id", id);
+  await admin
+    .from("evaluations")
+    .update({ target_teacher_id: null })
+    .eq("target_teacher_id", id);
+
+  const { error: teacherError } = await admin
+    .from("teachers")
+    .delete()
+    .eq("id", id);
+  if (teacherError) return { error: teacherError.message };
+
+  if (teacher.profile_id) {
+    await admin.from("profiles").delete().eq("id", teacher.profile_id);
+    try {
+      await admin.auth.admin.deleteUser(teacher.profile_id);
+    } catch {
+      /* auth user may already be gone */
+    }
+  }
+
+  revalidatePath("/registrar/teachers");
+  revalidatePath("/registrar/academics");
+  revalidatePath("/teacher");
+  return {
+    ok: true,
+    message: `Removed ${teacher.teacher_id || "teacher"} and their teaching loads.`,
   };
 }
 

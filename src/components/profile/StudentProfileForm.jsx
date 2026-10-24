@@ -8,6 +8,7 @@ import { ChangePasswordForm } from "@/components/student/ChangePasswordForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { cn } from "@/lib/utils";
 
 function buildFormState(profile, student) {
@@ -20,6 +21,8 @@ function buildFormState(profile, student) {
     address: student?.address || "",
     emergencyContactName: student?.emergency_contact_name || "",
     emergencyContactNumber: student?.emergency_contact_number || "",
+    parentEmail: student?.parent_email || "",
+    parentEmailNone: !String(student?.parent_email || "").trim(),
   };
 }
 
@@ -378,6 +381,24 @@ export function StudentProfileForm({
               grades.
             </p>
           </div>
+          <OptionalEmailField
+            className="sm:col-span-2"
+            id="parentEmail"
+            name="parentEmail"
+            label="Parent / guardian email"
+            placeholder="parent@email.com"
+            disabled={locked}
+            value={values.parentEmail}
+            none={Boolean(values.parentEmailNone)}
+            onChange={(next) => setField("parentEmail", next)}
+            onNoneChange={(next) => {
+              setDraft((prev) => ({
+                ...prev,
+                parentEmailNone: next,
+                parentEmail: next ? "" : prev.parentEmail,
+              }));
+            }}
+          />
         </div>
       </section>
     </form>

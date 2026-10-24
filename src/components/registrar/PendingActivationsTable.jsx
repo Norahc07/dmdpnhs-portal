@@ -21,6 +21,7 @@ import {
   deleteActivatedStudent,
   updateActivatedStudent,
 } from "@/actions/activation";
+import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,6 +192,10 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
               }
             />
             <DetailRow
+              label="Parent / guardian email"
+              value={student.parent_email || "None"}
+            />
+            <DetailRow
               label="Parent code"
               value={student.parent_access_code_shown}
             />
@@ -247,6 +252,10 @@ function StudentEditSheet({
   const [parentFirstName, setParentFirstName] = useState(parentParts.first);
   const [parentLastName, setParentLastName] = useState(parentParts.last);
   const [parentPhone, setParentPhone] = useState(student?.parent_phone || "");
+  const [parentEmail, setParentEmail] = useState(student?.parent_email || "");
+  const [parentEmailNone, setParentEmailNone] = useState(
+    !String(student?.parent_email || "").trim()
+  );
 
   useEffect(() => {
     if (!open || !student) return;
@@ -259,6 +268,8 @@ function StudentEditSheet({
     setParentFirstName(parts.first);
     setParentLastName(parts.last);
     setParentPhone(student.parent_phone || "");
+    setParentEmail(student.parent_email || "");
+    setParentEmailNone(!String(student.parent_email || "").trim());
   }, [open, student]);
 
   return (
@@ -287,6 +298,8 @@ function StudentEditSheet({
               parentFirstName,
               parentLastName,
               parentPhone,
+              parentEmail,
+              parentEmailNone,
             });
           }}
         >
@@ -369,6 +382,19 @@ function StudentEditSheet({
                   placeholder="09XXXXXXXXX"
                 />
               </div>
+              <OptionalEmailField
+                id="registrarParentEmail"
+                name="parentEmail"
+                label="Parent / guardian email"
+                placeholder="parent@email.com"
+                value={parentEmail}
+                none={parentEmailNone}
+                onChange={setParentEmail}
+                onNoneChange={(next) => {
+                  setParentEmailNone(next);
+                  if (next) setParentEmail("");
+                }}
+              />
               <p className="text-xs text-muted-foreground">
                 Parent code:{" "}
                 <span className="font-mono font-semibold text-[#3d1212]">
@@ -732,6 +758,9 @@ export function PendingActivationsTable({
                 },
                 parent_name: `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim(),
                 parent_phone: payload.parentPhone || "",
+                parent_email: payload.parentEmailNone
+                  ? ""
+                  : payload.parentEmail || "",
               }
             : row
         )
