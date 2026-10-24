@@ -442,3 +442,30 @@ export async function getStudentSubjectGrades({
 
   return { student, schoolYear: sy, rows };
 }
+
+/**
+ * Grade 12 HUMSS academic record: Final Grade + Remarks per subject/term.
+ */
+export async function getStudentAcademicRecord({
+  studentId,
+  schoolYear,
+} = {}) {
+  const detail = await getStudentSemestralGrades({ studentId, schoolYear });
+  if (detail.error) return { error: detail.error, rows: [] };
+
+  const rows = (detail.rows || []).map((row) => ({
+    id: row.id,
+    term: row.term,
+    subject_id: row.subject_id,
+    subject_name: row.subject_name,
+    final_grade: row.final_grade ?? row.semestral_grade ?? null,
+    remarks: row.remarks || null,
+    school_year: row.school_year,
+  }));
+
+  return {
+    student: detail.student,
+    schoolYear: detail.schoolYear,
+    rows,
+  };
+}

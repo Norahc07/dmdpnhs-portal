@@ -240,3 +240,6 @@ export function StudentEvaluationTabs({
       )}
 
       <EvaluationRecordsPanel records={records} />
+    </div>
+  );
+}

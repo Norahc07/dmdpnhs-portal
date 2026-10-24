@@ -39,6 +39,8 @@ export default async function StudentEvaluationPage({ searchParams }) {
   const evaluations = listed.evaluations || [];
   const systemExisting =
     evaluations.find((e) => e.evaluation_type === "system") || null;
+  const selfExisting =
+    evaluations.find((e) => e.evaluation_type === "self") || null;
   const teacherExistings = {};
   for (const e of evaluations) {
     if (e.evaluation_type !== "teacher") continue;
@@ -73,8 +75,6 @@ export default async function StudentEvaluationPage({ searchParams }) {
           defaultTerm={term}
           teachers={ctx.teachers || []}
           systemExisting={systemExisting}
-          teacherExistings={teacherExistings}
-          progress={progress}
           selfExisting={selfExisting}
           teacherExistings={teacherExistings}
           progress={progress}
@@ -91,6 +91,8 @@ export default async function StudentEvaluationPage({ searchParams }) {
                   ? "Yourself"
                   : "PastraPortal",
           }))}
+        />
+      </div>
     </AppShell>
   );
 }

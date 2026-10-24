@@ -504,6 +504,49 @@ export async function markAnnouncementRead(announcementId) {
   }
 
   revalidatePath("/student/announcements");
+  revalidatePath("/student/notifications");
+  revalidatePath("/student");
+  return { ok: true };
+}
+
+export async function listStudentNotifications() {
+  const list = await listStudentAnnouncements();
+  if (list.error) {
+    return { ...list, items: [], unreadCount: 0 };
+  }
+
+  const items = (list.posts || []).map((post) => ({
+    id: post.id,
+    href: `/student/announcements/${post.id}`,
+    title: post.title,
+    postType: post.postType,
+    createdAt: post.createdAt,
+    unread: Boolean(post.unread),
+  }));
+
+  return {
+    items,
+    unreadCount: list.unreadCount || 0,
+    hint: list.hint,
+  };
+}
+
+export async function markAllStudentNotificationsRead() {
+  const auth = await requireStudent();
+  if (auth.error) return auth;
+
+  const { error } = await auth.admin
+    .from("announcement_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("student_id", auth.student.id)
+    .is("read_at", null);
+
+  if (error && !isAnnouncementTableMissing(error)) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/student/notifications");
+  revalidatePath("/student/announcements");
   revalidatePath("/student");
   return { ok: true };
 }

@@ -192,7 +192,6 @@ export function ClassRecordCards({ groups = [] }) {
             })}
           </div>
           )}
-          </div>
         </section>
       ))}
     </div>

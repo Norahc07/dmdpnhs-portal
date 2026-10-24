@@ -40,6 +40,12 @@ export default async function ClassRecordPage({ params, searchParams }) {
 
   if (!assignment?.sections || !assignment?.subjects) notFound();
 
+  const academicMode = isHumssGrade12(assignment.sections);
+  const offeredTerm = humssSubjectTerm(assignment.subjects);
+  if (academicMode && offeredTerm && term !== offeredTerm) {
+    redirect(`/teacher/gradebook/${assignment.id}?term=${offeredTerm}`);
+  }
+
   const { data: students } = await supabase
     .from("students")
     .select("id, lrn, gender, profiles(first_name, last_name)")
@@ -52,7 +58,6 @@ export default async function ClassRecordPage({ params, searchParams }) {
     .from("class_records")
     .select("data, updated_at, workflow_status, review_notes, term")
     .eq("assignment_id", assignment.id)
-    .eq("activation_status", "active")
     .eq("term", term)
     .maybeSingle();
 
@@ -79,7 +84,7 @@ export default async function ClassRecordPage({ params, searchParams }) {
     .filter(Boolean)
     .join(" ");
 
-  const termName = termLabel(term);
+  const termName = academicMode ? humssTermLabel(term) : termLabel(term);
   const defaults = {
     region: "",
     division: "",
@@ -94,19 +99,19 @@ export default async function ClassRecordPage({ params, searchParams }) {
       assignment.subjects.track_strand || "Core Subject (All Tracks)",
   };
 
+  const studentRows = (students || []).map((student) => ({
+    id: student.id,
+    lrn: student.lrn,
+    gender: student.gender || "Unspecified",
+    firstName: student.profiles?.first_name || "",
+    lastName: student.profiles?.last_name || "",
+  }));
+
   return (
     <AppShell
       role="teacher"
       profile={profile}
       teacherAccess={teacherAccess}
-      title="Class Record"
-      subtitle={`${assignment.subjects.subject_name} · ${termName} · Grade ${assignment.sections.grade_level} ${assignment.sections.section_name}`}
-    >
-      <ClassRecordWorkspace
-        assignmentId={assignment.id}
-        term={term}
-        subjectId={assignment.subjects.id}
-        initialWeights={assignment.subjects}
       title={academicMode ? "Academic Record" : "Class Record"}
       subtitle={`${assignment.subjects.subject_name} · ${termName} · Grade ${assignment.sections.grade_level} ${assignment.sections.section_name}`}
     >
@@ -121,13 +126,7 @@ export default async function ClassRecordPage({ params, searchParams }) {
             classRecord?.workflow_status || GRADE_WORKFLOW.DRAFT
           }
           reviewNotes={classRecord?.review_notes || null}
-          students={(students || []).map((student) => ({
-            id: student.id,
-            lrn: student.lrn,
-            gender: student.gender || "Unspecified",
-            firstName: student.profiles?.first_name || "",
-            lastName: student.profiles?.last_name || "",
-          }))}
+          students={studentRows}
           isAdvisory={assignment.sections.adviser_id === teacher?.id}
         />
       ) : (
@@ -142,13 +141,10 @@ export default async function ClassRecordPage({ params, searchParams }) {
             classRecord?.workflow_status || GRADE_WORKFLOW.DRAFT
           }
           reviewNotes={classRecord?.review_notes || null}
-          students={(students || []).map((student) => ({
-            id: student.id,
-            lrn: student.lrn,
-            gender: student.gender || "Unspecified",
-            firstName: student.profiles?.first_name || "",
-            lastName: student.profiles?.last_name || "",
-          }))}
+          students={studentRows}
           isAdvisory={assignment.sections.adviser_id === teacher?.id}
         />
       )}
+    </AppShell>
+  );
+}
