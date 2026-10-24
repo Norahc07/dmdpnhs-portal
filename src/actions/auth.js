@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   formatBirthdatePassword,
-  parentEmailFromCode,
   ROLE_HOME,
   studentEmailFromLrn,
   teacherIdYearCode,
@@ -299,74 +298,57 @@ export async function resetStudentPassword(form) {
   return { ok: true, message: "Password updated. You can sign in now." };
 }
 
-export async function loginParent({ accessCode }) {
-  const code = String(accessCode || "").trim().toUpperCase();
-  if (!code) return { error: "Enter your Parent Access Code." };
+/**
+ * Faculty reset: Teacher ID + registered email must match, then set a new password.
+ * Registrars should contact the school admin (no self-reset).
+ */
+export async function resetStaffPassword(form) {
+  const teacherId = String(form.teacherId || "").trim().toUpperCase();
+  const email = String(form.email || "").trim().toLowerCase();
+  const password = String(form.password || "");
+  const confirmPassword = String(form.confirmPassword || "");
+
+  if (!/^T\d{2}-\d{5}$/.test(teacherId)) {
+    return { error: "Enter your Teacher ID (e.g. T26-43817)." };
+  }
+  if (!email) return { error: "Enter the email used on your faculty account." };
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match." };
+  }
 
   const admin = createAdminClient();
-  const { data: parent, error } = await admin
-    .from("parents")
-    .select("id, access_code, profile_id, profiles(id, email, first_name, last_name, status)")
-    .eq("access_code", code)
+  const { data: teacher } = await admin
+    .from("teachers")
+    .select("id, profile_id, teacher_id, profiles(email, role)")
+    .eq("teacher_id", teacherId)
     .maybeSingle();
 
-  if (error || !parent) {
-    return { error: "Invalid Parent Access Code." };
+  if (!teacher?.profile_id || !teacher.profiles?.email) {
+    return { error: "Teacher ID not found." };
+  }
+  if (String(teacher.profiles.email).toLowerCase() !== email) {
+    return { error: "Teacher ID and email do not match." };
+  }
+  if (teacher.profiles.role !== "teacher") {
+    return { error: "Use this reset only for faculty accounts." };
   }
 
-  const email =
-    parent.profiles?.email || parentEmailFromCode(code);
-  const password = code;
-  const supabase = await createClient();
-
-  let { error: signError } = await supabase.auth.signInWithPassword({
-    email,
+  const { error } = await admin.auth.admin.updateUserById(teacher.profile_id, {
     password,
+    email_confirm: true,
   });
+  if (error) return { error: error.message };
+  return { ok: true, message: "Password updated. You can sign in now." };
+}
 
-  if (signError) {
-    const { data: created, error: createError } =
-      await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { role: "parent" },
-      });
-
-    if (createError) {
-      const { data: list } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-      const existing = list?.users?.find((u) => u.email === email);
-      if (!existing) return { error: createError.message };
-      await admin.auth.admin.updateUserById(existing.id, {
-        password,
-        email_confirm: true,
-      });
-    } else if (created?.user) {
-      await admin.from("profiles").upsert({
-        id: created.user.id,
-        role: "parent",
-        first_name: parent.profiles?.first_name || "Parent",
-        last_name: parent.profiles?.last_name || code,
-        email,
-        status: "active",
-      });
-      await admin
-        .from("parents")
-        .update({ profile_id: created.user.id })
-        .eq("id", parent.id);
-    }
-
-    ({ error: signError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    }));
-  }
-
-  if (signError) return { error: signError.message };
-  redirect("/parent");
+export async function loginParent() {
+  return {
+    error:
+      "The parent portal is no longer available. Grades and attendance are in the student portal.",
+  };
 }
 
 /**
@@ -423,6 +405,14 @@ export async function loginStaff({ email, password }) {
     .maybeSingle();
 
   if (!profile) return { error: "Profile not found. Contact the registrar." };
+
+  if (profile.role === "parent") {
+    await supabase.auth.signOut();
+    return {
+      error:
+        "The parent portal is no longer available. Grades and attendance are in the student portal.",
+    };
+  }
 
   if (profile.role === "teacher" && profile.status === "pending") {
     redirect("/teacher/pending");
@@ -494,6 +484,61 @@ export async function registerTeacher(formData) {
   await supabase.auth.signInWithPassword({ email, password });
 
   redirect("/teacher/pending");
+}
+
+export async function changeAccountPassword({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+}) {
+  const current = String(currentPassword || "");
+  const next = String(newPassword || "");
+  const confirm = String(confirmPassword || "");
+
+  if (!current) return { error: "Enter your current password." };
+  if (next.length < 5) {
+    return { error: "New password must be at least 5 characters." };
+  }
+  if (next !== confirm) return { error: "New passwords do not match." };
+  if (current === next) {
+    return { error: "Choose a new password that is different from the current one." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, role, email")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile || !["student", "teacher"].includes(profile.role)) {
+    return { error: "This password page is for students and educators." };
+  }
+
+  const email = user.email || profile.email;
+  if (!email) return { error: "Account email was not found." };
+
+  const { error: checkError } = await supabase.auth.signInWithPassword({
+    email,
+    password: current,
+  });
+  if (checkError) return { error: "Current password is incorrect." };
+
+  const { error } = await supabase.auth.updateUser({ password: next });
+  if (error) return { error: error.message };
+
+  const home = profile.role === "teacher" ? "/teacher" : "/student";
+  revalidatePath(`${home}/password`);
+  revalidatePath(`${home}/settings`);
+  return { ok: true };
+}
+
+export async function changeStudentPassword(payload) {
+  return changeAccountPassword(payload);
 }
 
 export async function logout() {

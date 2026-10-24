@@ -107,7 +107,7 @@ async function publishGradesFromRecord(
 
   if (!gradeRows.length) {
     return {
-      error: `No ${termLabel(recordTerm)} scores to publish. Complete the grade sheet first.`,
+      error: `No ${termLabel(recordTerm)} final grades to publish. Encode Final Grade first.`,
     };
   }
 

@@ -1,6 +1,8 @@
 /**
- * Portal calendar helpers — PH holidays, annual school events, birthdays.
+ * Portal calendar helpers — official DepEd dates, class events, birthdays.
  */
+
+export { YEARLY_HOLIDAYS } from "@/lib/deped-school-calendar";
 
 export const CALENDAR_EVENT_STYLES = {
   assignment: {
@@ -28,6 +30,16 @@ export const CALENDAR_EVENT_STYLES = {
     badge: "bg-violet-100 text-violet-800 border-violet-200",
     label: "Holiday",
   },
+  enrollment: {
+    dot: "bg-teal-500",
+    badge: "bg-teal-100 text-teal-800 border-teal-200",
+    label: "Enrollment",
+  },
+  deped: {
+    dot: "bg-indigo-500",
+    badge: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    label: "DepEd date",
+  },
   important: {
     dot: "bg-orange-500",
     badge: "bg-orange-100 text-orange-900 border-orange-200",
@@ -44,174 +56,6 @@ export const CALENDAR_EVENT_STYLES = {
     label: "Your birthday",
   },
 };
-
-/** Fixed Philippine / school holidays shown every year (month 1–12, day). */
-export const YEARLY_HOLIDAYS = [
-  { month: 1, day: 1, title: "New Year’s Day", description: "Regular holiday" },
-  {
-    month: 2,
-    day: 25,
-    title: "EDSA People Power Revolution Anniversary",
-    description: "Special non-working / commemorative day",
-  },
-  {
-    month: 4,
-    day: 9,
-    title: "Araw ng Kagitingan",
-    description: "Day of Valor — regular holiday",
-  },
-  { month: 5, day: 1, title: "Labor Day", description: "Regular holiday" },
-  {
-    month: 6,
-    day: 12,
-    title: "Independence Day",
-    description: "Regular holiday",
-  },
-  {
-    month: 8,
-    day: 21,
-    title: "Ninoy Aquino Day",
-    description: "Special non-working holiday",
-  },
-  {
-    month: 8,
-    day: 25,
-    title: "National Heroes Day (observance week)",
-    description: "Usually last Monday of August — check official proclamation",
-  },
-  {
-    month: 11,
-    day: 1,
-    title: "All Saints’ Day",
-    description: "Special non-working holiday",
-  },
-  {
-    month: 11,
-    day: 2,
-    title: "All Souls’ Day",
-    description: "Special working / non-working depending on proclamation",
-  },
-  {
-    month: 11,
-    day: 30,
-    title: "Bonifacio Day",
-    description: "Regular holiday",
-  },
-  {
-    month: 12,
-    day: 8,
-    title: "Feast of the Immaculate Conception",
-    description: "Special non-working holiday",
-  },
-  {
-    month: 12,
-    day: 24,
-    title: "Christmas Eve",
-    description: "Special non-working holiday",
-  },
-  { month: 12, day: 25, title: "Christmas Day", description: "Regular holiday" },
-  { month: 12, day: 30, title: "Rizal Day", description: "Regular holiday" },
-  {
-    month: 12,
-    day: 31,
-    title: "New Year’s Eve",
-    description: "Special non-working holiday",
-  },
-];
-
-/** Recurring school / DepEd-style important dates every year. */
-export const YEARLY_IMPORTANT_EVENTS = [
-  {
-    month: 6,
-    day: 1,
-    title: "School year opening (typical)",
-    description: "Classes usually open in June — confirm with school bulletin.",
-  },
-  {
-    month: 6,
-    day: 12,
-    title: "Flag ceremony · Independence Day week",
-    description: "School patriotism activities around Independence Day.",
-  },
-  {
-    month: 8,
-    day: 1,
-    title: "Buwan ng Wika begins",
-    description: "National Language Month activities.",
-  },
-  {
-    month: 8,
-    day: 19,
-    title: "Buwan ng Wika culminating week",
-    description: "School programs celebrating Filipino language and culture.",
-  },
-  {
-    month: 9,
-    day: 5,
-    title: "First grading / mid-term checkpoint (typical)",
-    description: "Check official grading schedule from the registrar.",
-  },
-  {
-    month: 10,
-    day: 5,
-    title: "World Teachers’ Day",
-    description: "Appreciate teachers and school staff.",
-  },
-  {
-    month: 10,
-    day: 24,
-    title: "United Nations Day",
-    description: "UN / cultural awareness school activities.",
-  },
-  {
-    month: 11,
-    day: 25,
-    title: "National Reading Month highlight",
-    description: "Reading campaigns and literacy activities.",
-  },
-  {
-    month: 12,
-    day: 15,
-    title: "Christmas break (typical start)",
-    description: "Confirm exact vacation dates with the school calendar.",
-  },
-  {
-    month: 1,
-    day: 6,
-    title: "Classes resume after Christmas (typical)",
-    description: "Confirm exact return date with the school bulletin.",
-  },
-  {
-    month: 2,
-    day: 14,
-    title: "Valentine’s / Friendship Day activities",
-    description: "Optional school social activities.",
-  },
-  {
-    month: 3,
-    day: 15,
-    title: "Third grading / pre-final checkpoint (typical)",
-    description: "Check official term dates from the registrar.",
-  },
-  {
-    month: 4,
-    day: 1,
-    title: "Final examination period (typical)",
-    description: "Confirm exact exam weeks with teachers / registrar.",
-  },
-  {
-    month: 4,
-    day: 15,
-    title: "Graduation / moving-up season",
-    description: "End-of-year ceremonies — watch school announcements.",
-  },
-  {
-    month: 5,
-    day: 15,
-    title: "End of school year / enrollment prep",
-    description: "Summer break and next SY enrollment window.",
-  },
-];
 
 export function pad2(n) {
   return String(n).padStart(2, "0");
@@ -321,12 +165,14 @@ export function sortCalendarEvents(events = []) {
   const order = {
     birthday_mine: 0,
     holiday: 1,
-    important: 2,
+    enrollment: 2,
     exam: 3,
     school_event: 4,
-    assignment: 5,
-    activity: 6,
-    birthday: 7,
+    deped: 5,
+    important: 6,
+    assignment: 7,
+    activity: 8,
+    birthday: 9,
   };
   return [...events].sort((a, b) => {
     const dateCmp = String(a.event_date).localeCompare(String(b.event_date));

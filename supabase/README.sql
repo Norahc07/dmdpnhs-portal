@@ -10,3 +10,7 @@
 -- Optional: student-dashboard-upgrade.sql + seed-student-dashboard-demo.sql
 -- Optional: profile-upgrade.sql (teacher details + avatars bucket for My Profile pages)
 -- Optional: grade-validation-upgrade.sql (departments, faculty positions, reading committee / lock workflow)
+-- Optional: section-secretary.sql (class secretary attendance access granted by the adviser)
+-- Optional: announcements.sql (teacher posts to sections + student notifications)
+-- Optional: student-documents.sql (required uploads + review statuses)
+-- Optional: seed-grade12-humss-2025-2026.sql (Grade 12 HUMSS-A through HUMSS-H)

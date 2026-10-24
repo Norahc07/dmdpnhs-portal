@@ -23,6 +23,8 @@ export function AttendanceDetailControls({
   date,
   subjects = [],
   subjectId = "",
+  hideHomeroom = false,
+  periodHeading = "Subject period",
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -82,7 +84,7 @@ export function AttendanceDetailControls({
       {periodChips.length > 1 ? (
         <div>
           <p className="mb-2 text-[11px] font-semibold tracking-wide text-[#800000] uppercase">
-            Subject period
+            {periodHeading}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {periodChips.map((chip) => {

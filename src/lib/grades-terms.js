@@ -15,8 +15,8 @@ export const GRADE_TERMS = [
   {
     value: 3,
     key: "finalTerm",
-    shortLabel: "Final Term",
-    label: "Final Term",
+    shortLabel: "3rd Term",
+    label: "3rd Term",
   },
 ];
 

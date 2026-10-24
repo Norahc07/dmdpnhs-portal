@@ -3,7 +3,7 @@ import { ClassRecordCards } from "@/components/teacher/ClassRecordCards";
 import { requireRole } from "@/lib/auth-guard";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
-export const metadata = { title: "Class Records" };
+export const metadata = { title: "Academic Records" };
 
 export default async function TeacherGradebookPage() {
   const { supabase, profile } = await requireRole("teacher");
@@ -103,8 +103,8 @@ export default async function TeacherGradebookPage() {
       role="teacher"
       profile={profile}
       teacherAccess={teacherAccess}
-      title="Class Records"
-      subtitle="Create a class record for 1st, 2nd, and Final Term each school year. Submit for department head / committee validation."
+      title="Academic Records"
+      subtitle="Grade 12 HUMSS: Final Grade and Remarks for Term 1, Term 2, and Term 3. Earlier terms stay visible."
     >
       <ClassRecordCards groups={groups} />
     </AppShell>

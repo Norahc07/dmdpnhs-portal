@@ -11,6 +11,11 @@ import {
   GRADE_WORKFLOW,
   canTeacherEditWorkflow,
 } from "@/lib/grade-workflow";
+import {
+  assertHumssAttendanceSubject,
+  assertSecretaryCanMarkSection,
+  assertTeacherCanMarkSection,
+} from "@/lib/class-secretary";
 
 export async function updateSubjectWeights({
   subjectId,
@@ -105,6 +110,15 @@ export async function saveGradeRecord({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
+
+  const { data: teacherAccount } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("profile_id", user.id)
+    .maybeSingle();
+  if (!teacherAccount) {
+    return { error: "Only educators can encode grades." };
+  }
 
   const computed = computeDepEdGrade({
     writtenScores,
@@ -291,17 +305,45 @@ export async function markAttendance({
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile) return { error: "Profile not found." };
+
   const allowed = ["present", "absent", "late", "excused"];
   if (!allowed.includes(status)) {
     return { error: "Invalid attendance status." };
   }
+  if (!sectionId) return { error: "Section is required." };
+
+  const admin = createAdminClient();
+  const sid = subjectId || null;
+
+  if (profile.role === "teacher") {
+    const gate = await assertTeacherCanMarkSection(admin, profile.id, sectionId);
+    if (gate.error) return gate;
+  } else if (profile.role === "student") {
+    const gate = await assertSecretaryCanMarkSection(
+      admin,
+      profile.id,
+      sectionId,
+      sid
+    );
+    if (gate.error) return gate;
+  } else {
+    return { error: "Not allowed to mark attendance." };
+  }
+
+  const humssGate = await assertHumssAttendanceSubject(admin, sectionId, sid);
+  if (humssGate.error) return humssGate;
 
   const attendanceDate = date || new Date().toISOString().slice(0, 10);
-  const sid = subjectId || null;
 
   // Partial unique indexes (homeroom vs subject) are not usable with PostgREST
   // ON CONFLICT — find the row first, then update or insert.
-  let existingQuery = supabase
+  let existingQuery = admin
     .from("attendance")
     .select("id")
     .eq("student_id", studentId)
@@ -328,7 +370,7 @@ export async function markAttendance({
     };
     if (sid) updatePayload.subject_id = sid;
 
-    const res = await supabase
+    const res = await admin
       .from("attendance")
       .update(updatePayload)
       .eq("id", existing.id)
@@ -345,7 +387,7 @@ export async function markAttendance({
       subject_id: sid,
     };
 
-    const res = await supabase
+    const res = await admin
       .from("attendance")
       .insert(insertPayload)
       .select("*")
@@ -355,7 +397,7 @@ export async function markAttendance({
 
     // Legacy DB without subject_id column
     if (error && /subject_id/i.test(String(error.message || ""))) {
-      const retry = await supabase
+      const retry = await admin
         .from("attendance")
         .insert({
           student_id: studentId,
@@ -374,7 +416,7 @@ export async function markAttendance({
       error &&
       /duplicate|unique/i.test(String(error.message || ""))
     ) {
-      let raceQuery = supabase
+      let raceQuery = admin
         .from("attendance")
         .select("id")
         .eq("student_id", studentId)
@@ -384,7 +426,7 @@ export async function markAttendance({
 
       const { data: raced } = await raceQuery.maybeSingle();
       if (raced?.id) {
-        const retry = await supabase
+        const retry = await admin
           .from("attendance")
           .update({ status, section_id: sectionId })
           .eq("id", raced.id)
@@ -409,7 +451,10 @@ export async function markAttendance({
 
   // Optimistic UI already updates teacher attendance; avoid full RSC refresh.
   revalidatePath("/student/attendance");
-  revalidatePath("/parent/attendance");
+  revalidatePath("/student/class-attendance");
+  revalidatePath("/student/class-attendance/history");
+  revalidatePath("/student/class-secretary");
+  revalidatePath("/teacher/attendance");
   return { data };
 }
 

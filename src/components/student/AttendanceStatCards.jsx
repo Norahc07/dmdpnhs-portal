@@ -32,12 +32,12 @@ export function AttendanceStatCards({ stats }) {
 
   return (
     <div
-      className="grid w-full grid-cols-4 gap-2 sm:gap-3"
-      style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+      className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3"
     >
       <StatCard label="Present" value={stats?.present || 0} tone="text-emerald-700" />
-      <StatCard label="Tardy" value={stats?.tardy || 0} tone="text-amber-700" />
+      <StatCard label="Late" value={stats?.tardy || 0} tone="text-amber-700" />
       <StatCard label="Absent" value={stats?.absent || 0} tone="text-rose-700" />
+      <StatCard label="Excused" value={stats?.excused || 0} tone="text-sky-700" />
       <StatCard
         label="Attendance rate"
         value={`${rate}%`}
@@ -56,7 +56,7 @@ export function AttendanceLegend() {
     },
     {
       key: "late",
-      label: "Tardy (often 1st subject)",
+      label: "Late",
       ...ATTENDANCE_STATUS_META.late,
     },
     {

@@ -14,13 +14,18 @@ export const metadata = { title: "Evaluation" };
 
 export default async function StudentEvaluationPage({ searchParams }) {
   const params = await searchParams;
-  const { profile } = await requireRole("student");
+  const { profile, studentAccess } = await requireRole("student");
   const ctx = await getEvaluationContext();
   const term = Number(params.term) || currentEvaluationTerm();
 
   if (ctx.error) {
     return (
-      <AppShell role="student" profile={profile} title="Evaluation">
+      <AppShell
+        role="student"
+        profile={profile}
+        title="Evaluation"
+        studentAccess={studentAccess}
+      >
         <p className="text-sm text-muted-foreground">{ctx.error}</p>
       </AppShell>
     );
@@ -52,8 +57,8 @@ export default async function StudentEvaluationPage({ searchParams }) {
       role="student"
       profile={profile}
       title="Term evaluation"
-      subtitle={`LRN ${ctx.lrn || "—"} · Finish system + every subject teacher to unlock Term ${term} grades.`}
-      studentAccess={{ activated: true, enrolled: true }}
+      subtitle={`LRN ${ctx.lrn || "—"} · Finish system, self-assessment, and every subject teacher to unlock Term ${term} grades.`}
+      studentAccess={studentAccess}
     >
       {listed.tableMissing ? (
         <div className="mb-4 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm text-amber-950 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.2)]">
@@ -70,8 +75,22 @@ export default async function StudentEvaluationPage({ searchParams }) {
           systemExisting={systemExisting}
           teacherExistings={teacherExistings}
           progress={progress}
-        />
-      </div>
+          selfExisting={selfExisting}
+          teacherExistings={teacherExistings}
+          progress={progress}
+          records={(evaluations || []).map((row) => ({
+            ...row,
+            targetLabel:
+              row.evaluation_type === "teacher"
+                ? ctx.teachers?.find(
+                    (t) =>
+                      t.teacherId === row.target_teacher_id &&
+                      t.subjectId === row.target_subject_id
+                  )?.subjectName || "Subject teacher"
+                : row.evaluation_type === "self"
+                  ? "Yourself"
+                  : "PastraPortal",
+          }))}
     </AppShell>
   );
 }

@@ -25,9 +25,27 @@ export function AttendanceHistoryTable({
   day = null,
   selectedDate = null,
   allowExcuse = true,
+  expectedSubjects = [],
 }) {
   const [excuseTarget, setExcuseTarget] = useState(null);
-  const periods = day?.periods || [];
+  const recorded = day?.periods || [];
+  const periods =
+    expectedSubjects.length === 0
+      ? recorded
+      : expectedSubjects.map((name, index) => {
+          const hit = recorded.find(
+            (row) =>
+              String(row.subjectName || "").toLowerCase() ===
+              String(name).toLowerCase()
+          );
+          return (
+            hit || {
+              id: `expected-${selectedDate}-${index}`,
+              subjectName: name,
+              status: null,
+            }
+          );
+        });
   const isDemoDay = periods.some((p) => p._demo);
   const showActions = allowExcuse;
 
@@ -99,6 +117,9 @@ export function AttendanceHistoryTable({
               </TableRow>
             )}
             {periods.map((p, index) => {
+              const statusLabel = p.status
+                ? attendanceLabel(p.status)
+                : "Not marked";
               const canExcuse =
                 allowExcuse &&
                 p.status === "absent" &&
@@ -116,10 +137,11 @@ export function AttendanceHistoryTable({
                     <span
                       className={cn(
                         "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
-                        ATTENDANCE_STATUS_META[p.status]?.chip
+                        ATTENDANCE_STATUS_META[p.status]?.chip ||
+                          "border-[#800000]/15 bg-[#faf7f5] text-muted-foreground"
                       )}
                     >
-                      {attendanceLabel(p.status)}
+                      {statusLabel}
                     </span>
                     {p.excuse ? (
                       <span className="ml-2 text-[11px] text-muted-foreground">

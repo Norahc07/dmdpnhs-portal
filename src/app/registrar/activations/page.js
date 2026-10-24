@@ -116,7 +116,7 @@ export default async function RegistrarActivationsPage() {
       role="registrar"
       profile={profile}
       title="Student activations"
-      subtitle="Call the parent/guardian number to confirm it is real, verify personal details, then Verify & Approve. DMDPNHS SMSs the Parent Access Code and notifies the student."
+      subtitle="Call the parent/guardian number to confirm it is real, verify personal details, then Verify & Approve. DMDPNHS notifies the student and sends guardian SMS alerts to this number."
     >
       <PendingActivationsTable
         pendingRows={pendingRows}

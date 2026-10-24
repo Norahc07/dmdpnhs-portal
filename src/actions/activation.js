@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
-  parentEmailFromCode,
+  formatBirthdatePassword,
+  isSeniorHighGrade,
   parentIdYearCode,
   portalBaseUrl,
   SCHOOL_SHORT,
@@ -85,8 +86,8 @@ async function findParentByPhone(admin, phone) {
 
 /**
  * Phase 2 — Student completes personal data + parent/guardian emergency contacts.
- * Creates or links parent. If parent already exists, SMS their access code.
- * Registrar must verify before portal is fully activated.
+ * Creates or links a guardian contact record (no parent portal login).
+ * Registrar must verify before the student portal is fully activated.
  */
 export async function submitStudentActivation(form) {
   const supabase = await createClient();
@@ -151,7 +152,7 @@ export async function submitStudentActivation(form) {
   if (!parentFirstName || !parentLastName || !parentPhone) {
     return {
       error:
-        "Enter parent/guardian full name and contact number (required for Parent Access Code).",
+        "Enter parent/guardian full name and contact number.",
     };
   }
   if (normalizePhone(parentPhone).length < 10) {
@@ -160,105 +161,24 @@ export async function submitStudentActivation(form) {
 
   const existingParent = await findParentByPhone(admin, parentPhone);
   let accessCode = existingParent?.access_code || null;
-  let parentUserId = existingParent?.profile_id || null;
   let parentRowId = existingParent?.id || null;
-  let parentAlreadyInSystem = Boolean(existingParent);
 
   if (!existingParent) {
     accessCode = await generateParentAccessCode(admin);
-    const parentLoginEmail = parentEmail || parentEmailFromCode(accessCode);
-
-    const { data: parentAuth, error: parentAuthError } =
-      await admin.auth.admin.createUser({
-        email: parentLoginEmail,
-        password: accessCode,
-        email_confirm: true,
-        user_metadata: {
-          role: "parent",
-          first_name: parentFirstName,
-          last_name: parentLastName,
-        },
-      });
-
-    parentUserId = parentAuth?.user?.id;
-
-    if (parentAuthError) {
-      const { data: list } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-      const existing = list?.users?.find(
-        (u) => String(u.email).toLowerCase() === parentLoginEmail
-      );
-      if (!existing) return { error: parentAuthError.message };
-      parentUserId = existing.id;
-      await admin.auth.admin.updateUserById(parentUserId, {
-        password: accessCode,
-        email_confirm: true,
-      });
-    }
-
-    await admin.from("profiles").upsert({
-      id: parentUserId,
-      role: "parent",
-      first_name: parentFirstName,
-      last_name: parentLastName,
-      email: parentLoginEmail,
-      status: "active",
-    });
-
     const { data: parentRow, error: parentInsertError } = await admin
       .from("parents")
-      .upsert(
-        {
-          profile_id: parentUserId,
-          access_code: accessCode,
-          phone_number: parentPhone,
-          email: parentEmail || null,
-          relationship: parentRelationship,
-        },
-        { onConflict: "profile_id" }
-      )
+      .insert({
+        access_code: accessCode,
+        phone_number: parentPhone,
+        email: parentEmail || null,
+        relationship: parentRelationship,
+      })
       .select("id, access_code")
       .single();
 
-    if (parentInsertError) {
-      const { data: existingParentRow } = await admin
-        .from("parents")
-        .select("id, access_code")
-        .eq("profile_id", parentUserId)
-        .maybeSingle();
-
-      if (existingParentRow) {
-        parentRowId = existingParentRow.id;
-        accessCode = existingParentRow.access_code || accessCode;
-        await admin
-          .from("parents")
-          .update({
-            phone_number: parentPhone,
-            email: parentEmail || null,
-            relationship: parentRelationship,
-          })
-          .eq("id", existingParentRow.id);
-      } else {
-        const { data: inserted, error: insErr } = await admin
-          .from("parents")
-          .insert({
-            profile_id: parentUserId,
-            access_code: accessCode,
-            phone_number: parentPhone,
-            email: parentEmail || null,
-            relationship: parentRelationship,
-          })
-          .select("id, access_code")
-          .single();
-        if (insErr) return { error: insErr.message };
-        parentRowId = inserted.id;
-      }
-    } else {
-      parentRowId = parentRow.id;
-      accessCode = parentRow.access_code || accessCode;
-    }
+    if (parentInsertError) return { error: parentInsertError.message };
+    parentRowId = parentRow.id;
+    accessCode = parentRow.access_code || accessCode;
   } else {
     await admin
       .from("parents")
@@ -320,22 +240,6 @@ export async function submitStudentActivation(form) {
 
   if (updateError) return { error: updateError.message };
 
-  const portalUrl = portalBaseUrl();
-  const parentLoginUrl = `${portalUrl}/login/parent`;
-
-  // If parent already in system, notify them immediately with their existing code
-  if (parentAlreadyInSystem && accessCode) {
-    try {
-      await sendSMS({
-        recipient: parentPhone,
-        message: `${SCHOOL_SHORT}: You already have a Parent Access Code (${accessCode}). Sign in at ${parentLoginUrl} to monitor your child's grades and attendance.`,
-        triggerType: "parent_access_code",
-      });
-    } catch {
-      // non-blocking
-    }
-  }
-
   revalidatePath("/student");
   revalidatePath("/student/pending");
   revalidatePath("/registrar/activations");
@@ -384,8 +288,6 @@ export async function approveStudentActivation({ studentId, approve }) {
 
     const parentPhone =
       link?.parents?.phone_number || student.emergency_contact_number;
-    const accessCode =
-      link?.parents?.access_code || student.parent_access_code_shown;
     const studentName = [
       student.profiles?.first_name,
       student.profiles?.last_name,
@@ -399,12 +301,6 @@ export async function approveStudentActivation({ studentId, approve }) {
           "Parent contact number is missing. Call and verify the parent number before approving.",
       };
     }
-    if (!accessCode) {
-      return {
-        error: "Parent Access Code is missing. Return the request so the student can resubmit.",
-      };
-    }
-
     await admin
       .from("students")
       .update({
@@ -421,14 +317,13 @@ export async function approveStudentActivation({ studentId, approve }) {
     }
 
     const portalUrl = portalBaseUrl();
-    const parentLoginUrl = `${portalUrl}/login/parent`;
     const studentLoginUrl = `${portalUrl}/login/student`;
 
     try {
       await sendSMS({
         recipient: parentPhone,
-        message: `${SCHOOL_SHORT}: Your Parent Access Code is ${accessCode}. Sign in at ${parentLoginUrl} to check ${studentName || "your child"}'s grades and attendance. Keep this code private.`,
-        triggerType: "parent_access_code",
+        message: `${SCHOOL_SHORT}: ${studentName || "Your child"}'s student portal is activated. You will receive SMS alerts for absences and grade updates on this number. Keep it updated with the school.`,
+        triggerType: "activation",
       });
     } catch {
       // non-blocking
@@ -614,7 +509,7 @@ export async function enrollStudentByRegistrar(form) {
   const gender = String(form.gender || "Male").trim();
   const gradeLevel = Number(form.gradeLevel);
   const sectionId = form.sectionId || null;
-  const password = `Tmp-${crypto.randomUUID().slice(0, 12)}!`;
+  const password = formatBirthdatePassword(birthdate);
 
   if (!/^\d{12}$/.test(lrn)) return { error: "LRN must be exactly 12 digits." };
   if (!birthdate || birthdate.replaceAll("-", "").length < 8) {
@@ -650,7 +545,7 @@ export async function enrollStudentByRegistrar(form) {
     first_name: firstName,
     last_name: lastName,
     email,
-    status: "pending",
+    status: "active",
   });
 
   if (profileError) {
@@ -666,7 +561,7 @@ export async function enrollStudentByRegistrar(form) {
     grade_level: gradeLevel,
     section_id: sectionId,
     status: "enrolled",
-    activation_status: "incomplete",
+    activation_status: "active",
   });
 
   if (studentError) {
@@ -681,7 +576,7 @@ export async function enrollStudentByRegistrar(form) {
   revalidatePath("/registrar/academics");
   return {
     ok: true,
-    message: `Enrolled LRN ${lrn}. Student can activate at /register/student using LRN + birthdate.`,
+    message: `Enrolled and activated LRN ${lrn}. Sign in at Student Login with LRN and birthdate (YYYYMMDD) as the password.`,
     lrn,
   };
 }
@@ -856,11 +751,17 @@ export async function createSection(form) {
     return { error: "Select a valid grade level." };
   }
 
+  const trackStrand = isSeniorHighGrade(gradeLevel)
+    ? String(form.trackStrand || "").trim() || null
+    : null;
+
   const { error } = await gate.supabase.from("sections").insert({
     section_name: sectionName,
     grade_level: gradeLevel,
     school_year: schoolYear,
     adviser_id: adviserId,
+    track_strand: trackStrand,
+    capacity: 45,
   });
 
   if (error) return { error: error.message };

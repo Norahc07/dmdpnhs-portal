@@ -4,7 +4,6 @@ import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
-  ClipboardCheck,
   Home,
   IdCard,
   Mail,
@@ -204,13 +203,6 @@ export function ParentChildProfileCard({ child }) {
               >
                 <CalendarDays className="size-3.5 text-[#800000]" />
                 Attendance
-              </Link>
-              <Link
-                href="/parent/evaluation"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-white px-3.5 text-xs font-semibold text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-[#faf7f5]"
-              >
-                <ClipboardCheck className="size-3.5 text-[#800000]" />
-                Evaluation
               </Link>
             </div>
           </div>

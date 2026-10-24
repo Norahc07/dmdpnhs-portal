@@ -12,7 +12,11 @@ const PORTALS = [
     eyebrow: "Learner access",
     description:
       "View grades, attendance, and request official documents in one secure place built for every school day.",
-    features: ["Grades & transcripts", "Attendance record", "Document requests"],
+    features: [
+      "LRN and password sign-in",
+      "Class secretary access if appointed",
+      "Grades, attendance, and documents",
+    ],
     href: "/login/student",
     cta: "Enter student portal",
     quote: "Every grade and attendance mark is a step toward your goals—stay curious, stay present.",
@@ -22,31 +26,21 @@ const PORTALS = [
     imageLeft: true,
   },
   {
-    role: "Parent",
-    eyebrow: "Family hub",
-    description:
-      "Follow your child’s progress with live grades and attendance updates so you always know how they’re doing.",
-    features: ["Daily attendance", "Real-time grades", "Progress overview"],
-    href: "/login/parent",
-    cta: "Enter parent portal",
-    quote: "When you follow their progress with care, you walk beside them every school day.",
-    image:
-      "https://images.unsplash.com/photo-1476703993599-0035a21b17a9?auto=format&fit=crop&w=1200&q=80",
-    alt: "Parent supporting a learner",
-    imageLeft: false,
-  },
-  {
     role: "Educator",
     eyebrow: "Faculty console",
     description:
       "Record scores, mark attendance, and manage classes from anywhere with tools designed for teachers.",
-    features: ["Interactive gradebook", "Smart attendance", "Class management"],
+    features: [
+      "Email or Teacher ID sign-in",
+      "Gradebook, attendance, and classes",
+      "Registrar uses the same educator login",
+    ],
     href: "/login/teacher",
     cta: "Enter educator portal",
     quote: "A clear gradebook and mindful attendance turn teaching into lasting guidance.",
     image: "/images/portal-educator.jpg",
     alt: "Teacher helping a student with schoolwork",
-    imageLeft: true,
+    imageLeft: false,
   },
 ];
 
@@ -133,8 +127,8 @@ export function PortalCards() {
           </h2>
           <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-[#ffd700]" />
           <p className="mt-3 font-sans text-sm leading-relaxed text-neutral-600 sm:text-base">
-            Three clear pathways—pick the one that matches your role. Image on
-            one side, details and access on the other.
+            Two clear pathways—Student and Educator. Image on one side, details
+            and access on the other.
           </p>
         </ScrollReveal>
 

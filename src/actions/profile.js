@@ -3,12 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { generateParentAccessCode } from "@/actions/activation";
-import {
-  parentEmailFromCode,
-  portalBaseUrl,
-  SCHOOL_SHORT,
-} from "@/lib/constants";
+import { SCHOOL_SHORT } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -59,15 +54,14 @@ function extensionFor(type) {
 }
 
 /**
- * When parent/emergency phone changes: rotate Parent Access Code,
- * update linked parent + auth password, SMS the new code to the new number.
+ * When parent/emergency phone changes: update the linked guardian contact
+ * and SMS that absence/grade alerts will go to the new number.
  */
-async function rotateParentAccessCodeForStudent({
+async function updateGuardianPhoneForStudent({
   admin,
   studentId,
   studentName,
   newPhone,
-  parentDisplayName,
 }) {
   const digits = normalizePhone(newPhone);
   if (digits.length < 10) {
@@ -76,7 +70,7 @@ async function rotateParentAccessCodeForStudent({
 
   const { data: link } = await admin
     .from("parent_student_links")
-    .select("parent_id, parents(id, profile_id, access_code, phone_number)")
+    .select("parent_id, parents(id, phone_number)")
     .eq("student_id", studentId)
     .maybeSingle();
 
@@ -92,7 +86,7 @@ async function rotateParentAccessCodeForStudent({
     if (student?.parent_access_code_shown) {
       const { data: byCode } = await admin
         .from("parents")
-        .select("id, profile_id, access_code, phone_number")
+        .select("id, phone_number")
         .eq("access_code", student.parent_access_code_shown)
         .maybeSingle();
       parent = byCode;
@@ -106,63 +100,21 @@ async function rotateParentAccessCodeForStudent({
     };
   }
 
-  const newCode = await generateParentAccessCode(admin);
-  const newEmail = parentEmailFromCode(newCode);
-
-  const nameParts = String(parentDisplayName || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const firstName = nameParts[0] || "Parent";
-  const lastName =
-    nameParts.length > 1 ? nameParts.slice(1).join(" ") : "Guardian";
-
   const { error: parentUpdateError } = await admin
     .from("parents")
-    .update({
-      phone_number: newPhone,
-      access_code: newCode,
-    })
+    .update({ phone_number: newPhone })
     .eq("id", parent.id);
 
   if (parentUpdateError) return { error: parentUpdateError.message };
 
-  await admin
-    .from("students")
-    .update({ parent_access_code_shown: newCode })
-    .eq("id", studentId);
-
-  if (parent.profile_id) {
-    await admin
-      .from("profiles")
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        email: newEmail,
-      })
-      .eq("id", parent.profile_id);
-
-    try {
-      await admin.auth.admin.updateUserById(parent.profile_id, {
-        email: newEmail,
-        password: newCode,
-        email_confirm: true,
-      });
-    } catch {
-      // Auth sync is best-effort; parents.access_code remains login source of truth
-    }
-  }
-
-  const parentLoginUrl = `${portalBaseUrl()}/login/parent`;
   const sms = await sendSMS({
     recipient: newPhone,
-    message: `${SCHOOL_SHORT}: Your Parent Access Code was updated to ${newCode}. Sign in at ${parentLoginUrl} to check ${studentName || "your child"}'s grades and attendance. Keep this code private.`,
-    triggerType: "parent_access_code",
+    message: `${SCHOOL_SHORT}: Guardian contact number updated for ${studentName || "your child"}. Absence and grade SMS alerts will be sent to this number.`,
+    triggerType: "activation",
   });
 
   return {
     ok: true,
-    accessCode: newCode,
     smsSent: sms.ok,
     smsError: sms.error || null,
   };
@@ -321,17 +273,16 @@ export async function updateStudentProfile(payload) {
 
   if (parentPhoneChanged) {
     const studentName = [firstName, lastName].filter(Boolean).join(" ");
-    const rotated = await rotateParentAccessCodeForStudent({
+    const rotated = await updateGuardianPhoneForStudent({
       admin,
       studentId: student.id,
       studentName,
       newPhone: emergencyContactNumber,
-      parentDisplayName: emergencyContactName,
     });
 
     if (rotated?.error) {
       return {
-        error: `Profile saved, but parent access code could not be updated: ${rotated.error}`,
+        error: `Profile saved, but guardian contact could not be updated: ${rotated.error}`,
       };
     }
 

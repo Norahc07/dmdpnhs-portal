@@ -16,8 +16,8 @@ export const ATTENDANCE_STATUS_META = {
     dot: "bg-rose-500",
   },
   late: {
-    label: "Tardy",
-    short: "T",
+    label: "Late",
+    short: "L",
     color: "#ca8a04",
     chip: "bg-amber-100 text-amber-900 border-amber-200",
     dot: "bg-amber-400",
@@ -39,7 +39,7 @@ const DAY_STATUS_PRIORITY = ["absent", "late", "excused", "present"];
 /**
  * One color for the whole calendar day (not per-subject dots):
  * - Green  = all subjects Present
- * - Orange = Tardy/Late (usually 1st subject), no unexcused absence
+ * - Orange = Late (usually 1st subject), no unexcused absence
  * - Blue   = Excused on some/all subjects (e.g. emergency), no unexcused absence
  * - Red    = any Unexcused Absent
  */
@@ -176,24 +176,22 @@ const DEMO_SUBJECTS = [
 /**
  * Demo subject-period attendance for UI walkthrough when DB has no rows yet.
  */
-export function buildDemoAttendanceRecords(month, year) {
+export function buildDemoAttendanceRecords(
+  month,
+  year,
+  subjectNames = DEMO_SUBJECTS
+) {
+  const names = subjectNames.length ? subjectNames : DEMO_SUBJECTS;
   const m = Number(month);
   const y = Number(year);
   const daysInMonth = new Date(y, m, 0).getDate();
   const records = [];
-  let seq = 0;
 
-  // Clear day-type demos so calendar colors are easy to understand
   const patterns = [
-    // Green — all present
     ["present", "present", "present", "present", "present", "present", "present"],
-    // Orange — tardy on first subject only
     ["late", "present", "present", "present", "present", "present", "present"],
-    // Blue — some present, rest excused (emergency / calamity)
     ["present", "present", "present", "excused", "excused", "excused", "excused"],
-    // Red — unexcused absence on a subject
     ["present", "present", "absent", "present", "present", "present", "present"],
-    // Green again
     ["present", "present", "present", "present", "present", "present", "present"],
   ];
 
@@ -201,16 +199,14 @@ export function buildDemoAttendanceRecords(month, year) {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateObj = new Date(y, m - 1, day);
     const weekday = dateObj.getDay();
-    if (weekday === 0 || weekday === 6) continue; // weekends off
-    // Skip a few days to look realistic
+    if (weekday === 0 || weekday === 6) continue;
     if (day % 11 === 0) continue;
 
     const date = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const pattern = patterns[patternIdx % patterns.length];
     patternIdx += 1;
 
-    DEMO_SUBJECTS.forEach((subjectName, i) => {
-      seq += 1;
+    names.forEach((subjectName, i) => {
       const status = pattern[i] || "present";
       records.push({
         id: `demo-${date}-${i}`,
@@ -219,12 +215,7 @@ export function buildDemoAttendanceRecords(month, year) {
         subject_id: `demo-sub-${i}`,
         subjectName,
         notes: null,
-        excuse:
-          status === "absent" && day % 5 === 0
-            ? null
-            : status === "absent"
-              ? null
-              : null,
+        excuse: null,
         _demo: true,
       });
     });

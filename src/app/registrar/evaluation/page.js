@@ -74,14 +74,14 @@ export default async function RegistrarEvaluationPage() {
               average={result.summary?.teacherSection?.average}
             />
             <Stat
-              label="Parent → System"
-              count={result.summary?.parentSystem.count || 0}
-              average={result.summary?.parentSystem.average}
+              label="Student self-assessment"
+              count={result.summary?.studentSelf?.count || 0}
+              average={result.summary?.studentSelf?.average}
             />
             <Stat
-              label="Parent → Child"
-              count={result.summary?.parentChild?.count || 0}
-              average={result.summary?.parentChild?.average}
+              label="Teacher → Students"
+              count={result.summary?.teacherStudent?.count || 0}
+              average={result.summary?.teacherStudent?.average}
             />
           </div>
         </div>

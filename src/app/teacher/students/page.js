@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookOpen, GraduationCap, ShieldCheck, Users } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { AssignSecretaryButton } from "@/components/teacher/AssignSecretaryButton";
 import { requireRole } from "@/lib/auth-guard";
+import { getSectionSecretaryId } from "@/lib/class-secretary";
 import { getTeacherAccess } from "@/lib/teacher-access";
 import {
   sealTeacherSectionToken,
@@ -116,12 +118,16 @@ export default async function TeacherStudentsPage({ searchParams }) {
   }
 
   const selectedSection = sections.find((s) => s.id === selectedId) || null;
+  const canAssignSecretary = Boolean(selectedSection?.isAdvisory);
+  const secretaryStudentId = canAssignSecretary
+    ? await getSectionSecretaryId(selectedId)
+    : null;
 
   const { data: students } = selectedId
     ? await supabase
         .from("students")
         .select(
-          "id, lrn, gender, grade_level, status, activation_status, section_id, profiles(first_name, last_name), sections(section_name, grade_level)"
+          "id, lrn, gender, grade_level, status, activation_status, section_id, profiles(first_name, last_name)"
         )
         .eq("section_id", selectedId)
         .eq("activation_status", "active")
@@ -134,7 +140,7 @@ export default async function TeacherStudentsPage({ searchParams }) {
       profile={profile}
       teacherAccess={teacherAccess}
       title="My students & sections"
-      subtitle="Click a section to view its active learner roster."
+      subtitle="Click a section to view its roster. Advisers can appoint a class secretary for attendance."
     >
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sections.map((s) => {
@@ -226,36 +232,64 @@ export default async function TeacherStudentsPage({ searchParams }) {
                 <TableHead className="text-[#3d1212]">Gender</TableHead>
                 <TableHead className="text-[#3d1212]">Section</TableHead>
                 <TableHead className="text-[#3d1212]">Status</TableHead>
+                {canAssignSecretary ? (
+                  <TableHead className="text-right text-[#3d1212]">
+                    Secretary
+                  </TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {!selectedId && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
+                  <TableCell
+                    colSpan={canAssignSecretary ? 6 : 5}
+                    className="text-muted-foreground"
+                  >
                     Click an assigned section above to load its roster.
                   </TableCell>
                 </TableRow>
               )}
               {selectedId && (students || []).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
+                  <TableCell
+                    colSpan={canAssignSecretary ? 6 : 5}
+                    className="text-muted-foreground"
+                  >
                     No active students in this section yet.
                   </TableCell>
                 </TableRow>
               )}
-              {(students || []).map((s) => (
+              {(students || []).map((s) => {
+                const isSecretary = s.id === secretaryStudentId;
+                return (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium text-[#3d1212]">
                     {s.profiles?.last_name}, {s.profiles?.first_name}
+                    {isSecretary ? (
+                      <span className="ml-2 inline-flex rounded-md bg-[#ffd700]/25 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#6a4d00] uppercase">
+                        Secretary
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell>{s.lrn}</TableCell>
                   <TableCell>{s.gender}</TableCell>
                   <TableCell>
-                    G{s.sections?.grade_level} {s.sections?.section_name}
+                    G{selectedSection?.grade_level} {selectedSection?.section_name}
                   </TableCell>
                   <TableCell>{s.status}</TableCell>
+                  {canAssignSecretary ? (
+                    <TableCell className="text-right">
+                      <AssignSecretaryButton
+                        sectionId={selectedId}
+                        studentId={s.id}
+                        isSecretary={isSecretary}
+                      />
+                    </TableCell>
+                  ) : null}
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

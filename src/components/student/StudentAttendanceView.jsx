@@ -21,6 +21,8 @@ export function StudentAttendanceView({
   records,
   isDemo = false,
   allowExcuse = true,
+  expectedSubjects = [],
+  historyHint,
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -90,14 +92,15 @@ export function StudentAttendanceView({
               Attendance history
             </h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              All subjects for the selected day. Use the calendar to check past
-              days. Resets to today on a new school day.
+              {historyHint ||
+                "All subjects for the selected day. Use the calendar to check past days."}
             </p>
           </div>
           <AttendanceHistoryTable
             day={selectedDay}
             selectedDate={selectedDate}
             allowExcuse={allowExcuse}
+            expectedSubjects={expectedSubjects}
           />
         </div>
       </div>

@@ -53,7 +53,7 @@ import {
   DEFAULT_COMPONENT_WEIGHTS,
   normalizeComponentWeights,
 } from "@/lib/class-record";
-import { GRADE_LEVELS, SCHOOL_YEAR_DEFAULT, SHS_STRANDS, isSeniorHighGrade, nextStrandSectionLetter } from "@/lib/constants";
+import { GRADE_LEVELS, SCHOOL_YEAR_DEFAULT, SHS_STRANDS, isSeniorHighGrade, nextStrandSectionLetter, strandSectionName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const selectClass =
@@ -753,7 +753,7 @@ function AddSectionModal({
               );
               return;
             }
-            name = `${selectedStrand} ${letter}`;
+            name = strandSectionName(selectedStrand, letter);
           }
 
           if (!name) {
@@ -766,6 +766,7 @@ function AddSectionModal({
             schoolYear: String(fd.get("schoolYear") || "").trim(),
             sectionName: name,
             adviserId: fd.get("adviserId") || null,
+            trackStrand: shs ? selectedStrand : null,
           });
         }}
       >
@@ -1081,7 +1082,7 @@ export function AcademicsManager({
         toast.error(result.error);
         return;
       }
-      toast.success("Saved successfully.");
+      toast.success(result?.message || "Saved successfully.");
       closeModal();
     });
   }
@@ -1283,8 +1284,9 @@ export function AcademicsManager({
                     Grade {g}: {rows.length} subject
                     {rows.length === 1 ? "" : "s"} ·{" "}
                     {subjectBand === "shs" ? "Senior High" : "Junior High"}{" "}
-                    total {bandSubjectTotal}. Weights are shared with teacher
-                    class records (Written / Performance / Examinations).
+                    total {bandSubjectTotal}. Grade 12 HUMSS academic records
+                    use Final Grade and Remarks only (no quiz, activity, PT, or
+                    exam scores).
                   </p>
               </>
             );
@@ -1832,7 +1834,8 @@ export function AcademicsManager({
               <DialogHeader>
                 <DialogTitle>Enroll student</DialogTitle>
                 <DialogDescription>
-                  Create a learner record so they can register a portal account.
+                  Creates an enrolled, already-active student. They sign in with
+                  LRN and birthdate (YYYYMMDD) as the password.
                 </DialogDescription>
               </DialogHeader>
               <form

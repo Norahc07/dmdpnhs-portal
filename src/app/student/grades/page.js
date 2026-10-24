@@ -1,8 +1,10 @@
 import { LayoutGrid } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { EvaluationProgressCard } from "@/components/evaluation/EvaluationProgressCard";
+import { AcademicRecordView } from "@/components/student/AcademicRecordView";
 import { StudentGradesTabs } from "@/components/student/StudentGradesTabs";
 import {
+  getStudentAcademicRecord,
   getStudentSemestralGrades,
   getStudentSubjectGrades,
 } from "@/actions/student-grades";
@@ -10,22 +12,34 @@ import { getStudentGradesUnlockStatus } from "@/actions/evaluation";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
 import { currentEvaluationTerm } from "@/lib/evaluation";
+import { isHumssGrade12 } from "@/lib/humss-academic-record";
 
-export const metadata = { title: "My Grades" };
+export const metadata = { title: "Academic Records" };
 
 export default async function StudentGradesPage() {
-  const { supabase, profile } = await requireRole([
+  const { supabase, profile, studentAccess } = await requireRole([
     "student",
     "student-enrolled",
   ]);
 
-  const { data: student } = await supabase
+  const { data: studentRow } = await supabase
     .from("students")
-    .select(
-      "id, grade_level, section_id, lrn, personal_email, sections(section_name, grade_level, school_year)"
-    )
+    .select("id, grade_level, section_id, lrn, personal_email")
     .eq("profile_id", profile.id)
     .maybeSingle();
+
+  let section = null;
+  if (studentRow?.section_id) {
+    const { data } = await supabase
+      .from("sections")
+      .select("section_name, grade_level, school_year, track_strand")
+      .eq("id", studentRow.section_id)
+      .maybeSingle();
+    section = data;
+  }
+  const student = studentRow
+    ? { ...studentRow, sections: section }
+    : null;
 
   const studentId = student?.id;
   const schoolYear = student?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
@@ -38,12 +52,17 @@ export default async function StudentGradesPage() {
       })
     : { unlocked: false, progress: null };
 
-  const [classRecord, subjectGrades] = studentId
+  const academicMode = isHumssGrade12(student?.sections || student, null);
+
+  const [classRecord, subjectGrades, academicRecord] = studentId
     ? await Promise.all([
         getStudentSemestralGrades({ studentId, schoolYear }),
         getStudentSubjectGrades({ studentId, schoolYear }),
+        academicMode
+          ? getStudentAcademicRecord({ studentId, schoolYear })
+          : Promise.resolve({ rows: [] }),
       ])
-    : [{ rows: [] }, { rows: [] }];
+    : [{ rows: [] }, { rows: [] }, { rows: [] }];
 
   const sectionLabel = student?.sections
     ? `Grade ${student.sections.grade_level ?? student.grade_level ?? "—"} - ${student.sections.section_name}`
@@ -58,9 +77,13 @@ export default async function StudentGradesPage() {
     <AppShell
       role="student"
       profile={profile}
-      title="My Grades"
-      subtitle="Class Record (WW / PT / Exams) and published Grades — your scores only."
-      studentAccess={{ activated: true, enrolled: true }}
+      title="Academic Records"
+      subtitle={
+        academicMode
+          ? "Academic record: Term 1, Term 2, and Term 3 — Final Grade and Remarks only."
+          : "Class Record (WW / PT / Exams) and published Grades — your scores only."
+      }
+      studentAccess={studentAccess}
     >
       <div className="space-y-4">
         <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
@@ -70,10 +93,10 @@ export default async function StudentGradesPage() {
             </span>
             <div>
               <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
-                Student grades
+                Academic records
               </p>
               <h3 className="font-heading text-xl font-bold text-[#3d1212] sm:text-2xl">
-                My Grades
+                Academic Records
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 SY {schoolYear}
@@ -94,6 +117,11 @@ export default async function StudentGradesPage() {
                   label: "System / portal evaluation",
                   done: progress?.systemDone,
                 },
+                {
+                  key: "self",
+                  label: "Self-assessment",
+                  done: progress?.selfDone,
+                },
                 ...(progress?.teachers || []).map((t) => ({
                   key: t.key,
                   label: `${t.subjectName} — ${t.teacherName || "Teacher"}`,
@@ -110,15 +138,21 @@ export default async function StudentGradesPage() {
               <span className="font-semibold text-[#3d1212]">{sectionLabel}</span>
             </p>
 
-            {classRecord.error || subjectGrades.error ? (
+            {classRecord.error || subjectGrades.error || academicRecord.error ? (
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {classRecord.error || subjectGrades.error}
+                {classRecord.error || subjectGrades.error || academicRecord.error}
               </p>
             ) : null}
           </div>
         </div>
 
         {unlocked ? (
+          academicMode ? (
+            <AcademicRecordView
+              rows={academicRecord.rows || []}
+              emptyHint="Your teacher has not encoded Final Grades yet."
+            />
+          ) : (
           <StudentGradesTabs
             classRecordRows={classRecordRows}
             subjectGradeRows={gradeRows}
@@ -126,6 +160,7 @@ export default async function StudentGradesPage() {
             classRecordEmpty="No class record scores yet. Written and Performance appear as your teacher encodes them."
             gradesEmpty="No published subject grades yet. Locked term grades appear here."
           />
+          )
         ) : (
           <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-[#faf7f5] px-5 py-10 text-center text-sm text-muted-foreground">
             Grades stay locked until you finish the required evaluations.

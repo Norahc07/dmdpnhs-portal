@@ -1,4 +1,4 @@
-const CACHE = "dmdpnhs-portal-v4";
+const CACHE = "dmdpnhs-portal-v5";
 const OFFLINE_URLS = [
   "/",
   "/login",
@@ -8,17 +8,38 @@ const OFFLINE_URLS = [
   "/icons/icon-512.png",
 ];
 
+function isLocalHost() {
+  return (
+    self.location.hostname === "localhost" ||
+    self.location.hostname === "127.0.0.1"
+  );
+}
+
 self.addEventListener("install", (event) => {
+  if (isLocalHost()) {
+    self.skipWaiting();
+    return;
+  }
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(OFFLINE_URLS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(OFFLINE_URLS))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => isLocalHost() || key !== CACHE)
+            .map((key) => caches.delete(key))
+        )
+      )
+      .then(() => self.clients.claim())
   );
 });
 
@@ -29,10 +50,14 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for app routes; cache fallback for offline dashboards
+  // Never intercept Next.js / Turbopack chunks — stale factories crash the app.
+  if (url.pathname.startsWith("/_next/")) return;
+
+  // Local development must always hit the live server.
+  if (isLocalHost()) return;
+
   if (
     url.pathname.startsWith("/student") ||
-    url.pathname.startsWith("/parent") ||
     url.pathname.startsWith("/teacher") ||
     url.pathname.startsWith("/registrar") ||
     url.pathname === "/" ||
@@ -52,13 +77,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for static assets
-  if (
-    url.pathname.startsWith("/_next/static") ||
-    url.pathname.startsWith("/icons") ||
-    url.pathname.endsWith(".css") ||
-    url.pathname.endsWith(".js")
-  ) {
+  if (url.pathname.startsWith("/icons") || url.pathname.endsWith(".css")) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>

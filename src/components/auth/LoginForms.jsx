@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  loginParent,
   loginStaff,
   loginStudent,
 } from "@/actions/auth";
+import { AuthRoleSwitch } from "@/components/auth/AuthRoleSwitch";
 import { SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -78,18 +78,21 @@ export function StudentLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <LoginCard
-      title="Student Login"
-      subtitle="Sign in with your LRN and password"
+    <>
+      <AuthRoleSwitch active="student" />
+      <LoginCard
+      title="Student login"
+      subtitle="LRN-based sign-in. Class secretaries use this same login."
       error={error}
       footer={
         <div className="mt-5 space-y-2 text-center text-xs text-neutral-600">
           <p>
+            Forgot password?{" "}
             <Link
               href="/login/student/reset"
-              className="font-medium text-[#800000] underline-offset-2 hover:underline"
+              className="font-semibold text-[#800000] underline-offset-2 hover:underline"
             >
-              Reset password
+              Reset with LRN and birthdate
             </Link>
           </p>
           <p>
@@ -98,8 +101,13 @@ export function StudentLoginForm() {
               href="/register/student"
               className="font-semibold text-[#800000] underline-offset-2 hover:underline"
             >
-              Register Account
+              Set up password (register)
             </Link>
+          </p>
+          <p className="rounded-lg border border-[#800000]/10 bg-[#faf7f5] px-3 py-2 text-left leading-relaxed">
+            Class secretary access is not a separate login. Sign in with your
+            LRN. After your adviser appoints you, Class secretary appears in
+            your student portal.
           </p>
         </div>
       }
@@ -169,47 +177,7 @@ export function StudentLoginForm() {
         </Button>
       </form>
     </LoginCard>
-  );
-}
-
-export function ParentLoginForm() {
-  const { pending, error, run } = useLoginAction();
-
-  return (
-    <LoginCard
-      title="Parent Login"
-      subtitle="Sign in with your Parent Access Code"
-      error={error}
-    >
-      <form
-        className="space-y-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          run(() => loginParent({ accessCode: fd.get("accessCode") }));
-        }}
-      >
-        <div className="space-y-1.5">
-          <Label htmlFor="accessCode" className={loginLabelClass}>
-            Parent Access Code
-          </Label>
-          <Input
-            id="accessCode"
-            name="accessCode"
-            placeholder="e.g. P26-12345"
-            required
-            className={loginInputClass}
-          />
-        </div>
-        <Button
-          type="submit"
-          className="w-full bg-[#800000] font-semibold text-white hover:bg-[#6a0000]"
-          disabled={pending}
-        >
-          {pending ? "Signing in…" : "Sign in as Parent"}
-        </Button>
-      </form>
-    </LoginCard>
+    </>
   );
 }
 
@@ -218,17 +186,38 @@ export function TeacherLoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <LoginCard
-      title="Teacher Login"
-      subtitle="Sign in with your faculty email or Teacher ID"
+    <>
+      <AuthRoleSwitch active="educator" />
+      <LoginCard
+      title="Educator login"
+      subtitle="Teachers and registrars sign in with email or Teacher ID"
       error={error}
       footer={
-        <p className="mt-4 text-center text-xs text-neutral-600">
-          New faculty?{" "}
-          <Link href="/register/teacher" className="text-[#800000] underline">
-            Register for faculty access
-          </Link>
-        </p>
+        <div className="mt-5 space-y-2 text-center text-xs text-neutral-600">
+          <p>
+            Forgot password?{" "}
+            <Link
+              href="/login/teacher/reset"
+              className="font-semibold text-[#800000] underline-offset-2 hover:underline"
+            >
+              Reset with Teacher ID and email
+            </Link>
+          </p>
+          <p>
+            New faculty?{" "}
+            <Link
+              href="/register/teacher"
+              className="font-semibold text-[#800000] underline"
+            >
+              Register and set up a password
+            </Link>
+          </p>
+          <p className="rounded-lg border border-[#800000]/10 bg-[#faf7f5] px-3 py-2 text-left leading-relaxed">
+            Registrars use this page with the school email issued by DMDPNHS.
+            Role-based access opens the educator or registrar portal after
+            sign-in.
+          </p>
+        </div>
       }
     >
       <form
@@ -299,5 +288,6 @@ export function TeacherLoginForm() {
         </Button>
       </form>
     </LoginCard>
+    </>
   );
 }

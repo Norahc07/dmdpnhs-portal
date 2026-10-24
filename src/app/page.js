@@ -8,7 +8,7 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 export const metadata = {
   title: `${SCHOOL_SHORT} Portal | ${SCHOOL_NAME}`,
   description:
-    "Official school portal for students, parents, and teachers of Dr. Maria D. Pastrana National High School.",
+    "Official school portal for students and educators of Dr. Maria D. Pastrana National High School.",
 };
 
 export default async function HomePage() {
@@ -18,6 +18,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   let dashboardHref = "/#portals";
+  let showDashboard = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -25,7 +26,8 @@ export default async function HomePage() {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile) {
+    if (profile && profile.role !== "parent") {
+      showDashboard = true;
       dashboardHref =
         profile.role === "teacher" && profile.status === "pending"
           ? "/teacher/pending"
@@ -64,8 +66,8 @@ export default async function HomePage() {
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <LandingHeader
-          authHref={user ? dashboardHref : "/#portals"}
-          authLabel={user ? "Dashboard" : "Login"}
+          authHref={showDashboard ? dashboardHref : "/#portals"}
+          authLabel={showDashboard ? "Dashboard" : "Login"}
         />
         <main className="-mt-16 flex-1 sm:-mt-18">
           <LandingHero />

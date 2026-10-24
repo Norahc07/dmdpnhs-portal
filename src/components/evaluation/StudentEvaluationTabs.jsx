@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, CheckCircle2, ChevronRight, GraduationCap } from "lucide-react";
 import { EvaluationFormPanel } from "@/components/evaluation/EvaluationFormPanel";
 import { EvaluationProgressCard } from "@/components/evaluation/EvaluationProgressCard";
+import { EvaluationRecordsPanel } from "@/components/evaluation/EvaluationRecordsPanel";
 import { cn } from "@/lib/utils";
 
 export function StudentEvaluationTabs({
@@ -11,16 +12,23 @@ export function StudentEvaluationTabs({
   defaultTerm,
   teachers,
   systemExisting,
+  selfExisting,
   teacherExistings = {},
   progress,
+  records = [],
 }) {
   const [tab, setTab] = useState(
-    progress?.systemDone ? "teachers" : "system"
+    progress?.systemDone
+      ? progress?.selfDone
+        ? "teachers"
+        : "self"
+      : "system"
   );
   const [selectedTeacherKey, setSelectedTeacherKey] = useState(null);
 
   const tabs = [
     { key: "system", label: "System", hint: "Portal / digital process" },
+    { key: "self", label: "Self", hint: "Your own assessment" },
     { key: "teachers", label: "Teachers", hint: "Every subject teacher" },
   ];
 
@@ -39,6 +47,11 @@ export function StudentEvaluationTabs({
       key: "system",
       label: "System / portal evaluation",
       done: progress?.systemDone,
+    },
+    {
+      key: "self",
+      label: "Self-assessment",
+      done: progress?.selfDone,
     },
     ...progressTeachers.map((t) => ({
       key: t.key,
@@ -70,11 +83,11 @@ export function StudentEvaluationTabs({
         lockedMessage={
           progress?.awaitingTeachers
             ? "Subject teachers are not assigned yet. Ask the registrar to set teaching loads so you can finish teacher evaluations."
-            : "Finish the system evaluation and rate every subject teacher below before this term’s grades unlock."
+            : "Finish system, self-assessment, and every subject teacher before this term’s grades unlock."
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#800000]/10 bg-white p-1.5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+      <div className="grid grid-cols-3 gap-2 rounded-2xl border border-[#800000]/10 bg-white p-1.5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         {tabs.map((item) => {
           const active = tab === item.key;
           return (
@@ -111,6 +124,16 @@ export function StudentEvaluationTabs({
           existing={systemExisting}
           title="Evaluate PastraPortal"
           description="Required each term. Rate how well the portal supports grades, attendance, and digital school processes."
+        />
+      ) : tab === "self" ? (
+        <EvaluationFormPanel
+          role="student"
+          evaluationType="self"
+          schoolYear={schoolYear}
+          defaultTerm={defaultTerm}
+          existing={selfExisting}
+          title="Student self-assessment"
+          description="Required each term. Rate your own effort, attendance habits, and learning."
         />
       ) : teachers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-white px-5 py-10 text-center shadow-[0_12px_28px_-20px_rgba(61,18,18,0.25)]">
@@ -215,6 +238,5 @@ export function StudentEvaluationTabs({
           </ul>
         </section>
       )}
-    </div>
-  );
-}
+
+      <EvaluationRecordsPanel records={records} />

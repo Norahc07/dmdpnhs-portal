@@ -1,12 +1,5 @@
-import { AuthShell } from "@/components/auth/AuthShell";
-import { ParentLoginForm } from "@/components/auth/LoginForms";
-
-export const metadata = { title: "Parent Login" };
+import { redirect } from "next/navigation";
 
 export default function ParentLoginPage() {
-  return (
-    <AuthShell>
-      <ParentLoginForm />
-    </AuthShell>
-  );
+  redirect("/#portals");
 }

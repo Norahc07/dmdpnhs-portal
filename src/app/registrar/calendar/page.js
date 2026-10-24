@@ -16,14 +16,16 @@ export default async function RegistrarCalendarPage({ searchParams }) {
     Number(params.month) >= 0 ? Number(params.month) : now.getMonth();
 
   const calendar = await getPortalCalendarMonth({ year, month });
-  const managedEvents = (calendar.events || []).filter((e) => e.manageable);
+  const managedEvents = (calendar.events || []).filter(
+    (e) => e.manageable && e.category === "official"
+  );
 
   return (
     <AppShell
       role="registrar"
       profile={profile}
       title="School calendar"
-      subtitle="Publish special days and school events for every student and teacher."
+      subtitle="Official DepEd dates are built in. Publish extra school-wide events that appear on every portal calendar."
     >
       {calendar.error ? (
         <p className="text-sm text-muted-foreground">{calendar.error}</p>

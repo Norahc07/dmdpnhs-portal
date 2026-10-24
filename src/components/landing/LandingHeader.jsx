@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, ChevronDown, GraduationCap, Users } from "lucide-react";
+import { BookOpen, ChevronDown, GraduationCap } from "lucide-react";
 import { APP_NAME, SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -12,14 +12,8 @@ const LOGIN_OPTIONS = [
   {
     href: "/login/student",
     label: "I'm a Student",
-    description: "LRN & birthdate access",
+    description: "LRN and password",
     icon: GraduationCap,
-  },
-  {
-    href: "/login/parent",
-    label: "I'm a Parent",
-    description: "Parent access code",
-    icon: Users,
   },
   {
     href: "/login/teacher",

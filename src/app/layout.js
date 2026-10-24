@@ -21,7 +21,7 @@ export const metadata = {
     default: APP_NAME,
     template: `%s · ${APP_NAME}`,
   },
-  description: `${SCHOOL_NAME} digital school portal for learners, parents, teachers, and registrar.`,
+  description: `${SCHOOL_NAME} digital school portal for learners, educators, and the registrar.`,
   applicationName: APP_NAME,
   manifest: "/manifest.json",
   appleWebApp: {

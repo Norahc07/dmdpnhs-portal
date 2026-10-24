@@ -3,7 +3,7 @@ import { TeacherProfileForm } from "@/components/profile/TeacherProfileForm";
 import { requireRole } from "@/lib/auth-guard";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
-export const metadata = { title: "My Profile · Teacher" };
+export const metadata = { title: "Profile · Educator" };
 
 export default async function TeacherProfilePage() {
   const { supabase, profile } = await requireRole("teacher");
@@ -19,8 +19,8 @@ export default async function TeacherProfilePage() {
     <AppShell
       role="teacher"
       profile={profile}
-      title="My profile"
-      subtitle="Update your photo and personal details used across the teacher portal."
+      title="Profile"
+      subtitle="Update your photo and personal details used across the educator portal."
       teacherAccess={teacherAccess}
     >
       <TeacherProfileForm profile={profile} teacher={teacher} />

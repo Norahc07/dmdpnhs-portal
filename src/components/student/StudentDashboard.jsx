@@ -1,17 +1,46 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  Bell,
   BookOpen,
   CalendarDays,
   CheckCircle2,
+  ClipboardCheck,
+  ClipboardList,
   Clock3,
+  FileText,
   IdCard,
+  KeyRound,
+  LayoutDashboard,
   Mail,
+  Megaphone,
   School,
+  Settings,
+  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { EnrollButton } from "@/components/student/EnrollButton";
+import {
+  STUDENT_PORTAL_GROUPS,
+  STUDENT_PORTAL_MODULES,
+  studentModuleAvailable,
+} from "@/lib/student-portal";
 import { cn } from "@/lib/utils";
+
+const MODULE_ICONS = {
+  "/student": LayoutDashboard,
+  "/student/grades": BookOpen,
+  "/student/attendance": ClipboardList,
+  "/student/schedule": Clock3,
+  "/student/announcements": Megaphone,
+  "/student/calendar": CalendarDays,
+  "/student/requests": FileText,
+  "/student/evaluation": ClipboardCheck,
+  "/student/notifications": Bell,
+  "/student/profile": UserRound,
+  "/student/settings": Settings,
+  "/student/password": KeyRound,
+};
 
 const EVENT_STYLES = {
   assignment: "bg-sky-100 text-sky-800 border-sky-200",
@@ -167,13 +196,22 @@ export function TodaySchedulePanel({ events = [], todayLabel }) {
             {todayLabel}
           </h3>
         </div>
-        <Link
-          href="/student/calendar"
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-[#faf7f5] px-3 text-[0.8rem] font-medium text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-white"
-        >
-          <CalendarDays className="size-3.5 text-[#800000]" />
-          View calendar
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/student/schedule"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-[#faf7f5] px-3 text-[0.8rem] font-medium text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-white"
+          >
+            <Clock3 className="size-3.5 text-[#800000]" />
+            Class schedule
+          </Link>
+          <Link
+            href="/student/calendar"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-[#faf7f5] px-3 text-[0.8rem] font-medium text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-white"
+          >
+            <CalendarDays className="size-3.5 text-[#800000]" />
+            Calendar
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 space-y-2.5">
@@ -219,13 +257,21 @@ export function TodaySchedulePanel({ events = [], todayLabel }) {
 export function EnrolledSubjectsPanel({ subjects = [] }) {
   return (
     <section className="rounded-2xl border border-[#800000]/10 bg-white p-5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)] sm:p-6">
-      <div className="mb-4">
-        <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
-          Academics
-        </p>
-        <h3 className="mt-1 font-(family-name:--font-montserrat) text-lg font-bold text-[#3d1212]">
-          Enrolled subjects
-        </h3>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+            Academics
+          </p>
+          <h3 className="mt-1 font-(family-name:--font-montserrat) text-lg font-bold text-[#3d1212]">
+            Enrolled subjects
+          </h3>
+        </div>
+        <Link
+          href="/student/schedule"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#800000]/15 bg-[#faf7f5] px-3 text-[0.8rem] font-medium text-[#3d1212] transition hover:border-[#800000]/30 hover:bg-white"
+        >
+          Open class schedule
+        </Link>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -263,6 +309,83 @@ export function EnrolledSubjectsPanel({ subjects = [] }) {
           </article>
         ))}
       </div>
+    </section>
+  );
+}
+
+export function StudentModuleGrid({ studentAccess }) {
+  const unread = Number(studentAccess?.unreadAnnouncements || 0);
+
+  return (
+    <section className="space-y-4">
+      {STUDENT_PORTAL_GROUPS.map((group) => {
+        const items = STUDENT_PORTAL_MODULES.filter(
+          (module) => module.group === group.id && module.href !== "/student"
+        );
+        return (
+          <div
+            key={group.id}
+            className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]"
+          >
+            <div className="portal-panel-head px-5 py-3">
+              <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+                {group.label}
+              </p>
+            </div>
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              {items.map((module) => {
+                const Icon = MODULE_ICONS[module.href] || LayoutDashboard;
+                const available = studentModuleAvailable(module, studentAccess);
+                const badge =
+                  module.badge === "announcements" && unread > 0 ? unread : 0;
+                return (
+                  <Link
+                    key={module.href}
+                    href={available ? module.href : "/student?notice=enrollment"}
+                    className={cn(
+                      "relative rounded-xl border border-[#800000]/10 bg-[#faf7f5]/70 p-4 transition hover:border-[#800000]/25 hover:bg-white",
+                      !available && "opacity-70"
+                    )}
+                  >
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
+                      <Icon className="size-4" />
+                    </span>
+                    {badge > 0 ? (
+                      <span className="absolute top-3 right-3 rounded-full bg-[#800000] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        {badge > 9 ? "9+" : badge}
+                      </span>
+                    ) : null}
+                    <p className="mt-3 font-heading text-sm font-bold text-[#3d1212]">
+                      {module.label}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {available
+                        ? module.description
+                        : "Unlocks after activation and section enrollment."}
+                    </p>
+                  </Link>
+                );
+              })}
+              {group.id === "modules" && studentAccess?.isSecretary ? (
+                <Link
+                  href="/student/class-secretary"
+                  className="relative rounded-xl border border-[#ffd700]/40 bg-[#ffd700]/12 p-4 transition hover:border-[#800000]/25 hover:bg-white"
+                >
+                  <span className="flex size-9 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
+                    <ShieldCheck className="size-4" />
+                  </span>
+                  <p className="mt-3 font-heading text-sm font-bold text-[#3d1212]">
+                    Class secretary
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Attendance-only access for your assigned section.
+                  </p>
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }

@@ -3,17 +3,21 @@ import { StudentAttendanceView } from "@/components/student/StudentAttendanceVie
 import { getStudentAttendance } from "@/actions/attendance";
 import { requireRole } from "@/lib/auth-guard";
 import {
-  buildDemoAttendanceRecords,
   groupAttendanceByDate,
   summarizeAttendance,
   toDateKey,
 } from "@/lib/attendance";
+import {
+  humssAttendanceSubjectNames,
+  isHumssAttendanceSubject,
+  isHumssGrade12,
+} from "@/lib/humss-academic-record";
 
 export const metadata = { title: "Attendance" };
 
 export default async function StudentAttendancePage({ searchParams }) {
   const params = await searchParams;
-  const { supabase, profile } = await requireRole([
+  const { supabase, profile, studentAccess } = await requireRole([
     "student",
     "student-enrolled",
   ]);
@@ -22,22 +26,35 @@ export default async function StudentAttendancePage({ searchParams }) {
   const month = Number(params.month) || now.getMonth() + 1;
   const year = Number(params.year) || now.getFullYear();
 
-  const { data: student } = await supabase
+  const { data: studentRow } = await supabase
     .from("students")
-    .select("id")
+    .select("id, grade_level, section_id")
     .eq("profile_id", profile.id)
     .maybeSingle();
+
+  let section = null;
+  if (studentRow?.section_id) {
+    const { data } = await supabase
+      .from("sections")
+      .select("id, section_name, grade_level, track_strand")
+      .eq("id", studentRow.section_id)
+      .maybeSingle();
+    section = data;
+  }
+
+  const student = studentRow
+    ? { ...studentRow, sections: section }
+    : null;
+  const humssMode = isHumssGrade12(section || student, null);
+  const expectedSubjects = humssMode ? humssAttendanceSubjectNames() : [];
 
   let days = [];
   let stats = summarizeAttendance([]);
   let records = [];
-  let isDemo = false;
 
   if (student?.id) {
     const result = await getStudentAttendance(student.id, month, year);
     if (!result.error) {
-      days = result.days || [];
-      stats = result.stats || stats;
       records = result.records || [];
     } else {
       const start = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -45,7 +62,7 @@ export default async function StudentAttendancePage({ searchParams }) {
       const end = `${year}-${String(month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
       const { data: rows } = await supabase
         .from("attendance")
-        .select("id, date, status, notes")
+        .select("id, date, status, notes, subject_id")
         .eq("student_id", student.id)
         .gte("date", start)
         .lte("date", end)
@@ -54,20 +71,19 @@ export default async function StudentAttendancePage({ searchParams }) {
       records = (rows || []).map((r) => ({
         ...r,
         date: toDateKey(r.date),
-        subjectName: "Daily / Homeroom",
+        subjectName: r.subject_id ? "Subject" : "Daily / Homeroom",
         excuse: null,
       }));
-      days = groupAttendanceByDate(records);
-      stats = summarizeAttendance(records);
     }
-  }
 
-  // Demo sample when there is no live attendance for the month
-  if (records.length === 0) {
-    records = buildDemoAttendanceRecords(month, year);
+    if (humssMode) {
+      records = records.filter((row) =>
+        isHumssAttendanceSubject({ subject_name: row.subjectName })
+      );
+    }
+
     days = groupAttendanceByDate(records);
     stats = summarizeAttendance(records);
-    isDemo = true;
   }
 
   return (
@@ -75,8 +91,12 @@ export default async function StudentAttendancePage({ searchParams }) {
       role="student"
       profile={profile}
       title="Attendance"
-      subtitle="Monthly rate, calendar by subject period, and digital excuse letters for absences."
-      studentAccess={{ activated: true, enrolled: true }}
+      subtitle={
+        humssMode
+          ? "Your Term 2 attendance only — Present, Late, Absent, or Excused, with day history."
+          : "Monthly rate, calendar by subject period, and attendance history."
+      }
+      studentAccess={studentAccess}
     >
       <StudentAttendanceView
         initialMonth={month}
@@ -84,7 +104,12 @@ export default async function StudentAttendancePage({ searchParams }) {
         days={days}
         stats={stats}
         records={records}
-        isDemo={isDemo}
+        expectedSubjects={expectedSubjects}
+        historyHint={
+          humssMode
+            ? "Term 2 subjects for the selected day. Earlier days stay in history."
+            : undefined
+        }
       />
     </AppShell>
   );

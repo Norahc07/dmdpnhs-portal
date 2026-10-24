@@ -69,7 +69,8 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
         <p className="mt-1 text-amber-900/90">
           Use working mobile numbers for you and your parent/guardian. The
           registrar will call to verify before activating your account.{" "}
-          {SCHOOL_SHORT} will SMS the Parent Access Code only after verification.
+          {SCHOOL_SHORT} uses the parent/guardian number for absence and grade
+          SMS alerts after verification.
         </p>
       </div>
 

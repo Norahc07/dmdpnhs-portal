@@ -12,6 +12,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { GRADE_TERMS, termShortLabel } from "@/lib/grades-terms";
 import { GRADE_WORKFLOW, GRADE_WORKFLOW_LABELS } from "@/lib/grade-workflow";
+import {
+  humssSubjectTerm,
+  isHumssGrade12,
+} from "@/lib/humss-academic-record";
 import { cn } from "@/lib/utils";
 
 function termStatusLabel(status) {
@@ -93,7 +97,44 @@ export function ClassRecordCards({ groups = [] }) {
               {group.studentCount}
             </span>
           </div>
-
+          {isHumssGrade12(group.section) ? (
+            <div className="space-y-3 px-5 py-4">
+              <Link
+                href={`/teacher/gradebook/section/${group.section.id}`}
+                className="flex items-center justify-between rounded-xl border border-[#800000]/15 bg-[#800000]/5 px-3 py-2.5 text-sm font-semibold text-[#800000] hover:bg-[#800000]/8"
+              >
+                Open Term 1–3 academic record
+                <ChevronRight className="size-4" />
+              </Link>
+              {group.assignments.map((assignment) => {
+                const offeredTerm =
+                  humssSubjectTerm(assignment.subjects) || 1;
+                const status = assignment.recordsByTerm?.[offeredTerm] || null;
+                return (
+                  <Link
+                    key={assignment.id}
+                    href={`/teacher/gradebook/${assignment.id}?term=${offeredTerm}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#800000]/10 px-3 py-2.5 hover:bg-[#800000]/5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#3d1212]">
+                        {assignment.subjects?.subject_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {termShortLabel(offeredTerm)} · Final Grade · Remarks
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn("px-1.5 py-0 text-[9px]", termBadgeClass(status))}
+                    >
+                      {termStatusLabel(status)}
+                    </Badge>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
           <div className="divide-y divide-[#800000]/8">
             {group.assignments.map((assignment) => {
               const recordsByTerm = assignment.recordsByTerm || {};
@@ -110,7 +151,7 @@ export function ClassRecordCards({ groups = [] }) {
                       <p className="truncate text-xs text-muted-foreground">
                         {assignment.subjects?.track_strand ||
                           "Core Subject (All Tracks)"}{" "}
-                        · create one class record per semestral term
+                        · create one class record per term
                       </p>
                     </div>
                   </div>
@@ -149,6 +190,8 @@ export function ClassRecordCards({ groups = [] }) {
                 </div>
               );
             })}
+          </div>
+          )}
           </div>
         </section>
       ))}

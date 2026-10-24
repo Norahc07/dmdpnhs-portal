@@ -19,6 +19,32 @@ import {
   PASSING_GRADE,
   termLabel,
 } from "@/lib/grades-terms";
+import {
+  HUMSS_G12_CURRICULUM,
+  isHumssGrade12,
+  resolveAcademicFinalGrade,
+  resolveAcademicRemarks,
+} from "@/lib/humss-academic-record";
+
+async function loadStudentWithSection(admin, studentId) {
+  const { data: student, error } = await admin
+    .from("students")
+    .select("id, section_id, grade_level, lrn, profiles(first_name, last_name)")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (error || !student) return { student: null, error: error?.message || "Student not found." };
+
+  let section = null;
+  if (student.section_id) {
+    const { data } = await admin
+      .from("sections")
+      .select("id, section_name, grade_level, school_year, track_strand")
+      .eq("id", student.section_id)
+      .maybeSingle();
+    section = data;
+  }
+  return { student: { ...student, sections: section } };
+}
 
 async function assertCanViewStudentGrades(admin, profile, studentId) {
   if (profile.role === "student") {
@@ -29,25 +55,6 @@ async function assertCanViewStudentGrades(admin, profile, studentId) {
       .maybeSingle();
     if (!student || student.id !== studentId) {
       return { error: "You can only view your own grades." };
-    }
-    return { ok: true };
-  }
-
-  if (profile.role === "parent") {
-    const { data: parent } = await admin
-      .from("parents")
-      .select("id")
-      .eq("profile_id", profile.id)
-      .maybeSingle();
-    if (!parent) return { error: "Parent record not found." };
-    const { data: link } = await admin
-      .from("parent_student_links")
-      .select("id")
-      .eq("parent_id", parent.id)
-      .eq("student_id", studentId)
-      .maybeSingle();
-    if (!link) {
-      return { error: "That learner is not linked to your account." };
     }
     return { ok: true };
   }
@@ -95,15 +102,9 @@ export async function getStudentSemestralGrades({
   const sy = schoolYear || SCHOOL_YEAR_DEFAULT;
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: student } = await admin
-    .from("students")
-    .select(
-      "id, section_id, grade_level, lrn, profiles(first_name, last_name), sections(id, section_name, grade_level, school_year)"
-    )
-    .eq("id", sid)
-    .maybeSingle();
-
-  if (!student) return { error: "Student not found." };
+  const loaded = await loadStudentWithSection(admin, sid);
+  if (!loaded.student) return { error: loaded.error };
+  const student = loaded.student;
   if (!student.section_id) {
     return {
       student,
@@ -240,7 +241,9 @@ export async function getStudentSemestralGrades({
           )
         : null;
 
+      const academicGrade = resolveAcademicFinalGrade(rawStudentRow);
       const hasAnyScore =
+        academicGrade != null ||
         studentRow.ww.some((v) => numeric(v) != null) ||
         studentRow.pt.some((v) => numeric(v) != null) ||
         EXAMS.some((k) => numeric(studentRow.exams[k]) != null) ||
@@ -249,6 +252,9 @@ export async function getStudentSemestralGrades({
 
       rows.push({
         id: `${record.id}-${sid}`,
+        rawStudentRow,
+        remarks: resolveAcademicRemarks(rawStudentRow),
+        final_grade: academicGrade ?? semestralGrade,
         subject_id: assignment.subject_id,
         subject_name: assignment.subjects?.subject_name || "Subject",
         school_year: sy,
@@ -360,14 +366,9 @@ export async function getStudentSubjectGrades({
 
   const sy = schoolYear || SCHOOL_YEAR_DEFAULT;
 
-  const { data: student } = await admin
-    .from("students")
-    .select(
-      "id, section_id, grade_level, lrn, profiles(first_name, last_name), sections(id, section_name, grade_level, school_year)"
-    )
-    .eq("id", sid)
-    .maybeSingle();
-  if (!student) return { error: "Student not found." };
+  const loaded = await loadStudentWithSection(admin, sid);
+  if (!loaded.student) return { error: loaded.error };
+  const student = loaded.student;
 
   const byKey = new Map();
 

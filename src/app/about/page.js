@@ -6,7 +6,6 @@ import {
   GraduationCap,
   Link2,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 import { PublicShell } from "@/components/landing/PublicShell";
 import { SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
@@ -14,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "About",
-  description: `About ${SCHOOL_SHORT} Portal — why it was built, what it covers, and how students, parents, teachers, and the registrar use the system.`,
+  description: `About ${SCHOOL_SHORT} Portal — why it was built, what it covers, and how students, educators, and the registrar use the system.`,
 };
 
 const WHY_BUILT = [
@@ -24,7 +23,7 @@ const WHY_BUILT = [
   },
   {
     title: "Stronger home–school connection",
-    body: "Parents stay informed through the portal and SMS alerts when a learner is absent or when quarterly grades are shared.",
+    body: "Guardians stay informed through SMS alerts when a learner is absent or when term grades are shared.",
   },
   {
     title: "DepEd-aligned classroom tools",
@@ -32,14 +31,17 @@ const WHY_BUILT = [
   },
   {
     title: "One secure digital campus",
-    body: `${SCHOOL_SHORT} Portal was built so every role—student, parent, teacher, and registrar—works from a shared, role-protected system.`,
+    body: `${SCHOOL_SHORT} Portal was built so students, educators, and the registrar work from a shared, role-protected system.`,
   },
 ];
 
 const SCOPE = [
   "Student grades, attendance, calendar, and document requests",
-  "Parent monitoring of linked children’s progress",
+  "Guardian SMS alerts for absences and published grades",
   "Teacher gradebook and class attendance with SMS alerts",
+  "Class secretary attendance for an assigned section only",
+  "Teacher announcements and updates to assigned sections, with student notifications",
+  "School calendar with official DepEd dates plus teacher class events",
   "Registrar faculty approval, student status, documents, and SF exports",
 ];
 
@@ -54,24 +56,24 @@ const GUIDES = [
       "Your student record is prepared by the school (LRN and birthdate).",
       "Phase 1: Register with LRN + birthdate + password at /register/student.",
       "Phase 2: Complete personal details (name, grade, section, address, contacts) and parent/guardian emergency info.",
-      "Wait on the temporary dashboard while the registrar verifies your record and calls the parent number.",
-      "After approval, you get an SMS; parents get their Access Code by SMS from DMDPNHS.",
-      "Check My Grades and Attendance once you are activated and enrolled in a section/subjects.",
+      "Wait on the temporary dashboard while the registrar verifies your record and calls the parent/guardian number.",
+      "After approval, you get an SMS. Guardians receive SMS alerts for absences and grade updates.",
+      "Open Academic Records, Attendance, Class Schedule, Announcements & Updates, and Calendar once you are activated and enrolled.",
       "Open Evaluation to rate the portal and each subject teacher every term.",
       "Open Documents to request SF9, SF10, or Good Moral.",
     ],
   },
   {
-    role: "Parent",
-    icon: Users,
-    start: "Landing → Choose Parent portal → Login with Parent Access Code",
-    login: "/login/parent",
+    role: "Class secretary",
+    icon: ShieldCheck,
+    start: "Student login → adviser appoints you in My Students",
+    login: "/login/student",
     steps: [
-      "After your child’s Phase 2 details are verified by the registrar, you receive an SMS with your Parent Access Code and portal link.",
-      "Sign in on the Parent portal using that code.",
-      "Open the dashboard to see linked learners.",
-      "Review Grades and Attendance for each linked student.",
-      "Receive SMS when a teacher marks an absence, and optional SMS when grades are broadcast.",
+      "This is a separate attendance access, not an admin account.",
+      "The class adviser appoints one enrolled student as secretary for that section.",
+      "Open Class secretary to record or update Present, Late, Absent, or Excused.",
+      "Review Attendance history for the assigned section only.",
+      "You cannot encode grades, edit academic records, open other sections, or use registrar tools.",
     ],
   },
   {
@@ -84,8 +86,10 @@ const GUIDES = [
       "New faculty: register on the teacher registration page to receive a Teacher ID. Your account stays pending until approved.",
       "Wait on the pending page until the registrar approves your account.",
       "After approval, sign in and open the Teacher dashboard (maroon welcome overview).",
-      "Use Gradebook to encode DepEd-weighted grades and optionally broadcast term grades via SMS to parents.",
-      "Use Attendance to mark present, absent, tardy, or excused by subject period. Absences can trigger SMS to linked parents.",
+      "Use Gradebook to encode DepEd-weighted grades and optionally broadcast term grades via SMS to guardians.",
+      "Use Attendance to mark present, late, absent, or excused by subject period. Absences can trigger SMS to linked guardians.",
+      "Use Announcements to post reminders, assignments, or updates to selected sections. Targeted students see the post and a notification badge.",
+      "Use Calendar to view official DepEd dates. Authorized teachers may add class events for their assigned sections only.",
     ],
   },
   {
@@ -101,6 +105,7 @@ const GUIDES = [
       "Manage learner status on Promotion (promote, transfer, retain, remedial).",
       "Process document requests: Pending → Ready for Pickup → Already Claimed.",
       "Lock & publish submitted class records on Grade Lock.",
+      "Use Calendar to publish extra school-wide events. Official DepEd dates are already labeled and cannot be overwritten there.",
     ],
   },
 ];
@@ -113,18 +118,18 @@ const CONNECTIONS = [
   },
   {
     from: "Registrar",
-    to: "Student / Parent",
-    text: "Prepares learner and parent records, access codes, and links; manages promotion, transfer, and enrollment status.",
+    to: "Student",
+    text: "Prepares learner records and guardian contact details; manages promotion, transfer, and enrollment status.",
   },
   {
     from: "Teacher",
-    to: "Student & Parent",
-    text: "Saves grades and attendance that appear on student and parent portals.",
+    to: "Student",
+    text: "Saves grades and attendance that appear on the student portal.",
   },
   {
     from: "Teacher",
-    to: "Parent (SMS)",
-    text: "Absence alerts and optional quarterly grade broadcasts go to linked parent phone numbers.",
+    to: "Guardian (SMS)",
+    text: "Absence alerts and optional term grade broadcasts go to linked guardian phone numbers.",
   },
   {
     from: "Student",
@@ -169,7 +174,7 @@ export default function AboutPage() {
             <Panel className="mt-8 space-y-4 text-left">
               <p className="font-sans text-sm leading-relaxed text-neutral-700 sm:text-base">
                 The {SCHOOL_SHORT} Portal is the school’s secure online system
-                for learners, parents, educators, and the registrar. It brings
+                for learners, educators, and the registrar. It brings
                 grades, attendance, documents, enrollment status, and school
                 forms into one place—built for everyday use on desktop and
                 mobile, and aligned with DepEd classroom practice.

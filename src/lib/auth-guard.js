@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ROLE_HOME } from "@/lib/constants";
+import { countUnreadAnnouncementsForStudent } from "@/lib/announcements";
+import {
+  findSecretarySection,
+  isSectionSecretary,
+} from "@/lib/class-secretary";
 
 export async function requireRole(allowedRoles) {
   const supabase = await createClient();
@@ -32,10 +37,11 @@ export async function requireRole(allowedRoles) {
   }
 
   let student = null;
+  let studentAccess = null;
   if (profile.role === "student" && !roles.includes("student-activating")) {
     const { data } = await supabase
       .from("students")
-      .select("activation_status, section_id, status")
+      .select("id, activation_status, section_id, status")
       .eq("profile_id", user.id)
       .maybeSingle();
     student = data;
@@ -43,17 +49,35 @@ export async function requireRole(allowedRoles) {
     const activation = student?.activation_status || "active";
     if (activation === "incomplete") redirect("/student/activate");
 
+    const enrolled =
+      student?.status === "enrolled" ||
+      student?.status === "promoted" ||
+      Boolean(student?.section_id);
+
     if (roles.includes("student-enrolled")) {
       if (student?.activation_status !== "active") {
         redirect("/student?notice=activation");
       }
-      const enrolled =
-        student?.status === "enrolled" ||
-        student?.status === "promoted" ||
-        Boolean(student?.section_id);
       if (!enrolled) redirect("/student?notice=enrollment");
     }
+
+    const activated = student?.activation_status === "active";
+    const isSecretary =
+      activated && enrolled && student?.id
+        ? await isSectionSecretary(student.id)
+        : false;
+    studentAccess = { activated, enrolled, isSecretary };
   }
 
-  return { supabase, user, profile, student };
+  return { supabase, user, profile, student, studentAccess };
+}
+
+export async function requireSecretaryWorkspace() {
+  const auth = await requireRole(["student", "student-enrolled"]);
+  if (!auth.studentAccess?.isSecretary || !auth.student?.id) {
+    redirect("/student");
+  }
+  const section = await findSecretarySection(auth.student.id);
+  if (!section?.id) redirect("/student");
+  return { ...auth, section };
 }

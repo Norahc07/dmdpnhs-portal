@@ -104,60 +104,68 @@ export const TEACHER_SECTION_QUESTIONS = [
   },
 ];
 
-export const PARENT_SYSTEM_QUESTIONS = [
+export const STUDENT_SELF_QUESTIONS = [
   {
-    id: "grades_access",
-    prompt: "I can view my child’s grades clearly in the parent portal.",
+    id: "effort",
+    prompt: "I put consistent effort into my lessons, tasks, and study time this term.",
   },
   {
-    id: "attendance_access",
-    prompt: "I can monitor my child’s attendance easily.",
+    id: "attendance_habit",
+    prompt: "I attend class on time and take responsibility for missed work.",
   },
   {
-    id: "sms",
-    prompt: "SMS / portal notices (when sent) help me stay informed.",
+    id: "participation",
+    prompt: "I participate in class and ask for help when I do not understand.",
   },
   {
-    id: "usability",
-    prompt: "Signing in with my Parent Access Code and using the portal is easy.",
+    id: "honesty",
+    prompt: "I complete my own work honestly and follow classroom rules.",
   },
   {
     id: "overall",
-    prompt: "Overall, PastraPortal helps me as a parent.",
+    prompt: "Overall, I am satisfied with my performance as a learner this term.",
   },
 ];
 
-/** Parent rates experience supporting / observing each linked child */
-export const PARENT_CHILD_QUESTIONS = [
+export const TEACHER_STUDENT_QUESTIONS = [
   {
-    id: "progress_visibility",
-    prompt: "I can understand this child’s academic progress through the portal.",
+    id: "engagement",
+    prompt: "This learner participates and stays engaged during class.",
   },
   {
-    id: "attendance_visibility",
-    prompt: "I can follow this child’s attendance and absences clearly.",
+    id: "work_quality",
+    prompt: "This learner submits work that meets the expected quality for the term.",
   },
   {
-    id: "support",
-    prompt: "Portal information helps me support this child’s learning at home.",
+    id: "conduct",
+    prompt: "This learner shows respect, honesty, and good classroom conduct.",
   },
   {
-    id: "communication",
-    prompt: "I feel informed about this child’s school standing via the portal.",
+    id: "progress",
+    prompt: "This learner is making academic progress relative to the subject requirements.",
   },
   {
     id: "overall",
-    prompt: "Overall portal usefulness for monitoring this child.",
+    prompt: "Overall rating of this learner for this school year.",
   },
 ];
 
 export function questionsFor(role, evaluationType) {
   if (evaluationType === "teacher") return STUDENT_TEACHER_QUESTIONS;
   if (evaluationType === "section") return TEACHER_SECTION_QUESTIONS;
-  if (evaluationType === "child") return PARENT_CHILD_QUESTIONS;
+  if (evaluationType === "self") return STUDENT_SELF_QUESTIONS;
+  if (evaluationType === "student") return TEACHER_STUDENT_QUESTIONS;
   if (role === "teacher") return TEACHER_SYSTEM_QUESTIONS;
-  if (role === "parent") return PARENT_SYSTEM_QUESTIONS;
   return STUDENT_SYSTEM_QUESTIONS;
+}
+
+export function evaluationTypeLabel(type) {
+  if (type === "system") return "System / portal";
+  if (type === "teacher") return "Subject teacher";
+  if (type === "section") return "Section";
+  if (type === "self") return "Self-assessment";
+  if (type === "student") return "Learner evaluation";
+  return "Evaluation";
 }
 
 export function averageFromScores(scores, questions) {
@@ -185,8 +193,8 @@ export function evaluationTermOptions(schoolYear = SCHOOL_YEAR_DEFAULT) {
 }
 
 /**
- * Student must finish system + every assigned teacher for the term
- * before official grades for that term unlock.
+ * Student must finish system, self-assessment, and every assigned teacher
+ * for the term before official grades for that term unlock.
  */
 export function computeStudentTermCompletion({
   teachers = [],
@@ -199,6 +207,7 @@ export function computeStudentTermCompletion({
       e.school_year === schoolYear && Number(e.term) === Number(term)
   );
   const systemDone = inTerm.some((e) => e.evaluation_type === "system");
+  const selfDone = inTerm.some((e) => e.evaluation_type === "self");
   const teacherDoneKeys = new Set(
     inTerm
       .filter((e) => e.evaluation_type === "teacher")
@@ -216,18 +225,20 @@ export function computeStudentTermCompletion({
     teacherItems.length === 0 || teacherItems.every((t) => t.done);
   const requiredTeacherCount = teacherItems.length;
   const completedTeacherCount = teacherItems.filter((t) => t.done).length;
-  // Complete only when system is done AND every listed subject teacher is rated.
-  const complete = systemDone && teachersDone;
+  // Complete when system, self-assessment, and every listed subject teacher are done.
+  const complete = systemDone && selfDone && teachersDone;
 
   return {
     systemDone,
+    selfDone,
     teachers: teacherItems,
     requiredTeacherCount,
     completedTeacherCount,
     teachersDone: teacherItems.length > 0 && teacherItems.every((t) => t.done),
     complete,
-    totalRequired: 1 + requiredTeacherCount,
-    totalCompleted: (systemDone ? 1 : 0) + completedTeacherCount,
+    totalRequired: 2 + requiredTeacherCount,
+    totalCompleted:
+      (systemDone ? 1 : 0) + (selfDone ? 1 : 0) + completedTeacherCount,
     awaitingTeachers: requiredTeacherCount === 0,
   };
 }
@@ -277,39 +288,28 @@ export function computeTeacherYearCompletion({
   };
 }
 
-/** Parent: system + each linked child */
-export function computeParentTermCompletion({
-  children = [],
+export function computeTeacherStudentProgress({
+  learners = [],
   evaluations = [],
-  term,
   schoolYear,
 }) {
-  const inTerm = evaluations.filter(
+  const term = TEACHER_YEAR_END_TERM;
+  const inYear = evaluations.filter(
     (e) =>
-      e.school_year === schoolYear && Number(e.term) === Number(term)
+      e.school_year === schoolYear &&
+      Number(e.term) === term &&
+      e.evaluation_type === "student"
   );
-  const systemDone = inTerm.some((e) => e.evaluation_type === "system");
-  const childDoneIds = new Set(
-    inTerm
-      .filter((e) => e.evaluation_type === "child")
-      .map((e) => e.student_id)
-  );
-  const childItems = children.map((c) => ({
-    ...c,
-    done: childDoneIds.has(c.id),
-    name: [c.profiles?.last_name, c.profiles?.first_name]
-      .filter(Boolean)
-      .join(", "),
+  const doneIds = new Set(inYear.map((e) => e.student_id));
+  const items = learners.map((learner) => ({
+    ...learner,
+    done: doneIds.has(learner.studentId),
   }));
-  const childrenDone = childItems.every((c) => c.done);
-  const complete = systemDone && (childItems.length === 0 || childrenDone);
-
   return {
-    systemDone,
-    children: childItems,
-    complete,
-    totalRequired: 1 + childItems.length,
-    totalCompleted:
-      (systemDone ? 1 : 0) + childItems.filter((c) => c.done).length,
+    learners: items,
+    complete: items.length === 0 || items.every((item) => item.done),
+    totalRequired: items.length,
+    totalCompleted: items.filter((item) => item.done).length,
+    term,
   };
 }

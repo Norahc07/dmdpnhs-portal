@@ -1,6 +1,7 @@
 import { gradeResult, normalizeStudentRow } from "@/lib/class-record";
 import { PASSING_GRADE } from "@/lib/grades-terms";
 import { GRADE_WORKFLOW } from "@/lib/grade-workflow";
+import { resolveAcademicFinalGrade } from "@/lib/humss-academic-record";
 
 /** Count learners with computed quarterly grade below passing (when computable). */
 export function countFailingFromClassRecord(data, weights) {

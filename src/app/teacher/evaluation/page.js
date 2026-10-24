@@ -7,6 +7,7 @@ import {
 } from "@/actions/evaluation";
 import {
   TEACHER_YEAR_END_TERM,
+  computeTeacherStudentProgress,
   computeTeacherYearCompletion,
 } from "@/lib/evaluation";
 import { getTeacherAccess } from "@/lib/teacher-access";
@@ -56,7 +57,7 @@ export default async function TeacherEvaluationPage() {
       role="teacher"
       profile={profile}
       teacherAccess={teacherAccess}
-      title="Year-end evaluation"
+        title="Evaluation"
       subtitle={`SY ${ctx.schoolYear}: rate the system, then each grade · section you handle.`}
     >
       {listed.tableMissing ? (

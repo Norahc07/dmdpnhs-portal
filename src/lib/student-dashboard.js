@@ -56,3 +56,113 @@ export function formatLongDate(date = new Date()) {
     year: "numeric",
   }).format(date);
 }
+
+export const WEEKDAY_LABELS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+function mapScheduleTeacher(row) {
+  const teacherProfile = row.teachers?.profiles;
+  return {
+    teacher_name: teacherProfile
+      ? `${teacherProfile.first_name} ${teacherProfile.last_name}`
+      : null,
+    teacher_email: teacherProfile?.email || null,
+    teacher_code: row.teachers?.teacher_id || null,
+  };
+}
+
+export async function loadStudentClassSchedule(supabase, student) {
+  if (!student?.section_id) {
+    return { periods: [], subjects: [] };
+  }
+
+  const { data: schedules, error } = await supabase
+    .from("class_schedules")
+    .select(
+      `
+      id,
+      day_of_week,
+      start_time,
+      end_time,
+      room,
+      subject_id,
+      subjects ( id, subject_name ),
+      teachers (
+        id,
+        teacher_id,
+        profiles ( first_name, last_name, email )
+      )
+    `
+    )
+    .eq("section_id", student.section_id)
+    .order("day_of_week")
+    .order("start_time");
+
+  const periods = error
+    ? []
+    : (schedules || []).map((row) => ({
+        id: row.id,
+        day_of_week: row.day_of_week,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        room: row.room,
+        subject_id: row.subject_id || row.subjects?.id,
+        subject_name: row.subjects?.subject_name || "Subject",
+        ...mapScheduleTeacher(row),
+      }));
+
+  if (!periods.length) {
+    const { data: subjects } = await supabase
+      .from("subjects")
+      .select("id, subject_name")
+      .eq("grade_level", student.grade_level || 0)
+      .order("subject_name");
+
+    return {
+      periods: [],
+      subjects: (subjects || []).map((subject) => ({
+        id: subject.id,
+        subject_name: subject.subject_name,
+        schedule_label: "TBA",
+        teacher_name: null,
+        teacher_email: null,
+        teacher_code: null,
+      })),
+    };
+  }
+
+  const bySubject = new Map();
+  for (const row of periods) {
+    if (!row.subject_id) continue;
+    if (!bySubject.has(row.subject_id)) {
+      bySubject.set(row.subject_id, {
+        id: row.subject_id,
+        subject_name: row.subject_name,
+        scheduleRows: [],
+        teacher_name: row.teacher_name,
+        teacher_email: row.teacher_email,
+        teacher_code: row.teacher_code,
+      });
+    }
+    bySubject.get(row.subject_id).scheduleRows.push(row);
+  }
+
+  return {
+    periods,
+    subjects: Array.from(bySubject.values()).map((item) => ({
+      id: item.id,
+      subject_name: item.subject_name,
+      schedule_label: formatScheduleLabel(item.scheduleRows),
+      teacher_name: item.teacher_name,
+      teacher_email: item.teacher_email,
+      teacher_code: item.teacher_code,
+    })),
+  };
+}

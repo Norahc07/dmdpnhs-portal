@@ -12,6 +12,10 @@ import {
   unsealTeacherSectionToken,
 } from "@/lib/sealed-token";
 import { getTeacherAccess } from "@/lib/teacher-access";
+import {
+  filterHumssAttendanceSubjects,
+  isHumssGrade12,
+} from "@/lib/humss-academic-record";
 
 export const metadata = { title: "Attendance" };
 
@@ -45,7 +49,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
     const withAdviser = await supabase
       .from("teacher_assignments")
       .select(
-        "id, section_id, subject_id, school_year, sections(id, section_name, grade_level, school_year, adviser_id), subjects(id, subject_name)"
+        "id, section_id, subject_id, school_year, sections(id, section_name, grade_level, school_year, adviser_id, track_strand), subjects(id, subject_name, grade_level, track_strand)"
       )
       .eq("teacher_id", teacherId)
       .eq("school_year", SCHOOL_YEAR_DEFAULT);
@@ -54,7 +58,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
       const fallback = await supabase
         .from("teacher_assignments")
         .select(
-          "id, section_id, subject_id, school_year, sections(id, section_name, grade_level, school_year), subjects(id, subject_name)"
+          "id, section_id, subject_id, school_year, sections(id, section_name, grade_level, school_year, track_strand), subjects(id, subject_name, grade_level, track_strand)"
         )
         .eq("teacher_id", teacherId)
         .eq("school_year", SCHOOL_YEAR_DEFAULT);
@@ -68,7 +72,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
   if (teacherId) {
     const adv = await supabase
       .from("sections")
-      .select("id, section_name, grade_level, school_year")
+      .select("id, section_name, grade_level, school_year, track_strand")
       .eq("adviser_id", teacherId)
       .eq("school_year", SCHOOL_YEAR_DEFAULT);
     if (!adv.error) advisory = adv.data || [];
@@ -84,6 +88,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
       grade_level: s.grade_level,
       school_year: a.school_year || s.school_year,
       isAdvisory: s.adviser_id === teacherId,
+      track_strand: s.track_strand,
       subjects: [],
       subjectRows: [],
       studentCount: 0,
@@ -98,6 +103,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
         existing.subjectRows.push(a.subjects);
       }
     }
+    existing.track_strand = existing.track_strand || s.track_strand;
     sectionMap.set(s.id, existing);
   }
   for (const s of advisory) {
@@ -107,6 +113,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
       grade_level: s.grade_level,
       school_year: s.school_year,
       isAdvisory: true,
+      track_strand: s.track_strand,
       subjects: [],
       subjectRows: [],
       studentCount: 0,
@@ -140,6 +147,27 @@ export default async function TeacherAttendancePage({ searchParams }) {
     if (g !== 0) return g;
     return String(a.section_name).localeCompare(String(b.section_name));
   });
+
+  const humssNeedingSubjects = sections.filter(
+    (section) => isHumssGrade12(section) && !section.subjectRows.length
+  );
+  if (humssNeedingSubjects.length) {
+    const { data: humssSubjects } = await supabase
+      .from("subjects")
+      .select("id, subject_name, grade_level, track_strand")
+      .eq("grade_level", 12)
+      .eq("track_strand", "HUMSS");
+    const termTwo = filterHumssAttendanceSubjects(humssSubjects || []);
+    for (const section of humssNeedingSubjects) {
+      section.subjectRows = termTwo;
+      section.subjects = termTwo.map((row) => row.subject_name);
+    }
+  }
+  for (const section of sections) {
+    if (!isHumssGrade12(section)) continue;
+    section.subjectRows = filterHumssAttendanceSubjects(section.subjectRows);
+    section.subjects = section.subjectRows.map((row) => row.subject_name);
+  }
 
   const allowedIds = new Set(sections.map((s) => s.id));
 
@@ -176,7 +204,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
         profile={profile}
         teacherAccess={teacherAccess}
         title="Smart Attendance"
-        subtitle="Choose a grade level and section you handle, then mark attendance."
+        subtitle="Choose a section you handle, then mark Present, Late, Absent, or Excused. HUMSS uses Term 2 subjects."
       >
         <nav
           aria-label="Breadcrumb"
@@ -194,10 +222,22 @@ export default async function TeacherAttendancePage({ searchParams }) {
   }
 
   const selectedSection = sections.find((s) => s.id === selectedId);
+  const humssSection = isHumssGrade12(selectedSection);
   const subjectId = params.subjectId ? String(params.subjectId) : "";
   const subjectsForSection = selectedSection?.subjectRows || [];
   const selectedSubject =
     subjectsForSection.find((s) => s.id === subjectId) || null;
+
+  if (humssSection && subjectsForSection.length && !selectedSubject) {
+    redirect(
+      attendanceHref({
+        token: sealed,
+        date,
+        subjectId: subjectsForSection[0].id,
+      })
+    );
+  }
+
   const effectiveSubjectId = selectedSubject ? subjectId : "";
 
   const sealedToken = sealTeacherSectionToken(selectedId, teacherId);
@@ -245,7 +285,7 @@ export default async function TeacherAttendancePage({ searchParams }) {
       profile={profile}
       teacherAccess={teacherAccess}
       title="Smart Attendance"
-      subtitle={`${sectionLabel} · mark present, absent, tardy, or excused.`}
+      subtitle={`${sectionLabel} · mark present, late, absent, or excused.`}
     >
       <div className="space-y-4">
         <nav
@@ -284,6 +324,10 @@ export default async function TeacherAttendancePage({ searchParams }) {
           date={date}
           subjects={subjectsForSection}
           subjectId={effectiveSubjectId}
+          hideHomeroom={humssSection}
+          periodHeading={
+            humssSection ? "Term 2 attendance subjects" : "Subject period"
+          }
         />
 
         <AttendancePanel
@@ -295,7 +339,8 @@ export default async function TeacherAttendancePage({ searchParams }) {
           initialMap={initialMap}
           sectionLabel={sectionLabel}
           subjectLabel={
-            selectedSubject?.subject_name || "Daily / Homeroom"
+            selectedSubject?.subject_name ||
+            (humssSection ? "Select a Term 2 subject" : "Daily / Homeroom")
           }
         />
       </div>

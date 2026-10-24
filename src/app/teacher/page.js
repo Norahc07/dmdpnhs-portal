@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { BookOpen, ClipboardList, Users } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { TeacherProfileBanner } from "@/components/teacher/TeacherDashboard";
+import {
+  EducatorModuleGrid,
+  TeacherProfileBanner,
+} from "@/components/teacher/TeacherDashboard";
 import { requireRole } from "@/lib/auth-guard";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
-export const metadata = { title: "Teacher Dashboard" };
+export const metadata = { title: "Educator Dashboard" };
 
 export default async function TeacherDashboard() {
   const { supabase, profile } = await requireRole("teacher");
@@ -30,7 +33,13 @@ export default async function TeacherDashboard() {
     .eq("teacher_id", teacher?.id || "00000000-0000-0000-0000-000000000000");
 
   return (
-    <AppShell role="teacher" profile={profile} teacherAccess={teacherAccess}>
+    <AppShell
+      role="teacher"
+      profile={profile}
+      teacherAccess={teacherAccess}
+      title="Dashboard"
+      subtitle="Your educator portal home — classes, records, announcements, and account tools."
+    >
       <div className="space-y-5">
         <TeacherProfileBanner
           profile={profile}
@@ -38,6 +47,8 @@ export default async function TeacherDashboard() {
           advisorySections={sections || []}
           assignmentCount={(assignments || []).length}
         />
+
+        <EducatorModuleGrid teacherAccess={teacherAccess} />
 
         <div className="grid gap-4 md:grid-cols-3">
           <section className="rounded-2xl border border-[#800000]/10 bg-white p-5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
@@ -94,7 +105,7 @@ export default async function TeacherDashboard() {
                 className="mt-2 inline-flex text-sm font-medium text-[#800000] underline-offset-2 hover:underline"
                 href="/teacher/students"
               >
-                View enrolled students
+                Open student management
               </Link>
             </div>
           </section>
@@ -113,14 +124,21 @@ export default async function TeacherDashboard() {
                 className="flex items-center justify-between rounded-lg border border-[#800000]/08 bg-[#faf7f5] px-3 py-2.5 font-medium text-[#3d1212] transition hover:border-[#800000]/20 hover:bg-white"
                 href="/teacher/gradebook"
               >
-                Interactive gradebook
+                Academic Records
+                <span className="text-[#800000]">→</span>
+              </Link>
+              <Link
+                className="flex items-center justify-between rounded-lg border border-[#800000]/08 bg-[#faf7f5] px-3 py-2.5 font-medium text-[#3d1212] transition hover:border-[#800000]/20 hover:bg-white"
+                href="/teacher/announcements"
+              >
+                Announcements & Updates
                 <span className="text-[#800000]">→</span>
               </Link>
               <Link
                 className="flex items-center justify-between rounded-lg border border-[#800000]/08 bg-[#faf7f5] px-3 py-2.5 font-medium text-[#3d1212] transition hover:border-[#800000]/20 hover:bg-white"
                 href="/teacher/attendance"
               >
-                Smart attendance
+                Attendance
                 <span className="text-[#800000]">→</span>
               </Link>
             </div>

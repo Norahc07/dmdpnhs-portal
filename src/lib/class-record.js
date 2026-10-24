@@ -1,5 +1,6 @@
 import { transmuteGrade } from "@/lib/deped-grades";
 import { PASSING_GRADE } from "@/lib/grades-terms";
+import { resolveAcademicFinalGrade } from "@/lib/humss-academic-record";
 
 const WW_COUNT = 10;
 const PT_COUNT = 10;

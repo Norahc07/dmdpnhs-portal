@@ -1,15 +1,44 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  Bell,
   BookOpen,
   Briefcase,
+  CalendarDays,
+  ClipboardCheck,
   ClipboardList,
+  FileText,
   GraduationCap,
   IdCard,
+  KeyRound,
+  LayoutDashboard,
+  Megaphone,
   School,
+  Settings,
+  ShieldCheck,
+  UserRound,
   Users,
 } from "lucide-react";
+import {
+  EDUCATOR_PORTAL_GROUPS,
+  EDUCATOR_PORTAL_MODULES,
+} from "@/lib/educator-portal";
 import { cn } from "@/lib/utils";
+
+const MODULE_ICONS = {
+  "/teacher": LayoutDashboard,
+  "/teacher/students": Users,
+  "/teacher/gradebook": GraduationCap,
+  "/teacher/attendance": ClipboardList,
+  "/teacher/announcements": Megaphone,
+  "/teacher/calendar": CalendarDays,
+  "/teacher/documents": FileText,
+  "/teacher/evaluation": ClipboardCheck,
+  "/teacher/notifications": Bell,
+  "/teacher/profile": UserRound,
+  "/teacher/settings": Settings,
+  "/teacher/password": KeyRound,
+};
 
 function formatName(profile) {
   const surname = profile?.last_name || "—";

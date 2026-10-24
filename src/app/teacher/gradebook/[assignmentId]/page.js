@@ -1,10 +1,16 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
+import { AcademicRecordWorkspace } from "@/components/teacher/AcademicRecordWorkspace";
 import { ClassRecordWorkspace } from "@/components/teacher/ClassRecordWorkspace";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_NAME } from "@/lib/constants";
 import { GRADE_WORKFLOW } from "@/lib/grade-workflow";
 import { normalizeGradeTerm, termLabel } from "@/lib/grades-terms";
+import {
+  humssSubjectTerm,
+  humssTermLabel,
+  isHumssGrade12,
+} from "@/lib/humss-academic-record";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
 export const metadata = { title: "Class Record" };
@@ -46,6 +52,7 @@ export default async function ClassRecordPage({ params, searchParams }) {
     .from("class_records")
     .select("data, updated_at, workflow_status, review_notes, term")
     .eq("assignment_id", assignment.id)
+    .eq("activation_status", "active")
     .eq("term", term)
     .maybeSingle();
 
@@ -100,21 +107,48 @@ export default async function ClassRecordPage({ params, searchParams }) {
         term={term}
         subjectId={assignment.subjects.id}
         initialWeights={assignment.subjects}
-        metadataDefaults={defaults}
-        initialData={classRecord?.data || null}
-        initialWorkflowStatus={
-          classRecord?.workflow_status || GRADE_WORKFLOW.DRAFT
-        }
-        reviewNotes={classRecord?.review_notes || null}
-        students={(students || []).map((student) => ({
-          id: student.id,
-          lrn: student.lrn,
-          gender: student.gender || "Unspecified",
-          firstName: student.profiles?.first_name || "",
-          lastName: student.profiles?.last_name || "",
-        }))}
-        isAdvisory={assignment.sections.adviser_id === teacher?.id}
-      />
-    </AppShell>
-  );
-}
+      title={academicMode ? "Academic Record" : "Class Record"}
+      subtitle={`${assignment.subjects.subject_name} · ${termName} · Grade ${assignment.sections.grade_level} ${assignment.sections.section_name}`}
+    >
+      {academicMode ? (
+        <AcademicRecordWorkspace
+          assignmentId={assignment.id}
+          term={term}
+          sectionId={assignment.sections.id}
+          metadataDefaults={defaults}
+          initialData={classRecord?.data || null}
+          initialWorkflowStatus={
+            classRecord?.workflow_status || GRADE_WORKFLOW.DRAFT
+          }
+          reviewNotes={classRecord?.review_notes || null}
+          students={(students || []).map((student) => ({
+            id: student.id,
+            lrn: student.lrn,
+            gender: student.gender || "Unspecified",
+            firstName: student.profiles?.first_name || "",
+            lastName: student.profiles?.last_name || "",
+          }))}
+          isAdvisory={assignment.sections.adviser_id === teacher?.id}
+        />
+      ) : (
+        <ClassRecordWorkspace
+          assignmentId={assignment.id}
+          term={term}
+          subjectId={assignment.subjects.id}
+          initialWeights={assignment.subjects}
+          metadataDefaults={defaults}
+          initialData={classRecord?.data || null}
+          initialWorkflowStatus={
+            classRecord?.workflow_status || GRADE_WORKFLOW.DRAFT
+          }
+          reviewNotes={classRecord?.review_notes || null}
+          students={(students || []).map((student) => ({
+            id: student.id,
+            lrn: student.lrn,
+            gender: student.gender || "Unspecified",
+            firstName: student.profiles?.first_name || "",
+            lastName: student.profiles?.last_name || "",
+          }))}
+          isAdvisory={assignment.sections.adviser_id === teacher?.id}
+        />
+      )}

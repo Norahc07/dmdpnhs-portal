@@ -58,33 +58,12 @@ async function assertCanViewStudentAttendance(auth, studentId) {
     return { ok: true };
   }
 
-  if (auth.profile.role === "parent") {
-    const { data: parent } = await auth.admin
-      .from("parents")
-      .select("id")
-      .eq("profile_id", auth.profile.id)
-      .maybeSingle();
-    if (!parent) return { error: "Parent record not found." };
-
-    const { data: link } = await auth.admin
-      .from("parent_student_links")
-      .select("id")
-      .eq("parent_id", parent.id)
-      .eq("student_id", studentId)
-      .maybeSingle();
-
-    if (!link) {
-      return { error: "That learner is not linked to your account." };
-    }
-    return { ok: true };
-  }
-
   return { error: "Not allowed to view this attendance." };
 }
 
 /**
  * Fetch attendance + excuse letters for a student month view.
- * Students: own record. Parents: linked learners only.
+ * Students: own record.
  */
 export async function getStudentAttendance(studentId, month, year) {
   const auth = await getAuthContext();

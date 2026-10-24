@@ -58,9 +58,8 @@ export function EnrollmentTable({ students, sections }) {
   }, [sections]);
 
   const [search, setSearch] = useState("");
-  const [schoolYear, setSchoolYear] = useState(
-    schoolYears[0] || SCHOOL_YEAR_DEFAULT
-  );
+  // Prefer current school year — newest year may be empty promotion targets
+  const [schoolYear, setSchoolYear] = useState(SCHOOL_YEAR_DEFAULT);
   const [gradeLevel, setGradeLevel] = useState("all");
   const [sectionId, setSectionId] = useState("all");
   const [gender, setGender] = useState("all");
@@ -103,16 +102,28 @@ export function EnrollmentTable({ students, sections }) {
     ) {
       return false;
     }
+
     if (stu.section_id) {
       const s = sectionById[stu.section_id];
-      if (!s || s.school_year !== schoolYear) return false;
+      // Keep row if section missing from list (stale id) — still show the learner
+      if (s && s.school_year !== schoolYear) return false;
     }
+    // Unassigned (no section) always included for the selected year filters
+
     if (searchQ) {
       const hay = `${stu.profiles?.first_name || ""} ${stu.profiles?.last_name || ""} ${stu.lrn || ""}`;
       if (!hay.toLowerCase().includes(searchQ)) return false;
     }
     return true;
   });
+
+  const learnersInOtherYears = useMemo(() => {
+    return students.filter((stu) => {
+      if (!stu.section_id) return false;
+      const s = sectionById[stu.section_id];
+      return s && s.school_year && s.school_year !== schoolYear;
+    }).length;
+  }, [students, sectionById, schoolYear]);
 
   const totalsByGrade = GRADE_LEVELS.map((g) => {
     const inGrade = rows.filter((r) => Number(r.grade_level) === g);
@@ -155,12 +166,11 @@ export function EnrollmentTable({ students, sections }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="rounded-2xl border border-[#800000]/10 bg-white px-4 py-3 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.28)] sm:max-w-xl">
           <p className="text-sm font-semibold text-[#3d1212]">
-            Enroll learners for portal activation
+            Enroll and activate learners
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Add LRN + birthdate first. The student then registers at{" "}
-            <span className="font-medium text-[#800000]">/register/student</span>{" "}
-            and completes activation. Incomplete stubs:{" "}
+            Creating a student also activates their portal. They sign in with
+            LRN and birthdate as password (YYYYMMDD). Incomplete stubs:{" "}
             <span className="font-semibold text-[#800000]">{incompleteCount}</span>
           </p>
         </div>
@@ -295,7 +305,16 @@ export function EnrollmentTable({ students, sections }) {
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-muted-foreground">
-                  No enrollment records for these filters.
+                  {learnersInOtherYears > 0 ? (
+                    <>
+                      No enrollment records for SY {schoolYear}.{" "}
+                      {learnersInOtherYears} learner
+                      {learnersInOtherYears === 1 ? "" : "s"} are in another
+                      school year — switch the SY filter above.
+                    </>
+                  ) : (
+                    "No enrollment records for these filters."
+                  )}
                 </TableCell>
               </TableRow>
             )}

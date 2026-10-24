@@ -1234,16 +1234,16 @@ export function FacultyDirectory({
       if (result.department) {
         setDeptList((list) => [...list, result.department]);
       } else {
-        setDeptList((list) => [
-          ...list,
-          {
-            id: `temp-${Date.now()}`,
-            name: fd.name,
-            band: fd.band,
+      setDeptList((list) => [
+        ...list,
+        {
+          id: `temp-${Date.now()}`,
+          name: fd.name,
+          band: fd.band,
             grade_level: Number(fd.gradeLevel),
             description: null,
-          },
-        ]);
+        },
+      ]);
       }
     });
   }
@@ -1413,23 +1413,23 @@ export function FacultyDirectory({
           value="departments"
           className="space-y-6 rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
               Manage departments by Junior High and Senior High level bands.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-[#800000]/20 text-[#800000]"
-              onClick={() => {
-                setError("");
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          className="border-[#800000]/20 text-[#800000]"
+          onClick={() => {
+            setError("");
                 setDeptSheetOpen(true);
-              }}
-            >
+          }}
+        >
               <Plus className="size-4" />
-              Add department
-            </Button>
-          </div>
+          Add department
+        </Button>
+      </div>
 
           {deptList.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#800000]/20 bg-[#faf7f5] px-6 py-12 text-center">
@@ -1444,8 +1444,8 @@ export function FacultyDirectory({
                 </code>{" "}
                 if seed data is missing, or add a department here.
               </p>
-            </div>
-          ) : (
+        </div>
+      ) : (
             <div className="space-y-8">
               <BandSummaryCards
                 title="Junior High"
@@ -1573,7 +1573,7 @@ export function FacultyDirectory({
                 ))}
               </select>
             </div>
-          </div>
+      </div>
 
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -1663,13 +1663,13 @@ export function FacultyDirectory({
         }}
       >
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+              <DialogHeader>
             <DialogTitle>Add teacher</DialogTitle>
-            <DialogDescription>
+                <DialogDescription>
               Creates an active faculty account. Share the Teacher ID / email
               and temporary password so they can sign in at /login/teacher.
-            </DialogDescription>
-          </DialogHeader>
+                </DialogDescription>
+              </DialogHeader>
 
           {createdTeacherCreds ? (
             <div className="space-y-3">
@@ -1706,7 +1706,7 @@ export function FacultyDirectory({
                 submitAddTeacher(new FormData(e.currentTarget));
               }}
             >
-              <div className="space-y-1.5">
+                <div className="space-y-1.5">
                 <Label htmlFor="teacher-first">First name</Label>
                 <Input id="teacher-first" name="firstName" required />
               </div>
@@ -1726,41 +1726,41 @@ export function FacultyDirectory({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="teacher-dept">Department</Label>
-                <select
+                  <select
                   id="teacher-dept"
-                  name="departmentId"
+                    name="departmentId"
                   defaultValue=""
-                  className={selectClass}
-                >
+                    className={selectClass}
+                  >
                   <option value="">— Optional —</option>
-                  {deptList.map((d) => (
-                    <option key={d.id} value={d.id}>
+                    {deptList.map((d) => (
+                      <option key={d.id} value={d.id}>
                       {d.name}
                       {d.band ? ` · ${bandLabel[d.band] || d.band}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
                 <Label htmlFor="teacher-position">Position</Label>
-                <select
+                  <select
                   id="teacher-position"
-                  name="facultyPosition"
+                    name="facultyPosition"
                   defaultValue="teacher"
-                  className={selectClass}
-                >
-                  {FACULTY_POSITIONS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                    className={selectClass}
+                  >
+                    {FACULTY_POSITIONS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="teacher-password">
                   Temporary password (optional)
                 </Label>
-                <Input
+                  <Input
                   id="teacher-password"
                   name="password"
                   type="text"
@@ -1771,27 +1771,27 @@ export function FacultyDirectory({
                   Minimum 8 characters if you set one. Otherwise a secure temp
                   password is generated.
                 </p>
-              </div>
+                </div>
               {addTeacherError ? (
                 <p className="text-sm text-rose-700 sm:col-span-2">
                   {addTeacherError}
                 </p>
-              ) : null}
+          ) : null}
               <DialogFooter className="sm:col-span-2">
-                <DialogClose
-                  render={<Button type="button" variant="outline" />}
-                >
-                  Cancel
-                </DialogClose>
-                <Button
-                  type="submit"
-                  disabled={pending}
-                  className="bg-[#800000] hover:bg-[#6a0000]"
-                >
+                  <DialogClose
+                    render={<Button type="button" variant="outline" />}
+                  >
+                    Cancel
+                  </DialogClose>
+                  <Button
+                    type="submit"
+                    disabled={pending}
+                    className="bg-[#800000] hover:bg-[#6a0000]"
+                  >
                   {pending ? "Creating…" : "Create teacher"}
-                </Button>
-              </DialogFooter>
-            </form>
+                  </Button>
+                </DialogFooter>
+              </form>
           )}
         </DialogContent>
       </Dialog>

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { EvaluationFormPanel } from "@/components/evaluation/EvaluationFormPanel";
 import { EvaluationProgressCard } from "@/components/evaluation/EvaluationProgressCard";
+import { EvaluationRecordsPanel } from "@/components/evaluation/EvaluationRecordsPanel";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -73,9 +74,39 @@ export function TeacherEvaluationTabs({
   ];
 
   const progressItems = [
-    {
-      key: "system",
-      label: "System / portal (year-end)",
+  const learnerItems = studentProgress?.learners?.length
+    ? studentProgress.learners
+    : (learners || []).map((learner) => ({
+        ...learner,
+        done: Boolean(studentExistings[learner.studentId]),
+      }));
+  const selectedLearner = learnerItems.find(
+    (learner) => learner.studentId === selectedStudentId
+  );
+  const selectedStudentExisting = selectedStudentId
+    ? studentExistings[selectedStudentId] || null
+    : null;
+  const learnerDoneCount = learnerItems.filter((learner) => learner.done).length;
+
+  const learnersBySection = [];
+  const sectionBuckets = new Map();
+  for (const learner of learnerItems) {
+    const key = learner.sectionId || "none";
+    if (!sectionBuckets.has(key)) {
+      sectionBuckets.set(key, {
+        sectionId: learner.sectionId,
+        label: `Grade ${learner.gradeLevel || "—"} · ${learner.sectionName}`,
+        learners: [],
+      });
+      learnersBySection.push(sectionBuckets.get(key));
+    }
+    sectionBuckets.get(key).learners.push(learner);
+  }
+
+  const tabs = [
+    { key: "system", label: "System", hint: "Year-end digital tools" },
+    { key: "sections", label: "Sections", hint: "Grade · section cards" },
+    { key: "learners", label: "Learners", hint: "Teacher to student" },
       done: progress?.systemDone,
     },
     ...uniqueSections.map((s) => ({
@@ -101,17 +132,26 @@ export function TeacherEvaluationTabs({
           const active = tab === item.key;
           return (
             <button
+      <EvaluationProgressCard
+        title="Teacher to student evaluations"
+        complete={Boolean(studentProgress?.complete)}
+        totalCompleted={studentProgress?.totalCompleted || learnerDoneCount}
+        totalRequired={studentProgress?.totalRequired || learnerItems.length || 0}
+        items={[]}
+        lockedMessage="Mark each learner Submitted or keep as Not submitted until you finish the form."
+      />
+              key={item.key}
+      <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-[#800000]/10 bg-white p-1.5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+        {tabs.map((item) => {
+          const active = tab === item.key;
+          return (
+            <button
               key={item.key}
               type="button"
               onClick={() => {
                 setTab(item.key);
                 if (item.key === "sections") setSelectedSectionId(null);
-              }}
-              data-active={active ? "true" : undefined}
-              className={cn(
-                "portal-soft-tab flex w-full min-w-0 flex-col items-center px-2 py-2.5 text-sm sm:flex-row sm:justify-center sm:gap-1.5",
-                active && "is-active"
-              )}
+                if (item.key === "learners") setSelectedStudentId(null);
             >
               <span className="truncate">{item.label}</span>
               <span className="hidden text-[11px] font-normal opacity-75 sm:inline">
@@ -128,7 +168,100 @@ export function TeacherEvaluationTabs({
           evaluationType="system"
           schoolYear={schoolYear}
           yearOnly
-          existing={systemExisting}
+      {tab === "learners" ? (
+        learnerItems.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-white px-5 py-10 text-center text-sm text-muted-foreground">
+            No active learners in your sections yet.
+          </div>
+        ) : selectedStudentId && selectedLearner ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setSelectedStudentId(null)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#800000] hover:underline"
+            >
+              <ArrowLeft className="size-4" />
+              Back to learners
+            </button>
+            <EvaluationFormPanel
+              key={`student-${selectedStudentId}`}
+              role="teacher"
+              evaluationType="student"
+              schoolYear={schoolYear}
+              yearOnly
+              learners={learnerItems}
+              existing={selectedStudentExisting}
+              hideTargetPickers
+              lockedStudentId={selectedStudentId}
+              title={`Evaluate · ${selectedLearner.name}`}
+              description={`LRN ${selectedLearner.lrn} · Grade ${selectedLearner.gradeLevel || "—"} ${selectedLearner.sectionName}. Rate engagement, work quality, and conduct.`}
+              onSubmitted={() => setSelectedStudentId(null)}
+            />
+          </div>
+        ) : (
+          <section className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+            <div className="portal-panel-head flex flex-wrap items-end justify-between gap-2 px-4 py-4 sm:px-5">
+              <div>
+                <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+                  Teacher to student
+                </p>
+                <h2 className="mt-1 font-heading text-base font-bold text-[#3d1212]">
+                  Choose a learner to evaluate
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Submitted or not submitted for each learner in your sections.
+                </p>
+              </div>
+              <span className="rounded-full bg-[#800000]/8 px-2.5 py-1 text-[11px] font-bold text-[#800000] tabular-nums">
+                {learnerDoneCount}/{learnerItems.length} submitted
+              </span>
+            </div>
+            <div className="divide-y divide-[#800000]/08">
+              {learnersBySection.map((group) => (
+                <div key={group.sectionId || "none"} className="px-4 py-3 sm:px-5">
+                  <p className="text-xs font-semibold text-[#800000]">{group.label}</p>
+                  <ul className="mt-2 space-y-1">
+                    {group.learners.map((learner) => (
+                      <li key={learner.studentId}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentId(learner.studentId)}
+                          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-[#800000]/4"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-9 shrink-0 items-center justify-center rounded-xl ring-1",
+                              learner.done
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                : "bg-[#800000]/8 text-[#800000] ring-[#800000]/12"
+                            )}
+                          >
+                            {learner.done ? (
+                              <CheckCircle2 className="size-4" />
+                            ) : (
+                              <UserRound className="size-4" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold text-[#3d1212]">
+                              {learner.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              LRN {learner.lrn}
+                              {learner.done ? " · Submitted" : " · Not submitted"}
+                            </span>
+                          </span>
+                          <ChevronRight className="size-4 text-[#800000]/50" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        )
+      ) : tab === "system" ? (
           title="Evaluate digital tools for your daily work"
           description="Attendance, class record, grade distribution, and section management for this school year."
         />

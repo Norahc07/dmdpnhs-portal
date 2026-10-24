@@ -7,7 +7,7 @@ export const metadata = { title: "School Calendar" };
 
 export default async function StudentCalendarPage({ searchParams }) {
   const params = await searchParams;
-  const { profile, supabase } = await requireRole("student");
+  const { profile, supabase, studentAccess } = await requireRole("student");
 
   const { data: student } = await supabase
     .from("students")
@@ -32,8 +32,8 @@ export default async function StudentCalendarPage({ searchParams }) {
       role="student"
       profile={profile}
       title="School calendar"
-      subtitle="Holidays, important dates, school events, and community birthdays — every year."
-      studentAccess={{ activated: true, enrolled: true }}
+      subtitle="Official DepEd holidays, enrollment, exams, and school activities — plus class events from your teachers."
+      studentAccess={studentAccess}
     >
       {calendar.error ? (
         <p className="text-sm text-muted-foreground">{calendar.error}</p>

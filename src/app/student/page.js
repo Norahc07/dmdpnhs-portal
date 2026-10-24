@@ -1,121 +1,77 @@
+import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import {
   EnrolledSubjectsPanel,
+  StudentModuleGrid,
   StudentProfileBanner,
   TodaySchedulePanel,
 } from "@/components/student/StudentDashboard";
 import { requireRole } from "@/lib/auth-guard";
 import {
   formatLongDate,
-  formatScheduleLabel,
   getEnrollmentTermLabel,
+  loadStudentClassSchedule,
   toDateKey,
 } from "@/lib/student-dashboard";
+import { expandOfficialCalendarEvents } from "@/lib/deped-school-calendar";
 
 export const metadata = { title: "Student Dashboard" };
 
 async function loadTodayEvents(supabase, student) {
-  const today = toDateKey(new Date());
+  const now = new Date();
+  const today = toDateKey(now);
   const { data, error } = await supabase
     .from("school_events")
     .select("*")
     .eq("event_date", today)
     .order("start_time", { ascending: true });
 
-  if (error) return [];
+  const dbEvents = error
+    ? []
+    : (data || []).filter((event) => {
+        const gradeOk =
+          event.grade_level == null ||
+          event.grade_level === student?.grade_level;
+        const sectionOk =
+          event.section_id == null || event.section_id === student?.section_id;
+        return gradeOk && sectionOk;
+      });
 
-  return (data || []).filter((event) => {
-    const gradeOk =
-      event.grade_level == null || event.grade_level === student?.grade_level;
-    const sectionOk =
-      event.section_id == null || event.section_id === student?.section_id;
-    return gradeOk && sectionOk;
-  });
+  const officialToday = expandOfficialCalendarEvents(
+    now.getFullYear(),
+    now.getMonth()
+  ).filter((event) => event.event_date === today);
+
+  return [...officialToday, ...dbEvents];
 }
 
 async function loadEnrolledSubjects(supabase, student) {
-  if (!student?.section_id) return [];
-
-  const { data: schedules, error } = await supabase
-    .from("class_schedules")
-    .select(
-      `
-      id,
-      day_of_week,
-      start_time,
-      end_time,
-      room,
-      subject_id,
-      subjects ( id, subject_name ),
-      teachers (
-        id,
-        teacher_id,
-        profiles ( first_name, last_name, email )
-      )
-    `
-    )
-    .eq("section_id", student.section_id)
-    .order("day_of_week")
-    .order("start_time");
-
-  if (error || !schedules?.length) {
-    const { data: subjects } = await supabase
-      .from("subjects")
-      .select("id, subject_name")
-      .eq("grade_level", student.grade_level || 0)
-      .order("subject_name");
-
-    return (subjects || []).map((subject) => ({
-      id: subject.id,
-      subject_name: subject.subject_name,
-      schedule_label: "TBA",
-      teacher_name: null,
-      teacher_email: null,
-      teacher_code: null,
-    }));
-  }
-
-  const bySubject = new Map();
-  for (const row of schedules) {
-    const subjectId = row.subject_id || row.subjects?.id;
-    if (!subjectId) continue;
-
-    if (!bySubject.has(subjectId)) {
-      const teacherProfile = row.teachers?.profiles;
-      bySubject.set(subjectId, {
-        id: subjectId,
-        subject_name: row.subjects?.subject_name || "Subject",
-        scheduleRows: [],
-        teacher_name: teacherProfile
-          ? `${teacherProfile.first_name} ${teacherProfile.last_name}`
-          : null,
-        teacher_email: teacherProfile?.email || null,
-        teacher_code: row.teachers?.teacher_id || null,
-      });
-    }
-
-    bySubject.get(subjectId).scheduleRows.push(row);
-  }
-
-  return Array.from(bySubject.values()).map((item) => ({
-    id: item.id,
-    subject_name: item.subject_name,
-    schedule_label: formatScheduleLabel(item.scheduleRows),
-    teacher_name: item.teacher_name,
-    teacher_email: item.teacher_email,
-    teacher_code: item.teacher_code,
-  }));
+  const { subjects } = await loadStudentClassSchedule(supabase, student);
+  return subjects;
 }
 
 export default async function StudentDashboardPage({ searchParams }) {
   const params = await searchParams;
-  const { supabase, profile } = await requireRole("student");
+  const { supabase, profile, studentAccess } = await requireRole("student");
 
-  const { data: student } = await supabase
+  const { data: studentRow } = await supabase
     .from("students")
-    .select("*, sections(section_name, grade_level, school_year)")
+    .select("*")
     .eq("profile_id", profile.id)
     .maybeSingle();
+
+  let section = null;
+  if (studentRow?.section_id) {
+    const { data } = await supabase
+      .from("sections")
+      .select("section_name, grade_level, school_year")
+      .eq("id", studentRow.section_id)
+      .maybeSingle();
+    section = data;
+  }
+  const student = studentRow
+    ? { ...studentRow, sections: section }
+    : null;
 
   const activated = student?.activation_status === "active";
   const enrolled =
@@ -138,7 +94,14 @@ export default async function StudentDashboardPage({ searchParams }) {
     <AppShell
       role="student"
       profile={profile}
-      studentAccess={{ activated, enrolled }}
+      title="Dashboard"
+      subtitle="Your student portal home — records, schedule, announcements, and account tools."
+      studentAccess={{
+        activated,
+        enrolled,
+        isSecretary: Boolean(studentAccess?.isSecretary),
+        unreadAnnouncements: studentAccess?.unreadAnnouncements || 0,
+      }}
     >
       <div className="space-y-5">
         {isPending ? (
@@ -166,6 +129,40 @@ export default async function StudentDashboardPage({ searchParams }) {
           </div>
         ) : null}
 
+        {Number(studentAccess?.unreadAnnouncements || 0) > 0 ? (
+          <div className="rounded-xl border border-[#800000]/20 bg-[#800000]/5 px-4 py-3 text-sm text-[#3d1212]">
+            <p className="font-semibold">New announcements</p>
+            <p className="mt-1 text-[#3d1212]/80">
+              You have {studentAccess.unreadAnnouncements} unread post
+              {studentAccess.unreadAnnouncements === 1 ? "" : "s"} from your
+              teachers.{" "}
+              <Link
+                href="/student/announcements"
+                className="font-semibold text-[#800000] underline-offset-2 hover:underline"
+              >
+                Open announcements
+              </Link>
+            </p>
+          </div>
+        ) : null}
+
+        {studentAccess?.isSecretary ? (
+          <div className="rounded-xl border border-[#ffd700]/40 bg-[#ffd700]/15 px-4 py-3 text-sm text-[#3d1212]">
+            <p className="font-semibold">Class secretary</p>
+            <p className="mt-1 text-[#3d1212]/80">
+              Your adviser gave you class secretary access for your assigned
+              section. Attendance only — you cannot encode grades or use
+              administrative tools.{" "}
+              <Link
+                href="/student/class-secretary"
+                className="font-semibold text-[#800000] underline-offset-2 hover:underline"
+              >
+                Open class secretary
+              </Link>
+            </p>
+          </div>
+        ) : null}
+
         {notice === "pending" ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
             Profile submitted. Please wait for registrar verification. You can use
@@ -179,6 +176,15 @@ export default async function StudentDashboardPage({ searchParams }) {
           termLabel={termLabel}
           activated={activated}
           enrolled={enrolled}
+        />
+
+        <StudentModuleGrid
+          studentAccess={{
+            activated,
+            enrolled,
+            isSecretary: Boolean(studentAccess?.isSecretary),
+            unreadAnnouncements: studentAccess?.unreadAnnouncements || 0,
+          }}
         />
 
         {activated ? (

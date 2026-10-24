@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoginCard } from "@/components/auth/LoginForms";
+import { AuthRoleSwitch } from "@/components/auth/AuthRoleSwitch";
 import { SCHOOL_NAME, SCHOOL_SHORT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +100,7 @@ export function StudentRegisterForm() {
               "Phase 1: Verify with your LRN and birthdate, then create a password.",
               "Phase 2: Enter personal details and parent/guardian contacts.",
               "Wait for registrar verification (they will call the parent number).",
-              "When activated, sign in with your LRN and password. Parents receive an SMS access code from DMDPNHS.",
+              "When activated, sign in with your LRN and password.",
             ].map((step, i) => (
               <li key={step} className="flex gap-3 font-sans text-sm text-[#3d1212]">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#800000] text-xs font-bold text-white">
@@ -213,8 +214,10 @@ export function StudentResetPasswordForm() {
   const [done, setDone] = useState(false);
 
   return (
+    <>
+    <AuthRoleSwitch active="student" />
     <LoginCard
-      title="Reset password"
+      title="Reset student password"
       subtitle="Verify your LRN and birthdate, then choose a new password."
       error={error}
       footer={
@@ -310,5 +313,6 @@ export function StudentResetPasswordForm() {
         </form>
       )}
     </LoginCard>
+    </>
   );
 }

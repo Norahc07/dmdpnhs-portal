@@ -41,7 +41,7 @@ export const ROLES = {
 export const ROLE_HOME = {
   student: "/student",
   teacher: "/teacher",
-  parent: "/parent",
+  parent: "/",
   registrar: "/registrar",
 };
 
@@ -86,11 +86,21 @@ export const GRADE_LEVELS = [7, 8, 9, 10, 11, 12];
 export const SHS_STRANDS = [
   "STEM ENGINEERING",
   "STEM MEDICAL",
+  "HUMSS",
   "HOSPITALITY AND TOURISM",
   "BUSINESS AND ENTREPRENEURSHIP",
   "ASSH-SOCIAL SCIENCE",
   "ASSH-COM. ARTS FILIPINO",
 ];
+
+/** HUMSS sections are named HUMSS-A; other strands use "STRAND A". */
+export function strandSectionName(strand, letter) {
+  const s = String(strand || "").trim();
+  const L = String(letter || "").trim().toUpperCase();
+  if (!s || !L) return "";
+  if (s === "HUMSS") return `HUMSS-${L}`;
+  return `${s} ${L}`;
+}
 
 export function isSeniorHighGrade(gradeLevel) {
   const g = Number(gradeLevel);
@@ -102,11 +112,19 @@ export function isSeniorHighGrade(gradeLevel) {
  * Existing names like "STEM ENGINEERING A" → next is "B".
  */
 export function nextStrandSectionLetter(existingSectionNames, strand) {
-  const prefix = `${strand} `;
+  const hyphenPrefix = strand === "HUMSS" ? "HUMSS-" : null;
+  const spacePrefix = `${strand} `;
   const used = new Set();
   for (const name of existingSectionNames || []) {
-    if (!String(name).startsWith(prefix)) continue;
-    const letter = String(name).slice(prefix.length).trim().toUpperCase();
+    const raw = String(name);
+    let letter = "";
+    if (hyphenPrefix && raw.startsWith(hyphenPrefix)) {
+      letter = raw.slice(hyphenPrefix.length).trim().toUpperCase();
+    } else if (raw.startsWith(spacePrefix)) {
+      letter = raw.slice(spacePrefix.length).trim().toUpperCase();
+    } else {
+      continue;
+    }
     if (/^[A-Z]$/.test(letter)) used.add(letter);
   }
   for (let i = 0; i < 26; i += 1) {
@@ -144,7 +162,15 @@ export const STATUS_BADGE_STYLES = {
   excused: "bg-sky-100 text-sky-800 border-sky-200",
   draft: "bg-neutral-100 text-neutral-700 border-neutral-200",
   submitted: "bg-sky-100 text-sky-800 border-sky-200",
+  Submitted: "bg-sky-100 text-sky-800 border-sky-200",
   under_review: "bg-amber-100 text-amber-900 border-amber-200",
+  "Under Review": "bg-amber-100 text-amber-900 border-amber-200",
+  approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  Approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  needs_revision: "bg-rose-100 text-rose-800 border-rose-200",
+  "Needs Revision": "bg-rose-100 text-rose-800 border-rose-200",
+  not_submitted: "bg-neutral-100 text-neutral-700 border-neutral-200",
+  "Not Submitted": "bg-neutral-100 text-neutral-700 border-neutral-200",
   returned: "bg-rose-100 text-rose-800 border-rose-200",
   endorsed: "bg-violet-100 text-violet-800 border-violet-200",
   locked: "bg-emerald-100 text-emerald-800 border-emerald-200",

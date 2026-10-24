@@ -10,13 +10,13 @@ import { cn } from "@/lib/utils";
 
 const LEGEND = [
   ["holiday", "Holiday"],
-  ["important", "Important"],
-  ["birthday", "Birthday"],
-  ["birthday_mine", "Your birthday"],
-  ["exam", "Exam"],
-  ["assignment", "Assignment"],
+  ["enrollment", "Enrollment"],
+  ["exam", "Examination"],
+  ["activity", "School activity"],
   ["school_event", "School event"],
-  ["activity", "Activity"],
+  ["deped", "Other DepEd date"],
+  ["assignment", "Assignment"],
+  ["birthday", "Birthday"],
 ];
 
 export function PortalCalendarView({
@@ -102,8 +102,8 @@ export function PortalCalendarView({
           );
         })}
         <span className="ml-auto self-center text-muted-foreground">
-          {counts.holidays || 0} holidays · {counts.important || 0} important ·{" "}
-          {counts.birthdays || 0} birthdays
+          {counts.official || 0} official · {counts.classEvents || 0} class
+          events · {counts.birthdays || 0} birthdays
         </span>
       </div>
 
@@ -162,7 +162,9 @@ export function PortalCalendarView({
                       <p
                         key={event.id}
                         className="truncate rounded px-1 py-0.5 text-[10px] font-medium text-[#3d1212]"
-                        title={event.title}
+                        title={`${style.label} · ${event.title}${
+                          event.originLabel ? ` (${event.originLabel})` : ""
+                        }`}
                       >
                         <span
                           className={cn(
@@ -186,27 +188,48 @@ export function PortalCalendarView({
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-        <div className="portal-panel-head px-5 py-4">
-          <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
-            Schedule
-          </p>
-          <h3 className="mt-1 font-(family-name:--font-montserrat) text-lg font-bold text-[#3d1212]">
-            Events this month
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Holidays and important dates repeat every year. Student and teacher
-            birthdays appear as community reminders. Registrar-published school
-            events are visible to everyone on the portal calendar.
-          </p>
-        </div>
-        <div className="space-y-3 p-5">
-          {events.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No calendar items for this month yet.
-            </p>
-          )}
-          {events.map((event) => {
+      <EventGroup
+        kicker="Official calendar"
+        title="DepEd school calendar"
+        hint="Holidays, enrollment, examinations, school activities, and other official DepEd dates. These are labeled automatically and cannot be edited here."
+        events={events.filter((event) => event.category === "official")}
+        empty="No official DepEd dates in this month."
+      />
+      <EventGroup
+        kicker="Class events"
+        title="Teacher-added events"
+        hint="Events posted by authorized teachers for their assigned sections. Separate from the official DepEd calendar."
+        events={events.filter((event) => event.category === "teacher")}
+        empty="No class events in this month."
+      />
+      <EventGroup
+        kicker="Community"
+        title="Birthdays this month"
+        hint="Student and teacher birthday reminders."
+        events={events.filter((event) => event.category === "community")}
+        empty="No birthdays in this month."
+      />
+    </div>
+  );
+}
+
+function EventGroup({ kicker, title, hint, events, empty }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+      <div className="portal-panel-head px-5 py-4">
+        <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+          {kicker}
+        </p>
+        <h3 className="mt-1 font-(family-name:--font-montserrat) text-lg font-bold text-[#3d1212]">
+          {title}
+        </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <div className="space-y-3 p-5">
+        {events.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{empty}</p>
+        ) : (
+          events.map((event) => {
             const style = styleForEventType(event.event_type);
             return (
               <div
@@ -228,10 +251,8 @@ export function PortalCalendarView({
                     {event.start_time
                       ? ` · ${String(event.start_time).slice(0, 5)}`
                       : ""}
-                    {event.source === "yearly" || event.source === "database_yearly"
-                      ? " · every year"
-                      : ""}
-                    {event.source === "birthday" ? " · birthday reminder" : ""}
+                    {event.originLabel ? ` · ${event.originLabel}` : ""}
+                    {event.sectionLabel ? ` · ${event.sectionLabel}` : ""}
                   </p>
                   {event.description ? (
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -241,9 +262,9 @@ export function PortalCalendarView({
                 </div>
               </div>
             );
-          })}
-        </div>
-      </section>
-    </div>
+          })
+        )}
+      </div>
+    </section>
   );
 }

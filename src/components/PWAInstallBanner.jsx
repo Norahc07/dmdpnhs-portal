@@ -30,8 +30,22 @@ export function PWAInstallBanner() {
       setVisible(true);
     }
 
+    const isLocal =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      if (isLocal) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((reg) => reg.unregister());
+        });
+        if (window.caches?.keys) {
+          window.caches.keys().then((keys) => {
+            keys.forEach((key) => window.caches.delete(key));
+          });
+        }
+      } else {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
     }
 
     return () => {

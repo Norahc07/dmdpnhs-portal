@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 
 const PROTECTED_PREFIXES = [
   "/student",
-  "/parent",
   "/teacher",
   "/registrar",
 ];
@@ -12,7 +11,6 @@ function roleHome(role) {
   const map = {
     student: "/student",
     teacher: "/teacher",
-    parent: "/parent",
     registrar: "/registrar",
   };
   return map[role] || "/login";
@@ -82,6 +80,16 @@ export async function middleware(request) {
     const status = profile?.status;
     let studentActivation = null;
 
+    // Parent portal removed — send leftover parent sessions to the public site.
+    if (role === "parent") {
+      if (isProtected || isAuthPage || pathname.startsWith("/parent")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
+
     // Pending teachers may only access /teacher/pending
     if (role === "teacher" && status === "pending") {
       if (
@@ -113,7 +121,9 @@ export async function middleware(request) {
       const onStudentHome = pathname === "/student";
       const needsEnrollment =
         pathname.startsWith("/student/grades") ||
-        pathname.startsWith("/student/attendance");
+        pathname.startsWith("/student/attendance") ||
+        pathname.startsWith("/student/class-attendance") ||
+        pathname.startsWith("/student/class-secretary");
 
       if (studentActivation === "incomplete") {
         if (!onActivate) {

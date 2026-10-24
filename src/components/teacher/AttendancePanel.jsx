@@ -33,7 +33,7 @@ const OPTIONS = [
   },
   {
     value: "late",
-    label: "Tardy",
+    label: "Late",
     icon: Moon,
     iconClass: "fill-amber-400 text-amber-500",
     activeClass: "border-amber-400 bg-amber-50 hover:bg-amber-100",

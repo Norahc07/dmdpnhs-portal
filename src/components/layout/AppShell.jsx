@@ -81,6 +81,11 @@ function SidebarBody({ role, onNavigate, studentAccess, teacherAccess }) {
     <div className="flex h-full flex-col p-4">
       <div className="mb-6">
         <BrandBlock size="md" />
+        {role === "student" || role === "teacher" ? (
+          <p className="mt-2 text-center text-[10px] font-semibold tracking-[0.18em] text-[#800000]/70 uppercase">
+            {role === "teacher" ? "Educator Portal" : "Student Portal"}
+          </p>
+        ) : null}
       </div>
 
       <PortalNav
@@ -97,7 +102,7 @@ function SidebarBody({ role, onNavigate, studentAccess, teacherAccess }) {
           className="mt-4 w-full justify-start text-[#4a1515]/70"
         >
           <LogOut className="size-4" />
-          Sign out
+          Logout
         </Button>
       </form>
     </div>
@@ -208,6 +213,11 @@ export function AppShell({
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <div className="px-4 pt-6 pb-2">
               <BrandBlock size="lg" />
+              {role === "student" || role === "teacher" ? (
+                <p className="mt-2 text-center text-[10px] font-semibold tracking-[0.18em] text-[#800000]/70 uppercase">
+                  {role === "teacher" ? "Educator Portal" : "Student Portal"}
+                </p>
+              ) : null}
             </div>
             <div className="px-4 pb-10">
               <PortalNav
@@ -223,7 +233,7 @@ export function AppShell({
                   className="w-full justify-start text-[#4a1515]/70"
                 >
                   <LogOut className="size-4" />
-                  Sign out
+                  Logout
                 </Button>
               </form>
             </div>
@@ -235,7 +245,16 @@ export function AppShell({
         <div className="px-4 py-4 sm:px-6 lg:px-8">
           {(title || subtitle) && (
             <header className="mb-5">
-              <p className="portal-page-kicker">PastraPortal</p>
+              <p className="portal-page-kicker">
+                {pathname?.startsWith("/student/class-secretary") ||
+                pathname?.startsWith("/student/class-attendance")
+                  ? "Class Secretary"
+                  : role === "student"
+                    ? "Student Portal"
+                    : role === "teacher"
+                      ? "Educator Portal"
+                      : "PastraPortal"}
+              </p>
               {title && (
                 <h2 className="mt-1 font-heading text-xl font-bold tracking-tight text-[#3d1212] sm:text-2xl">
                   {title}

@@ -201,39 +201,42 @@ export async function getEvaluationContext() {
       return String(a.sectionName || "").localeCompare(String(b.sectionName || ""));
     });
 
+    const sectionIds = sections.map((s) => s.sectionId).filter(Boolean);
+    let learners = [];
+    if (sectionIds.length) {
+      const { data: studentRows } = await admin
+        .from("students")
+        .select("id, lrn, section_id, profiles(first_name, last_name)")
+        .in("section_id", sectionIds)
+        .eq("activation_status", "active");
+      const sectionById = new Map(sections.map((s) => [s.sectionId, s]));
+      learners = (studentRows || [])
+        .map((row) => {
+          const section = sectionById.get(row.section_id);
+          return {
+            studentId: row.id,
+            lrn: row.lrn || "—",
+            name: [row.profiles?.last_name, row.profiles?.first_name]
+              .filter(Boolean)
+              .join(", ") || "Learner",
+            sectionId: row.section_id,
+            sectionName: section?.sectionName || "Section",
+            gradeLevel: section?.gradeLevel,
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
     return {
       role: "teacher",
       schoolYear,
       teacher,
       sections,
+      learners,
     };
   }
 
-  if (profile.role === "parent") {
-    const { data: parent } = await admin
-      .from("parents")
-      .select("id, access_code")
-      .eq("profile_id", profile.id)
-      .maybeSingle();
-
-    const { data: links } = parent?.id
-      ? await admin
-          .from("parent_student_links")
-          .select(
-            "student_id, students(id, lrn, grade_level, profiles(first_name, last_name))"
-          )
-          .eq("parent_id", parent.id)
-      : { data: [] };
-
-    return {
-      role: "parent",
-      schoolYear,
-      parent,
-      children: (links || []).map((l) => l.students).filter(Boolean),
-    };
-  }
-
-  return { error: "Evaluation is for students, teachers, and parents." };
+  return { error: "Evaluation is for students and teachers." };
 }
 
 export async function listMyEvaluations({ schoolYear, term } = {}) {
@@ -356,23 +359,20 @@ export async function submitEvaluation({
   const { admin, profile } = auth;
 
   const role = profile.role;
-  if (!["student", "teacher", "parent"].includes(role)) {
+  if (!["student", "teacher"].includes(role)) {
     return { error: "Unauthorized role." };
   }
 
   const type = String(evaluationType || "").trim();
-  const allowed = ["system", "teacher", "section", "child"];
+  const allowed = ["system", "teacher", "section", "self", "student"];
   if (!allowed.includes(type)) {
     return { error: "Invalid evaluation type." };
   }
-  if (type === "teacher" && role !== "student") {
-    return { error: "Only students evaluate teachers." };
+  if ((type === "teacher" || type === "self") && role !== "student") {
+    return { error: "Only students can submit this evaluation." };
   }
-  if (type === "section" && role !== "teacher") {
-    return { error: "Only teachers evaluate their sections." };
-  }
-  if (type === "child" && role !== "parent") {
-    return { error: "Only parents evaluate linked children." };
+  if ((type === "section" || type === "student") && role !== "teacher") {
+    return { error: "Only teachers can submit this evaluation." };
   }
 
   let termNum = Number(term);
@@ -394,7 +394,6 @@ export async function submitEvaluation({
   const average = averageFromScores(cleanScores, questions);
 
   let studentId = null;
-  let parentId = null;
   let sectionId = null;
   let teacherId = null;
   let subjectId = null;
@@ -431,27 +430,32 @@ export async function submitEvaluation({
       if (!targetSectionId) return { error: "Choose a section to evaluate." };
       sectionId = targetSectionId;
     }
-  }
-
-  if (role === "parent") {
-    const { data: parent } = await admin
-      .from("parents")
-      .select("id")
-      .eq("profile_id", profile.id)
-      .maybeSingle();
-    if (!parent) return { error: "Parent record not found." };
-    parentId = parent.id;
-    if (type === "child") {
-      if (!targetStudentId) return { error: "Choose a child to evaluate." };
-      // Verify link
-      const { data: link } = await admin
-        .from("parent_student_links")
-        .select("id")
-        .eq("parent_id", parent.id)
-        .eq("student_id", targetStudentId)
+    if (type === "student") {
+      if (!targetStudentId) return { error: "Choose a learner to evaluate." };
+      const { data: target } = await admin
+        .from("students")
+        .select("id, section_id")
+        .eq("id", targetStudentId)
         .maybeSingle();
-      if (!link) return { error: "That learner is not linked to your account." };
-      studentId = targetStudentId;
+      if (!target) return { error: "Learner not found." };
+      const { data: assignments } = await admin
+        .from("teacher_assignments")
+        .select("section_id")
+        .eq("teacher_id", teacher.id)
+        .eq("school_year", sy);
+      const { data: advisory } = await admin
+        .from("sections")
+        .select("id")
+        .eq("adviser_id", teacher.id);
+      const allowedSections = new Set([
+        ...(assignments || []).map((row) => row.section_id),
+        ...(advisory || []).map((row) => row.id),
+      ]);
+      if (!allowedSections.has(target.section_id)) {
+        return { error: "You can only evaluate learners in your sections." };
+      }
+      studentId = target.id;
+      sectionId = target.section_id;
     }
   }
 
@@ -465,7 +469,6 @@ export async function submitEvaluation({
     target_subject_id: subjectId,
     target_section_id: sectionId,
     student_id: studentId,
-    parent_id: parentId,
     scores: cleanScores,
     average_score: average,
     comments: comments ? String(comments).trim() || null : null,
@@ -487,7 +490,7 @@ export async function submitEvaluation({
       .eq("target_subject_id", subjectId);
   } else if (type === "section") {
     existingQuery = existingQuery.eq("target_section_id", sectionId);
-  } else if (type === "child") {
+  } else if (type === "student") {
     existingQuery = existingQuery.eq("student_id", studentId);
   }
 
@@ -567,11 +570,11 @@ export async function getEvaluationSummary({ schoolYear, term } = {}) {
     teacherSection: rows.filter(
       (r) => r.evaluator_role === "teacher" && r.evaluation_type === "section"
     ),
-    parentSystem: rows.filter(
-      (r) => r.evaluator_role === "parent" && r.evaluation_type === "system"
+    studentSelf: rows.filter(
+      (r) => r.evaluator_role === "student" && r.evaluation_type === "self"
     ),
-    parentChild: rows.filter(
-      (r) => r.evaluator_role === "parent" && r.evaluation_type === "child"
+    teacherStudent: rows.filter(
+      (r) => r.evaluator_role === "teacher" && r.evaluation_type === "student"
     ),
   };
 
@@ -597,8 +600,11 @@ export async function getEvaluationSummary({ schoolYear, term } = {}) {
         count: by.teacherSection.length,
         average: avg(by.teacherSection),
       },
-      parentSystem: { count: by.parentSystem.length, average: avg(by.parentSystem) },
-      parentChild: { count: by.parentChild.length, average: avg(by.parentChild) },
+      studentSelf: { count: by.studentSelf.length, average: avg(by.studentSelf) },
+      teacherStudent: {
+        count: by.teacherStudent.length,
+        average: avg(by.teacherStudent),
+      },
       total: rows.length,
     },
   };

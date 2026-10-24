@@ -59,12 +59,12 @@ function EvaluationGuide({ role, evaluationType, description }) {
       ? "Rate each subject teacher honestly so the school can improve teaching quality and classroom support for every learner."
       : evaluationType === "section"
         ? "Reflect on how the portal supports the sections you handle this school year."
-        : evaluationType === "child"
-          ? "Share how clearly you can monitor this child’s progress and attendance through the parent portal."
-          : role === "teacher"
-            ? "Help improve PastraPortal tools used for attendance, class records, and grade distribution."
-            : role === "parent"
-              ? "Tell us how the parent portal helps you stay informed about your child’s school standing."
+        : evaluationType === "self"
+          ? "Reflect on your own effort, attendance habits, and learning this term."
+          : evaluationType === "student"
+            ? "Rate this learner’s engagement, work quality, and conduct for your class."
+            : role === "teacher"
+              ? "Help improve PastraPortal tools used for attendance, class records, and grade distribution."
               : "Help improve PastraPortal — grades access, digital processes, and how useful the student portal is for you.";
 
   return (
@@ -252,6 +252,7 @@ export function EvaluationFormPanel({
 
   const icon =
     evaluationType === "teacher" || evaluationType === "child" ? (
+    evaluationType === "teacher" || evaluationType === "student" ? (
       <Star className="size-5" />
     ) : evaluationType === "section" ? (
       <Users className="size-5" />
@@ -263,9 +264,8 @@ export function EvaluationFormPanel({
     evaluationType === "teacher" && !hideTargetPickers && !lockedTeacherKey;
   const showSectionSelect =
     evaluationType === "section" && !hideTargetPickers && !lockedSectionId;
-  const showChildSelect =
-    evaluationType === "child" && !hideTargetPickers && !lockedChildId;
-
+  const showLearnerSelect =
+    evaluationType === "student" && !hideTargetPickers && !lockedStudentId;
   return (
     <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
       <div className="portal-panel-head flex items-start gap-3 px-4 py-4 sm:px-5">
