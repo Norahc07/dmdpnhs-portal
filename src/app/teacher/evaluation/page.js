@@ -41,13 +41,23 @@ export default async function TeacherEvaluationPage() {
   const systemExisting =
     evaluations.find((e) => e.evaluation_type === "system") || null;
   const sectionExistings = {};
+  const studentExistings = {};
   for (const e of evaluations) {
-    if (e.evaluation_type !== "section" || !e.target_section_id) continue;
-    sectionExistings[e.target_section_id] = e;
+    if (e.evaluation_type === "section" && e.target_section_id) {
+      sectionExistings[e.target_section_id] = e;
+    }
+    if (e.evaluation_type === "student" && e.student_id) {
+      studentExistings[e.student_id] = e;
+    }
   }
 
   const progress = computeTeacherYearCompletion({
     sections: ctx.sections || [],
+    evaluations,
+    schoolYear: ctx.schoolYear,
+  });
+  const studentProgress = computeTeacherStudentProgress({
+    learners: ctx.learners || [],
     evaluations,
     schoolYear: ctx.schoolYear,
   });
@@ -71,6 +81,9 @@ export default async function TeacherEvaluationPage() {
         systemExisting={systemExisting}
         sectionExistings={sectionExistings}
         progress={progress}
+        learners={ctx.learners || []}
+        studentExistings={studentExistings}
+        studentProgress={studentProgress}
       />
     </AppShell>
   );

@@ -166,7 +166,6 @@ async function upsertStudentRow(admin, sectionId, row) {
 
   const payload = {
     lrn: row.lrn,
-    profile_id: profileId,
     gender: row.gender,
     birthdate: row.birthdate,
     grade_level: 7,
@@ -178,10 +177,18 @@ async function upsertStudentRow(admin, sectionId, row) {
     parent_access_code_shown: row.parent_access_code_shown || null,
   };
 
+  if (profileId) {
+    payload.profile_id = profileId;
+  }
+
   if (existing?.id) {
     const { error } = await admin.from("students").update(payload).eq("id", existing.id);
     if (error) throw new Error(`student ${row.lrn}: ${error.message}`);
     return existing.id;
+  }
+
+  if (!profileId) {
+    return null;
   }
 
   const { data: inserted, error } = await admin

@@ -251,7 +251,6 @@ export function EvaluationFormPanel({
   }
 
   const icon =
-    evaluationType === "teacher" || evaluationType === "child" ? (
     evaluationType === "teacher" || evaluationType === "student" ? (
       <Star className="size-5" />
     ) : evaluationType === "section" ? (

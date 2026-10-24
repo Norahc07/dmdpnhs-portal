@@ -187,3 +187,65 @@ export function TeacherProfileBanner({
     </section>
   );
 }
+
+export function EducatorModuleGrid({ teacherAccess }) {
+  return (
+    <section className="space-y-4">
+      {EDUCATOR_PORTAL_GROUPS.map((group) => {
+        const items = EDUCATOR_PORTAL_MODULES.filter(
+          (module) => module.group === group.id && module.href !== "/teacher"
+        );
+        return (
+          <div
+            key={group.id}
+            className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]"
+          >
+            <div className="portal-panel-head px-5 py-3">
+              <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+                {group.label}
+              </p>
+            </div>
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              {items.map((module) => {
+                const Icon = MODULE_ICONS[module.href] || LayoutDashboard;
+                return (
+                  <Link
+                    key={module.href}
+                    href={module.href}
+                    className="relative rounded-xl border border-[#800000]/10 bg-[#faf7f5]/70 p-4 transition hover:border-[#800000]/25 hover:bg-white"
+                  >
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
+                      <Icon className="size-4" />
+                    </span>
+                    <p className="mt-3 font-heading text-sm font-bold text-[#3d1212]">
+                      {module.label}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {module.description}
+                    </p>
+                  </Link>
+                );
+              })}
+              {group.id === "modules" && teacherAccess?.canValidateGrades ? (
+                <Link
+                  href="/teacher/gradebook"
+                  className="relative rounded-xl border border-[#ffd700]/40 bg-[#ffd700]/12 p-4 transition hover:border-[#800000]/25 hover:bg-white"
+                >
+                  <span className="flex size-9 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
+                    <ShieldCheck className="size-4" />
+                  </span>
+                  <p className="mt-3 font-heading text-sm font-bold text-[#3d1212]">
+                    Grade validation
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Review and validate encoded grades for your department.
+                  </p>
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}

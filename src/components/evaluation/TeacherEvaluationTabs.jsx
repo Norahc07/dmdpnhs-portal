@@ -8,10 +8,10 @@ import {
   ClipboardCheck,
   School,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { EvaluationFormPanel } from "@/components/evaluation/EvaluationFormPanel";
 import { EvaluationProgressCard } from "@/components/evaluation/EvaluationProgressCard";
-import { EvaluationRecordsPanel } from "@/components/evaluation/EvaluationRecordsPanel";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +21,13 @@ export function TeacherEvaluationTabs({
   systemExisting,
   sectionExistings = {},
   progress,
+  learners = [],
+  studentExistings = {},
+  studentProgress,
 }) {
   const [tab, setTab] = useState(progress?.systemDone ? "sections" : "system");
   const [selectedSectionId, setSelectedSectionId] = useState(null);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
 
   const uniqueSections = useMemo(() => {
     const fromProgress = progress?.sections;
@@ -68,12 +72,6 @@ export function TeacherEvaluationTabs({
   const allSectionsDone =
     uniqueSections.length === 0 || uniqueSections.every((s) => s.done);
 
-  const tabs = [
-    { key: "system", label: "System", hint: "Year-end digital tools" },
-    { key: "sections", label: "Sections", hint: "Grade · section cards" },
-  ];
-
-  const progressItems = [
   const learnerItems = studentProgress?.learners?.length
     ? studentProgress.learners
     : (learners || []).map((learner) => ({
@@ -107,8 +105,10 @@ export function TeacherEvaluationTabs({
     { key: "system", label: "System", hint: "Year-end digital tools" },
     { key: "sections", label: "Sections", hint: "Grade · section cards" },
     { key: "learners", label: "Learners", hint: "Teacher to student" },
-      done: progress?.systemDone,
-    },
+  ];
+
+  const progressItems = [
+    { key: "system", label: "System evaluation", done: progress?.systemDone },
     ...uniqueSections.map((s) => ({
       key: s.sectionId,
       label: `Grade ${s.gradeLevel} · ${s.sectionName}`,
@@ -126,12 +126,6 @@ export function TeacherEvaluationTabs({
         items={progressItems}
         lockedMessage="Required after the school year: evaluate the system and every section you handled."
       />
-
-      <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[#800000]/10 bg-white p-1.5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-        {tabs.map((item) => {
-          const active = tab === item.key;
-          return (
-            <button
       <EvaluationProgressCard
         title="Teacher to student evaluations"
         complete={Boolean(studentProgress?.complete)}
@@ -140,7 +134,7 @@ export function TeacherEvaluationTabs({
         items={[]}
         lockedMessage="Mark each learner Submitted or keep as Not submitted until you finish the form."
       />
-              key={item.key}
+
       <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-[#800000]/10 bg-white p-1.5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
         {tabs.map((item) => {
           const active = tab === item.key;
@@ -152,9 +146,17 @@ export function TeacherEvaluationTabs({
                 setTab(item.key);
                 if (item.key === "sections") setSelectedSectionId(null);
                 if (item.key === "learners") setSelectedStudentId(null);
+              }}
+              className={cn(
+                "rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition",
+                active
+                  ? "bg-[#800000] text-white shadow-sm"
+                  : "text-[#3d1212] hover:bg-[#800000]/6"
+              )}
             >
               <span className="truncate">{item.label}</span>
               <span className="hidden text-[11px] font-normal opacity-75 sm:inline">
+                {" "}
                 · {item.hint}
               </span>
             </button>
@@ -162,12 +164,6 @@ export function TeacherEvaluationTabs({
         })}
       </div>
 
-      {tab === "system" ? (
-        <EvaluationFormPanel
-          role="teacher"
-          evaluationType="system"
-          schoolYear={schoolYear}
-          yearOnly
       {tab === "learners" ? (
         learnerItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-white px-5 py-10 text-center text-sm text-muted-foreground">
@@ -262,6 +258,12 @@ export function TeacherEvaluationTabs({
           </section>
         )
       ) : tab === "system" ? (
+        <EvaluationFormPanel
+          role="teacher"
+          evaluationType="system"
+          schoolYear={schoolYear}
+          yearOnly
+          existing={systemExisting}
           title="Evaluate digital tools for your daily work"
           description="Attendance, class record, grade distribution, and section management for this school year."
         />
