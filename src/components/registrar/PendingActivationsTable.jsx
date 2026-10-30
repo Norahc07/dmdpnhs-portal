@@ -427,7 +427,7 @@ function StudentEditSheet({
   );
 }
 
-function PendingTable({ rows, pending, onApprove, onReturn }) {
+function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
   const isEmpty = !rows.length;
   return (
     <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
@@ -518,32 +518,59 @@ function PendingTable({ rows, pending, onApprove, onReturn }) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.activation_status === "pending" ? (
-                      <div className="inline-flex gap-2">
-                        <Button
-                          size="sm"
-                          disabled={pending}
-                          className="bg-[#800000] hover:bg-[#6a0000]"
-                          onClick={() => onApprove(row.id)}
+                    <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                      {row.activation_status === "pending" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={pending}
+                            className="bg-[#800000] hover:bg-[#6a0000]"
+                            onClick={() => onApprove(row.id)}
+                          >
+                            <CheckCircle2 className="size-3.5" />
+                            Verify &amp; Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={pending}
+                            onClick={() => onReturn(row.id)}
+                          >
+                            <RotateCcw className="size-3.5" />
+                            Return
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Waiting for student details
+                        </span>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-muted-foreground"
+                              aria-label={`Actions for ${studentFullName(row)}`}
+                            />
+                          }
                         >
-                          <CheckCircle2 className="size-3.5" />
-                          Verify &amp; Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={pending}
-                          onClick={() => onReturn(row.id)}
-                        >
-                          <RotateCcw className="size-3.5" />
-                          Return
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Waiting for student details
-                      </p>
-                    )}
+                          <MoreHorizontal className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-36">
+                          <DropdownMenuItem onClick={() => onView?.(row)}>
+                            <Eye className="size-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onEdit?.(row)}>
+                            <Pencil className="size-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -725,6 +752,35 @@ export function PendingActivationsTable({
     });
   }
 
+  function applyEditedRow(list, payload, section) {
+    return list.map((row) =>
+      row.id === payload.studentId
+        ? {
+            ...row,
+            contact_number: payload.contactNumber || null,
+            personal_email: payload.personalEmail || null,
+            section_id: payload.sectionId,
+            sections: section
+              ? {
+                  section_name: section.section_name,
+                  grade_level: section.grade_level,
+                  school_year: section.school_year,
+                }
+              : row.sections,
+            profiles: {
+              ...row.profiles,
+              first_name: payload.firstName,
+              last_name: payload.lastName,
+            },
+            parent_name:
+              `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim(),
+            parent_phone: payload.parentPhone || "",
+            parent_address: payload.parentAddress || "",
+          }
+        : row
+    );
+  }
+
   function saveEdit(payload) {
     setError("");
     startTransition(async () => {
@@ -735,32 +791,12 @@ export function PendingActivationsTable({
         return;
       }
       const section = sortedSections.find((s) => s.id === payload.sectionId);
-      setActivatedList((list) =>
-        list.map((row) =>
-          row.id === payload.studentId
-            ? {
-                ...row,
-                contact_number: payload.contactNumber || null,
-                personal_email: payload.personalEmail || null,
-                section_id: payload.sectionId,
-                sections: section
-                  ? {
-                      section_name: section.section_name,
-                      grade_level: section.grade_level,
-                      school_year: section.school_year,
-                    }
-                  : row.sections,
-                profiles: {
-                  ...row.profiles,
-                  first_name: payload.firstName,
-                  last_name: payload.lastName,
-                },
-                parent_name: `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim(),
-                parent_phone: payload.parentPhone || "",
-                parent_address: payload.parentAddress || "",
-              }
-            : row
-        )
+      setPendingList((list) => applyEditedRow(list, payload, section));
+      setActivatedList((list) => applyEditedRow(list, payload, section));
+      setViewStudent((current) =>
+        current?.id === payload.studentId
+          ? applyEditedRow([current], payload, section)[0]
+          : current
       );
       toast.success("Student updated.");
       setEditStudent(null);
@@ -829,7 +865,8 @@ export function PendingActivationsTable({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Incomplete = still filling details. Pending = ready to call
-                  the parent number and Approve.
+                  the parent number and Approve. Use Edit to correct learner or
+                  guardian details anytime.
                 </p>
               </div>
             </div>
@@ -850,6 +887,11 @@ export function PendingActivationsTable({
             pending={pending}
             onApprove={(id) => act(id, true)}
             onReturn={(id) => act(id, false)}
+            onView={setViewStudent}
+            onEdit={(row) => {
+              setError("");
+              setEditStudent(row);
+            }}
           />
         </TabsContent>
 
