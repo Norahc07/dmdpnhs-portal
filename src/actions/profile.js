@@ -160,8 +160,6 @@ export async function updateStudentProfile(payload) {
   const firstName = String(payload.firstName || "").trim();
   const middleName = String(payload.middleName || "").trim();
   const lastName = String(payload.lastName || "").trim();
-  const contactNumber = String(payload.contactNumber || "").trim();
-  const personalEmail = String(payload.personalEmail || "").trim();
   const address = String(payload.address || "").trim();
   const emergencyContactName = String(
     payload.emergencyContactName || ""
@@ -175,12 +173,6 @@ export async function updateStudentProfile(payload) {
 
   if (!firstName || !middleName || !lastName) {
     return { error: "First, middle, and last name are required." };
-  }
-  if (!contactNumber || normalizePhone(contactNumber).length < 10) {
-    return { error: "Your contact number is required." };
-  }
-  if (!personalEmail) {
-    return { error: "Your personal email is required." };
   }
   if (!address) {
     return { error: "Home address is required." };
@@ -226,8 +218,8 @@ export async function updateStudentProfile(payload) {
   if (profileError) return { error: profileError.message };
 
   const studentPatch = {
-    contact_number: contactNumber,
-    personal_email: personalEmail,
+    contact_number: null,
+    personal_email: null,
     address,
     emergency_contact_name: emergencyContactName,
     emergency_contact_number: emergencyContactNumber,

@@ -10,7 +10,7 @@ export default async function StudentSettingsPage() {
   const { supabase, profile, studentAccess } = await requireRole("student");
   const { data: student } = await supabase
     .from("students")
-    .select("lrn, personal_email, contact_number, activation_status, status")
+    .select("lrn, activation_status, status")
     .eq("profile_id", profile.id)
     .maybeSingle();
 
@@ -48,22 +48,6 @@ export default async function StudentSettingsPage() {
               </dt>
               <dd className="mt-1 text-sm font-semibold text-[#3d1212]">
                 {statusLabel}
-              </dd>
-            </div>
-            <div className="rounded-xl border border-[#800000]/08 bg-[#faf7f5] px-3 py-3">
-              <dt className="text-[11px] font-medium tracking-wide text-[#800000]/75 uppercase">
-                Contact number
-              </dt>
-              <dd className="mt-1 text-sm font-semibold text-[#3d1212]">
-                {student?.contact_number || "—"}
-              </dd>
-            </div>
-            <div className="rounded-xl border border-[#800000]/08 bg-[#faf7f5] px-3 py-3">
-              <dt className="text-[11px] font-medium tracking-wide text-[#800000]/75 uppercase">
-                Personal email
-              </dt>
-              <dd className="mt-1 text-sm font-semibold text-[#3d1212]">
-                {student?.personal_email || profile.email || "—"}
               </dd>
             </div>
           </dl>

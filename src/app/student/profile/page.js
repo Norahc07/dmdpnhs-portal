@@ -10,7 +10,7 @@ export default async function StudentProfilePage() {
   let studentQuery = await supabase
     .from("students")
     .select(
-      "id, lrn, grade_level, section_id, status, activation_status, contact_number, personal_email, address, emergency_contact_name, emergency_contact_number, emergency_contact_address"
+      "id, lrn, grade_level, section_id, status, activation_status, address, emergency_contact_name, emergency_contact_number, emergency_contact_address"
     )
     .eq("profile_id", profile.id)
     .maybeSingle();
@@ -18,7 +18,7 @@ export default async function StudentProfilePage() {
     studentQuery = await supabase
       .from("students")
       .select(
-        "id, lrn, grade_level, section_id, status, activation_status, contact_number, personal_email, address, emergency_contact_name, emergency_contact_number"
+        "id, lrn, grade_level, section_id, status, activation_status, address, emergency_contact_name, emergency_contact_number"
       )
       .eq("profile_id", profile.id)
       .maybeSingle();

@@ -15,8 +15,6 @@ function buildFormState(profile, student) {
     firstName: profile?.first_name || "",
     middleName: profile?.middle_name || "",
     lastName: profile?.last_name || "",
-    contactNumber: student?.contact_number || "",
-    personalEmail: student?.personal_email || "",
     address: student?.address || "",
     emergencyContactName: student?.emergency_contact_name || "",
     emergencyContactNumber: student?.emergency_contact_number || "",
@@ -293,10 +291,11 @@ export function StudentProfileForm({
             Account information
           </p>
           <h3 className="mt-1 font-heading text-sm font-bold text-[#3d1212]">
-            Sign-in and contact details
+            Sign-in and home address
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            You sign in with your LRN and password.
+            You sign in with your LRN and password. School SMS goes to the
+            parent/guardian number below.
           </p>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
@@ -315,31 +314,6 @@ export function StudentProfileForm({
             <p className="mt-1 text-sm font-semibold text-[#3d1212]">
               LRN {student?.lrn || "—"}
             </p>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="contactNumber">Contact number</Label>
-            <Input
-              id="contactNumber"
-              required={editing}
-              disabled={locked}
-              placeholder="09XXXXXXXXX"
-              value={values.contactNumber}
-              onChange={(e) => setField("contactNumber", e.target.value)}
-              className={cn(locked && "bg-muted/40")}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="personalEmail">Personal email</Label>
-            <Input
-              id="personalEmail"
-              type="email"
-              required={editing}
-              disabled={locked}
-              placeholder="you@email.com"
-              value={values.personalEmail}
-              onChange={(e) => setField("personalEmail", e.target.value)}
-              className={cn(locked && "bg-muted/40")}
-            />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="address">Home address</Label>

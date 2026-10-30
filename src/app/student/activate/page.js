@@ -74,8 +74,6 @@ export default async function StudentActivatePage() {
                   profile.last_name !== student.lrn ? profile.last_name : "",
                 gradeLevel: student.grade_level || "",
                 sectionId: student.section_id || "",
-                contactNumber: student.contact_number || "",
-                personalEmail: student.personal_email || "",
                 address: student.address || "",
                 parentFirstName,
                 parentLastName,

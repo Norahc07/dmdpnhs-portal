@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   formatBirthdatePassword,
   isSeniorHighGrade,
-  portalBaseUrl,
   SCHOOL_SHORT,
   SCHOOL_YEAR_DEFAULT,
   studentEmailFromLrn,
@@ -140,8 +139,6 @@ export async function submitStudentActivation(form) {
   const firstName = String(form.firstName || "").trim();
   const middleName = String(form.middleName || "").trim();
   const lastName = String(form.lastName || "").trim();
-  const contactNumber = String(form.contactNumber || "").trim();
-  const personalEmail = String(form.personalEmail || "").trim().toLowerCase();
   const address = String(form.address || "").trim();
   const gradeLevel = Number(form.gradeLevel || student.grade_level || 0);
   const sectionId = form.sectionId || student.section_id || null;
@@ -169,12 +166,6 @@ export async function submitStudentActivation(form) {
     gradeLevel
   );
   if (sectionGate?.error) return sectionGate;
-  if (!contactNumber || normalizePhone(contactNumber).length < 10) {
-    return { error: "Enter a valid contact number. This is required for SMS notices." };
-  }
-  if (!personalEmail) {
-    return { error: "Enter your personal email address." };
-  }
   if (!address) {
     return { error: "Enter your home address." };
   }
@@ -211,8 +202,8 @@ export async function submitStudentActivation(form) {
     .eq("id", user.id);
 
   const studentUpdate = {
-    contact_number: contactNumber,
-    personal_email: personalEmail || null,
+    contact_number: null,
+    personal_email: null,
     address,
     grade_level: gradeLevel,
     section_id: sectionId,
@@ -313,9 +304,6 @@ export async function approveStudentActivation({ studentId, approve }) {
         .eq("id", student.profile_id);
     }
 
-    const portalUrl = portalBaseUrl();
-    const studentLoginUrl = `${portalUrl}/login/student`;
-
     try {
       await sendSMS({
         recipient: parentPhone,
@@ -324,18 +312,6 @@ export async function approveStudentActivation({ studentId, approve }) {
       });
     } catch {
       // non-blocking
-    }
-
-    if (student.contact_number) {
-      try {
-        await sendSMS({
-          recipient: student.contact_number,
-          message: `${SCHOOL_SHORT}: Your student portal is activated. Sign in at ${studentLoginUrl} with your LRN. IMPORTANT: Keep your contact number updated — the school uses it for notices. Grades and attendance appear after you are enrolled in a section/subjects.`,
-          triggerType: "activation",
-        });
-      } catch {
-        // non-blocking
-      }
     }
   } else {
     const { error: returnError } = await writer
@@ -353,11 +329,11 @@ export async function approveStudentActivation({ studentId, approve }) {
         .eq("id", student.profile_id);
     }
 
-    if (student.contact_number) {
+    if (student.emergency_contact_number) {
       try {
         await sendSMS({
-          recipient: student.contact_number,
-          message: `${SCHOOL_SHORT}: Your activation was returned by the registrar. Please sign in and update your personal/parent contact details, then resubmit. Accurate phone numbers are required.`,
+          recipient: student.emergency_contact_number,
+          message: `${SCHOOL_SHORT}: A learner activation was returned by the registrar. Please have them sign in and update parent/guardian contact details, then resubmit.`,
           triggerType: "activation",
         });
       } catch {
@@ -381,8 +357,6 @@ export async function updateActivatedStudent(form) {
   const studentId = form.studentId;
   const firstName = String(form.firstName || "").trim();
   const lastName = String(form.lastName || "").trim();
-  const contactNumber = String(form.contactNumber || "").trim();
-  const personalEmail = String(form.personalEmail || "").trim() || null;
   const sectionId = form.sectionId || null;
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
@@ -392,9 +366,6 @@ export async function updateActivatedStudent(form) {
   if (!studentId) return { error: "Student id is required." };
   if (!firstName || !lastName) {
     return { error: "Student first and last name are required." };
-  }
-  if (!contactNumber || normalizePhone(contactNumber).length < 10) {
-    return { error: "Enter a valid student contact number." };
   }
   if (!sectionId) {
     return { error: "Select a section for this student." };
@@ -407,9 +378,6 @@ export async function updateActivatedStudent(form) {
   }
   if (!parentAddress) {
     return { error: "Parent/guardian address is required." };
-  }
-  if (!personalEmail) {
-    return { error: "Student personal email is required." };
   }
 
   const { data: student } = await admin
@@ -438,8 +406,8 @@ export async function updateActivatedStudent(form) {
   }
 
   const studentPatch = {
-    contact_number: contactNumber,
-    personal_email: personalEmail,
+    contact_number: null,
+    personal_email: null,
     section_id: sectionId,
     emergency_contact_name: `${parentFirstName} ${parentLastName}`.trim(),
     emergency_contact_number: parentPhone,

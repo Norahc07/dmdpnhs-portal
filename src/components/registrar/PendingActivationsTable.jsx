@@ -173,14 +173,6 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
           <dl className="flex-1 overflow-y-auto px-5 py-2">
             <DetailRow label="Student name" value={studentFullName(student)} />
             <DetailRow label="LRN" value={student.lrn} />
-            <DetailRow
-              label="Contact"
-              value={
-                [student.contact_number, student.personal_email]
-                  .filter(Boolean)
-                  .join(" · ") || null
-              }
-            />
             <DetailRow label="Section" value={sectionLabel(student)} />
             <DetailRow
               label="Parent / guardian"
@@ -237,12 +229,6 @@ function StudentEditSheet({
     student?.profiles?.first_name || ""
   );
   const [lastName, setLastName] = useState(student?.profiles?.last_name || "");
-  const [contactNumber, setContactNumber] = useState(
-    student?.contact_number || ""
-  );
-  const [personalEmail, setPersonalEmail] = useState(
-    student?.personal_email || ""
-  );
   const [sectionId, setSectionId] = useState(student?.section_id || "");
   const [parentFirstName, setParentFirstName] = useState(parentParts.first);
   const [parentLastName, setParentLastName] = useState(parentParts.last);
@@ -256,8 +242,6 @@ function StudentEditSheet({
     const parts = splitParentName(student.parent_name);
     setFirstName(student.profiles?.first_name || "");
     setLastName(student.profiles?.last_name || "");
-    setContactNumber(student.contact_number || "");
-    setPersonalEmail(student.personal_email || "");
     setSectionId(student.section_id || "");
     setParentFirstName(parts.first);
     setParentLastName(parts.last);
@@ -285,8 +269,6 @@ function StudentEditSheet({
               studentId: student.id,
               firstName,
               lastName,
-              contactNumber,
-              personalEmail,
               sectionId: sectionId || null,
               parentFirstName,
               parentLastName,
@@ -315,25 +297,6 @@ function StudentEditSheet({
                   placeholder="e.g. Dela Cruz"
                 />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Contact number</Label>
-              <Input
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                required
-                placeholder="09XXXXXXXXX"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Personal email</Label>
-              <Input
-                type="email"
-                value={personalEmail}
-                onChange={(e) => setPersonalEmail(e.target.value)}
-                required
-                placeholder="you@email.com"
-              />
             </div>
             <div className="space-y-1.5">
               <Label>Section</Label>
@@ -757,8 +720,6 @@ export function PendingActivationsTable({
       row.id === payload.studentId
         ? {
             ...row,
-            contact_number: payload.contactNumber || null,
-            personal_email: payload.personalEmail || null,
             section_id: payload.sectionId,
             sections: section
               ? {

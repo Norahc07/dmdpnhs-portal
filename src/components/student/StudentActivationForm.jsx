@@ -85,12 +85,11 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
       ) : null}
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p className="font-semibold">Important — contact numbers</p>
+        <p className="font-semibold">Important — parent / guardian contact</p>
         <p className="mt-1 text-amber-900/90">
-          Use working mobile numbers for you and your emergency contact. The
-          registrar will call to verify before activating your account.{" "}
-          {SCHOOL_SHORT} uses the emergency contact number for absence and grade
-          SMS alerts after verification.
+          Use a working mobile number for your parent or guardian. The registrar
+          will call to verify before activating your account. {SCHOOL_SHORT} uses
+          that number for absence and grade SMS alerts after verification.
         </p>
       </div>
 
@@ -174,29 +173,6 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
                 No sections for this grade yet. Ask the registrar to create one.
               </p>
             ) : null}
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="contactNumber">Your contact number</Label>
-            <Input
-              id="contactNumber"
-              name="contactNumber"
-              required
-              placeholder="09XXXXXXXXX"
-              defaultValue={initial?.contactNumber || ""}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="personalEmail">Personal email</Label>
-            <Input
-              id="personalEmail"
-              name="personalEmail"
-              type="email"
-              required
-              placeholder="you@email.com"
-              defaultValue={initial?.personalEmail || ""}
-            />
           </div>
         </div>
         <div className="space-y-1.5">
