@@ -18,7 +18,6 @@ function buildFormState(profile, student) {
     address: student?.address || "",
     emergencyContactName: student?.emergency_contact_name || "",
     emergencyContactNumber: student?.emergency_contact_number || "",
-    emergencyContactAddress: student?.emergency_contact_address || "",
   };
 }
 
@@ -359,22 +358,6 @@ export function StudentProfileForm({
             <p className="text-[11px] text-muted-foreground">
               Changing this number updates SMS alerts for absences and grades.
             </p>
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="emergencyContactAddress">
-              Parent / guardian address
-            </Label>
-            <Input
-              id="emergencyContactAddress"
-              required={editing}
-              disabled={locked}
-              placeholder="House No., Street, Barangay, City"
-              value={values.emergencyContactAddress}
-              onChange={(e) =>
-                setField("emergencyContactAddress", e.target.value)
-              }
-              className={cn(locked && "bg-muted/40")}
-            />
           </div>
         </div>
       </section>

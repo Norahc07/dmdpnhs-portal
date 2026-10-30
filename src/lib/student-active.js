@@ -55,10 +55,11 @@ export function trashedAuthEmail(studentId, lrn) {
 export async function moveStudentToTrash(admin, student, deletedBy = null) {
   if (!student?.id) return { error: "Student id is required." };
 
+  // Keep enrollment status as-is — students_status_check only allows
+  // enrolled/promoted/retained/remedial. Trash is tracked by deleted_at.
   const patch = {
     deleted_at: new Date().toISOString(),
     deleted_by: deletedBy || null,
-    status: "deleted",
   };
 
   let { error } = await admin.from("students").update(patch).eq("id", student.id);

@@ -50,7 +50,6 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
     payload.emergencyContactName =
       `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim();
     payload.emergencyContactNumber = payload.parentPhone || "";
-    payload.emergencyContactAddress = payload.parentAddress || "";
     startTransition(async () => {
       const result = await submitStudentActivation(payload);
       if (result?.error) setError(result.error);
@@ -192,8 +191,8 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
           Parent / guardian
         </h2>
         <p className="text-sm text-muted-foreground">
-          Name, contact number, and address for school notices. Parent email is
-          optional. There is no parent portal login.
+          Name and contact number for school notices. Parent email is optional.
+          There is no parent portal login.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -224,16 +223,6 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
               required
               placeholder="09XXXXXXXXX"
               defaultValue={initial?.parentPhone || ""}
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="parentAddress">Parent / guardian address</Label>
-            <Input
-              id="parentAddress"
-              name="parentAddress"
-              required
-              placeholder="House No., Street, Barangay, City"
-              defaultValue={initial?.parentAddress || ""}
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">

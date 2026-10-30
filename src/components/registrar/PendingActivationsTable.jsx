@@ -182,10 +182,6 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
                   : null
               }
             />
-            <DetailRow
-              label="Parent / guardian address"
-              value={student.parent_address || null}
-            />
             <DetailRow label="Status" value={student.activation_status} />
           </dl>
           <div className="flex gap-2 border-t px-5 py-4">
@@ -233,9 +229,6 @@ function StudentEditSheet({
   const [parentFirstName, setParentFirstName] = useState(parentParts.first);
   const [parentLastName, setParentLastName] = useState(parentParts.last);
   const [parentPhone, setParentPhone] = useState(student?.parent_phone || "");
-  const [parentAddress, setParentAddress] = useState(
-    student?.parent_address || ""
-  );
 
   useEffect(() => {
     if (!open || !student) return;
@@ -246,7 +239,6 @@ function StudentEditSheet({
     setParentFirstName(parts.first);
     setParentLastName(parts.last);
     setParentPhone(student.parent_phone || "");
-    setParentAddress(student.parent_address || "");
   }, [open, student]);
 
   return (
@@ -273,7 +265,6 @@ function StudentEditSheet({
               parentFirstName,
               parentLastName,
               parentPhone,
-              parentAddress,
             });
           }}
         >
@@ -352,15 +343,6 @@ function StudentEditSheet({
                   onChange={(e) => setParentPhone(e.target.value)}
                   required
                   placeholder="09XXXXXXXXX"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Address</Label>
-                <Input
-                  value={parentAddress}
-                  onChange={(e) => setParentAddress(e.target.value)}
-                  required
-                  placeholder="House No., Street, Barangay, City"
                 />
               </div>
             </div>
@@ -736,7 +718,6 @@ export function PendingActivationsTable({
             parent_name:
               `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim(),
             parent_phone: payload.parentPhone || "",
-            parent_address: payload.parentAddress || "",
           }
         : row
     );

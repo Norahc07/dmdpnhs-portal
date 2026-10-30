@@ -38,14 +38,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS students_lrn_active_uidx
   ON public.students (lrn)
   WHERE deleted_at IS NULL;
 
--- Move any already-marked deleted rows into Trash so their LRNs are free.
+-- Move any already-trashed profile rows into Trash so their LRNs are free.
+-- Do NOT set students.status = 'deleted' — students_status_check only allows
+-- enrolled / promoted / retained / remedial. Use deleted_at for trash.
 UPDATE public.students
-SET deleted_at = COALESCE(deleted_at, now()),
-    status = 'deleted'
+SET deleted_at = COALESCE(deleted_at, now())
 WHERE deleted_at IS NULL
-  AND (
-    status = 'deleted'
-    OR profile_id IN (
-      SELECT id FROM public.profiles WHERE status = 'trashed'
-    )
+  AND profile_id IN (
+    SELECT id FROM public.profiles WHERE status = 'trashed'
   );

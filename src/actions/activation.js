@@ -144,12 +144,10 @@ export async function submitStudentActivation(form) {
   const sectionId = form.sectionId || student.section_id || null;
   const emergencyName = String(form.emergencyContactName || "").trim();
   const emergencyNumber = String(form.emergencyContactNumber || "").trim();
-  const emergencyAddress = String(form.emergencyContactAddress || "").trim();
 
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
-  const parentAddress = String(form.parentAddress || "").trim();
 
   if (!firstName || !middleName || !lastName) {
     return { error: "Enter your first, middle, and last name." };
@@ -172,7 +170,6 @@ export async function submitStudentActivation(form) {
   const guardianName =
     `${parentFirstName} ${parentLastName}`.trim() || emergencyName;
   const guardianPhone = parentPhone || emergencyNumber;
-  const guardianAddress = parentAddress || emergencyAddress;
   if (!parentFirstName || !parentLastName || !guardianName) {
     return {
       error: "Enter parent/guardian first and last name.",
@@ -185,9 +182,6 @@ export async function submitStudentActivation(form) {
   }
   if (normalizePhone(guardianPhone).length < 10) {
     return { error: "Enter a valid parent/guardian contact number." };
-  }
-  if (!guardianAddress) {
-    return { error: "Enter parent/guardian address." };
   }
   // Parent email is optional (parentEmail / parentEmailNone from OptionalEmailField).
 
@@ -209,7 +203,7 @@ export async function submitStudentActivation(form) {
     section_id: sectionId,
     emergency_contact_name: guardianName,
     emergency_contact_number: guardianPhone,
-    emergency_contact_address: guardianAddress,
+    emergency_contact_address: null,
     parent_access_code_shown: null,
     activation_status: "pending",
     status: "enrolled",
@@ -361,7 +355,6 @@ export async function updateActivatedStudent(form) {
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
-  const parentAddress = String(form.parentAddress || "").trim();
 
   if (!studentId) return { error: "Student id is required." };
   if (!firstName || !lastName) {
@@ -375,9 +368,6 @@ export async function updateActivatedStudent(form) {
   }
   if (!parentPhone || normalizePhone(parentPhone).length < 10) {
     return { error: "Enter a valid parent/guardian contact number." };
-  }
-  if (!parentAddress) {
-    return { error: "Parent/guardian address is required." };
   }
 
   const { data: student } = await admin
@@ -411,7 +401,7 @@ export async function updateActivatedStudent(form) {
     section_id: sectionId,
     emergency_contact_name: `${parentFirstName} ${parentLastName}`.trim(),
     emergency_contact_number: parentPhone,
-    emergency_contact_address: parentAddress,
+    emergency_contact_address: null,
   };
   let { error: studentError } = await admin
     .from("students")
@@ -577,7 +567,6 @@ export async function enrollStudentByRegistrar(form) {
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
-  const parentAddress = String(form.parentAddress || "").trim();
   const password = formatBirthdatePassword(birthdate);
 
   if (!/^\d{12}$/.test(lrn)) return { error: "LRN must be exactly 12 digits." };
@@ -607,9 +596,6 @@ export async function enrollStudentByRegistrar(form) {
   }
   if (!parentPhone || normalizePhone(parentPhone).length < 10) {
     return { error: "Enter a valid parent/guardian contact number." };
-  }
-  if (!parentAddress) {
-    return { error: "Parent/guardian address is required." };
   }
 
   const email = studentEmailFromLrn(lrn);
@@ -673,7 +659,7 @@ export async function enrollStudentByRegistrar(form) {
     emergency_contact_name:
       `${parentFirstName} ${parentLastName}`.trim() || null,
     emergency_contact_number: parentPhone || null,
-    emergency_contact_address: parentAddress || null,
+    emergency_contact_address: null,
   };
 
   let { error: studentError } = await admin

@@ -78,7 +78,6 @@ export default async function StudentActivatePage() {
                 parentFirstName,
                 parentLastName,
                 parentPhone: student.emergency_contact_number || "",
-                parentAddress: student.emergency_contact_address || "",
               }}
             />
             <form action={logout} className="mt-6">

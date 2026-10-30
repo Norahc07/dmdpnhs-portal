@@ -1949,14 +1949,6 @@ export function AcademicsManager({
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Parent / guardian address</Label>
-                  <Input
-                    name="parentAddress"
-                    required
-                    placeholder="House No., Street, Barangay, City"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
                   <Label>Section</Label>
                   <select
                     name="sectionId"

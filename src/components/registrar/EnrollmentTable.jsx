@@ -493,17 +493,6 @@ export function EnrollmentTable({ students, sections, loadError = "" }) {
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="enroll-parent-address">
-                Parent / guardian address
-              </Label>
-              <Input
-                id="enroll-parent-address"
-                name="parentAddress"
-                required
-                placeholder="House No., Street, Barangay, City"
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="enroll-section">Section</Label>
               <select
                 id="enroll-section"

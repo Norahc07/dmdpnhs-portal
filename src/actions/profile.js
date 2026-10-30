@@ -167,9 +167,6 @@ export async function updateStudentProfile(payload) {
   const emergencyContactNumber = String(
     payload.emergencyContactNumber || ""
   ).trim();
-  const emergencyContactAddress = String(
-    payload.emergencyContactAddress || ""
-  ).trim();
 
   if (!firstName || !middleName || !lastName) {
     return { error: "First, middle, and last name are required." };
@@ -182,9 +179,6 @@ export async function updateStudentProfile(payload) {
   }
   if (!emergencyContactNumber || normalizePhone(emergencyContactNumber).length < 10) {
     return { error: "Parent/guardian contact number is required." };
-  }
-  if (!emergencyContactAddress) {
-    return { error: "Parent/guardian address is required." };
   }
 
   const admin = createAdminClient();
@@ -223,7 +217,7 @@ export async function updateStudentProfile(payload) {
     address,
     emergency_contact_name: emergencyContactName,
     emergency_contact_number: emergencyContactNumber,
-    emergency_contact_address: emergencyContactAddress,
+    emergency_contact_address: null,
   };
   let { error: studentError } = await admin
     .from("students")

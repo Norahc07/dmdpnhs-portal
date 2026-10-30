@@ -84,7 +84,6 @@ function withEmergencyContact(students) {
     ...stu,
     parent_name: stu.emergency_contact_name || "",
     parent_phone: stu.emergency_contact_number || "",
-    parent_address: stu.emergency_contact_address || "",
     parent_email: "",
     parent_access_code_shown: "",
   }));
