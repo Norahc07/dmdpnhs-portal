@@ -45,7 +45,7 @@ function activationBadgeClass(status) {
   );
 }
 
-export function EnrollmentTable({ students, sections }) {
+export function EnrollmentTable({ students, sections, loadError = "" }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [enrollOpen, setEnrollOpen] = useState(false);
@@ -60,8 +60,8 @@ export function EnrollmentTable({ students, sections }) {
   }, [sections]);
 
   const [search, setSearch] = useState("");
-  // Prefer current school year — newest year may be empty promotion targets
-  const [schoolYear, setSchoolYear] = useState(SCHOOL_YEAR_DEFAULT);
+  // Show every enrolled learner by default; SY filter is optional.
+  const [schoolYear, setSchoolYear] = useState("all");
   const [gradeLevel, setGradeLevel] = useState("all");
   const [sectionId, setSectionId] = useState("all");
   const [gender, setGender] = useState("all");
@@ -73,7 +73,7 @@ export function EnrollmentTable({ students, sections }) {
   );
 
   const filteredSections = sections.filter((s) => {
-    if (s.school_year !== schoolYear) return false;
+    if (schoolYear !== "all" && s.school_year !== schoolYear) return false;
     if (gradeLevel !== "all" && String(s.grade_level) !== String(gradeLevel)) {
       return false;
     }
@@ -107,12 +107,11 @@ export function EnrollmentTable({ students, sections }) {
       return false;
     }
 
-    if (stu.section_id) {
+    if (schoolYear !== "all" && stu.section_id) {
       const s = sectionById[stu.section_id];
       // Keep row if section missing from list (stale id) — still show the learner
       if (s && s.school_year !== schoolYear) return false;
     }
-    // Unassigned (no section) always included for the selected year filters
 
     if (searchQ) {
       const hay = `${stu.profiles?.first_name || ""} ${stu.profiles?.last_name || ""} ${stu.lrn || ""}`;
@@ -122,6 +121,7 @@ export function EnrollmentTable({ students, sections }) {
   });
 
   const learnersInOtherYears = useMemo(() => {
+    if (schoolYear === "all") return 0;
     return students.filter((stu) => {
       if (!stu.section_id) return false;
       const s = sectionById[stu.section_id];
@@ -167,13 +167,21 @@ export function EnrollmentTable({ students, sections }) {
 
   return (
     <div className="space-y-4">
+      {loadError ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+          {loadError}
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="rounded-2xl border border-[#800000]/10 bg-white px-4 py-3 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.28)] sm:max-w-xl">
           <p className="text-sm font-semibold text-[#3d1212]">
             Enroll learners
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            New students appear under Activations → Awaiting until they submit
+            Showing {students.length} enrolled learner
+            {students.length === 1 ? "" : "s"} (excluding Trash). New students
+            appear under Activations → Awaiting until they submit
             personal/guardian details and you verify them. Sign-in is LRN and
             birthdate (YYYYMMDD). Incomplete stubs:{" "}
             <span className="font-semibold text-[#800000]">{incompleteCount}</span>
@@ -210,6 +218,7 @@ export function EnrollmentTable({ students, sections }) {
           }}
           className="h-9 rounded-md border pl-3 pr-9 text-sm"
         >
+          <option value="all">All school years</option>
           {schoolYears.map((y) => (
             <option key={y} value={y}>
               SY {y}
@@ -336,7 +345,13 @@ export function EnrollmentTable({ students, sections }) {
                   <TableCell className="font-mono text-xs">{stu.lrn}</TableCell>
                   <TableCell>{stu.gender}</TableCell>
                   <TableCell>{stu.grade_level}</TableCell>
-                  <TableCell>{sec ? `${sec.section_name}` : "—"}</TableCell>
+                  <TableCell>
+                    {sec
+                      ? `${sec.section_name}${
+                          sec.school_year ? ` · ${sec.school_year}` : ""
+                        }`
+                      : "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
@@ -395,13 +410,19 @@ export function EnrollmentTable({ students, sections }) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="enroll-first">First name</Label>
-              <Input id="enroll-first" name="firstName" placeholder="e.g. Juan" />
+              <Input
+                id="enroll-first"
+                name="firstName"
+                required
+                placeholder="e.g. Juan"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="enroll-last">Last name</Label>
               <Input
                 id="enroll-last"
                 name="lastName"
+                required
                 placeholder="e.g. Dela Cruz"
               />
             </div>
@@ -410,11 +431,12 @@ export function EnrollmentTable({ students, sections }) {
               <select
                 id="enroll-gender"
                 name="gender"
+                required
                 defaultValue="Male"
                 className={selectClass}
               >
-                <option>Male</option>
-                <option>Female</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
               </select>
             </div>
             <div className="space-y-1.5">
@@ -422,6 +444,7 @@ export function EnrollmentTable({ students, sections }) {
               <select
                 id="enroll-grade"
                 name="gradeLevel"
+                required
                 value={formGrade}
                 onChange={(e) => {
                   setFormGrade(e.target.value);
@@ -443,6 +466,7 @@ export function EnrollmentTable({ students, sections }) {
               <Input
                 id="enroll-parent-first"
                 name="parentFirstName"
+                required
                 placeholder="e.g. Maria"
               />
             </div>
@@ -453,6 +477,7 @@ export function EnrollmentTable({ students, sections }) {
               <Input
                 id="enroll-parent-last"
                 name="parentLastName"
+                required
                 placeholder="e.g. Dela Cruz"
               />
             </div>
@@ -463,6 +488,7 @@ export function EnrollmentTable({ students, sections }) {
               <Input
                 id="enroll-parent-phone"
                 name="parentPhone"
+                required
                 placeholder="09XXXXXXXXX"
               />
             </div>
@@ -473,19 +499,25 @@ export function EnrollmentTable({ students, sections }) {
               <Input
                 id="enroll-parent-address"
                 name="parentAddress"
+                required
                 placeholder="House No., Street, Barangay, City"
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="enroll-section">Section (optional)</Label>
+              <Label htmlFor="enroll-section">Section</Label>
               <select
                 id="enroll-section"
                 name="sectionId"
+                required={enrollSections.length > 0}
                 value={formSection}
                 onChange={(e) => setFormSection(e.target.value)}
                 className={selectClass}
               >
-                <option value="">— Assign later —</option>
+                <option value="">
+                  {enrollSections.length
+                    ? "Select section"
+                    : "No sections for this grade"}
+                </option>
                 {enrollSections.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.section_name} ({s.school_year})
@@ -494,8 +526,9 @@ export function EnrollmentTable({ students, sections }) {
                 ))}
               </select>
               {!enrollSections.length ? (
-                <p className="text-xs text-muted-foreground">
-                  No sections for Grade {formGrade} yet.
+                <p className="text-xs text-rose-600">
+                  Create a Grade {formGrade} section in Academics before
+                  enrolling.
                 </p>
               ) : null}
             </div>

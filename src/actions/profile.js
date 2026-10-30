@@ -173,11 +173,26 @@ export async function updateStudentProfile(payload) {
     payload.emergencyContactAddress || ""
   ).trim();
 
-  if (!firstName || !lastName) {
-    return { error: "First and last name are required." };
+  if (!firstName || !middleName || !lastName) {
+    return { error: "First, middle, and last name are required." };
   }
-  if (!contactNumber) {
+  if (!contactNumber || normalizePhone(contactNumber).length < 10) {
     return { error: "Your contact number is required." };
+  }
+  if (!personalEmail) {
+    return { error: "Your personal email is required." };
+  }
+  if (!address) {
+    return { error: "Home address is required." };
+  }
+  if (!emergencyContactName) {
+    return { error: "Parent/guardian name is required." };
+  }
+  if (!emergencyContactNumber || normalizePhone(emergencyContactNumber).length < 10) {
+    return { error: "Parent/guardian contact number is required." };
+  }
+  if (!emergencyContactAddress) {
+    return { error: "Parent/guardian address is required." };
   }
 
   const admin = createAdminClient();
@@ -203,7 +218,7 @@ export async function updateStudentProfile(payload) {
     .from("profiles")
     .update({
       first_name: firstName,
-      middle_name: middleName || null,
+      middle_name: middleName,
       last_name: lastName,
     })
     .eq("id", auth.user.id);
@@ -212,11 +227,11 @@ export async function updateStudentProfile(payload) {
 
   const studentPatch = {
     contact_number: contactNumber,
-    personal_email: personalEmail || null,
-    address: address || null,
-    emergency_contact_name: emergencyContactName || null,
-    emergency_contact_number: emergencyContactNumber || null,
-    emergency_contact_address: emergencyContactAddress || null,
+    personal_email: personalEmail,
+    address,
+    emergency_contact_name: emergencyContactName,
+    emergency_contact_number: emergencyContactNumber,
+    emergency_contact_address: emergencyContactAddress,
   };
   let { error: studentError } = await admin
     .from("students")

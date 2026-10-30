@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { submitStudentActivation } from "@/actions/activation";
+import { OptionalEmailField } from "@/components/forms/OptionalEmailField";
 import { ProfilePicturePicker } from "@/components/profile/ProfilePicturePicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,6 +114,7 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
             <Input
               id="middleName"
               name="middleName"
+              required
               placeholder="e.g. Santos"
               defaultValue={initial?.middleName || ""}
             />
@@ -186,11 +188,12 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="personalEmail">Personal email (optional)</Label>
+            <Label htmlFor="personalEmail">Personal email</Label>
             <Input
               id="personalEmail"
               name="personalEmail"
               type="email"
+              required
               placeholder="you@email.com"
               defaultValue={initial?.personalEmail || ""}
             />
@@ -213,8 +216,8 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
           Parent / guardian
         </h2>
         <p className="text-sm text-muted-foreground">
-          Name, contact number, and address for school notices. There is no
-          parent portal login.
+          Name, contact number, and address for school notices. Parent email is
+          optional. There is no parent portal login.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -262,14 +265,20 @@ export function StudentActivationForm({ initial, sections = [], profile }) {
             <select
               id="parentRelationship"
               name="parentRelationship"
+              required
               defaultValue={initial?.parentRelationship || "Mother"}
               className="flex h-9 w-full rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
-              <option>Mother</option>
-              <option>Father</option>
-              <option>Guardian</option>
+              <option value="Mother">Mother</option>
+              <option value="Father">Father</option>
+              <option value="Guardian">Guardian</option>
             </select>
           </div>
+          <OptionalEmailField
+            className="sm:col-span-2"
+            defaultValue={initial?.parentEmail || ""}
+            defaultNone={!initial?.parentEmail}
+          />
         </div>
       </section>
 

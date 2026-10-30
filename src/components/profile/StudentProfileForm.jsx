@@ -219,6 +219,7 @@ export function StudentProfileForm({
                 <Label htmlFor="middleName">Middle name</Label>
                 <Input
                   id="middleName"
+                  required={editing}
                   disabled={locked}
                   placeholder="e.g. Santos"
                   value={values.middleName}
@@ -332,6 +333,7 @@ export function StudentProfileForm({
             <Input
               id="personalEmail"
               type="email"
+              required={editing}
               disabled={locked}
               placeholder="you@email.com"
               value={values.personalEmail}
@@ -343,6 +345,7 @@ export function StudentProfileForm({
             <Label htmlFor="address">Home address</Label>
             <Input
               id="address"
+              required={editing}
               disabled={locked}
               placeholder="House No., Street, Barangay, City"
               value={values.address}
@@ -356,6 +359,7 @@ export function StudentProfileForm({
             </Label>
             <Input
               id="emergencyContactName"
+              required={editing}
               disabled={locked}
               placeholder="e.g. Maria Dela Cruz"
               value={values.emergencyContactName}
@@ -369,6 +373,7 @@ export function StudentProfileForm({
             </Label>
             <Input
               id="emergencyContactNumber"
+              required={editing}
               disabled={locked}
               placeholder="09XXXXXXXXX"
               value={values.emergencyContactNumber}
@@ -387,6 +392,7 @@ export function StudentProfileForm({
             </Label>
             <Input
               id="emergencyContactAddress"
+              required={editing}
               disabled={locked}
               placeholder="House No., Street, Barangay, City"
               value={values.emergencyContactAddress}

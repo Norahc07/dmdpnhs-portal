@@ -123,16 +123,29 @@ export default async function TeacherStudentsPage({ searchParams }) {
     ? await getSectionSecretaryId(selectedId)
     : null;
 
-  const { data: students } = selectedId
-    ? await supabase
+  let students = [];
+  if (selectedId) {
+    let roster = await supabase
+      .from("students")
+      .select(
+        "id, lrn, gender, grade_level, status, activation_status, section_id, profiles(first_name, last_name)"
+      )
+      .eq("section_id", selectedId)
+      .eq("activation_status", "active")
+      .is("deleted_at", null)
+      .order("lrn");
+    if (roster.error && /deleted_at/i.test(roster.error.message || "")) {
+      roster = await supabase
         .from("students")
         .select(
           "id, lrn, gender, grade_level, status, activation_status, section_id, profiles(first_name, last_name)"
         )
         .eq("section_id", selectedId)
         .eq("activation_status", "active")
-        .order("lrn")
-    : { data: [] };
+        .order("lrn");
+    }
+    students = roster.data || [];
+  }
 
   return (
     <AppShell

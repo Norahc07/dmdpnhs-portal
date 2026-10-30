@@ -38,14 +38,28 @@ export default async function RegistrarAcademicsPage() {
         "id, teacher_id, section_id, subject_id, school_year, teachers(id, teacher_id, profiles(first_name, last_name)), sections(section_name, grade_level), subjects(subject_name, grade_level)"
       )
       .order("created_at", { ascending: false }),
-    supabase
-      .from("students")
-      .select(
-        "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name), sections(section_name, grade_level)"
-      )
-      .in("activation_status", ["active", "pending"])
-      .order("lrn")
-      .limit(500),
+    (async () => {
+      let result = await supabase
+        .from("students")
+        .select(
+          "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name), sections(section_name, grade_level)"
+        )
+        .is("deleted_at", null)
+        .in("activation_status", ["active", "pending"])
+        .order("lrn")
+        .limit(500);
+      if (result.error && /deleted_at/i.test(result.error.message || "")) {
+        result = await supabase
+          .from("students")
+          .select(
+            "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name), sections(section_name, grade_level)"
+          )
+          .in("activation_status", ["active", "pending"])
+          .order("lrn")
+          .limit(500);
+      }
+      return result;
+    })(),
   ]);
 
   const activeTeachers = (teachers || []).filter(

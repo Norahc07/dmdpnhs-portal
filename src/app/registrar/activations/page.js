@@ -26,11 +26,19 @@ async function fetchStudents(db) {
 
   let lastError = "";
   for (const fields of attempts) {
-    const result = await db
+    let result = await db
       .from("students")
       .select(fields)
+      .is("deleted_at", null)
       .order("grade_level")
       .limit(2000);
+    if (result.error && /deleted_at/i.test(result.error.message || "")) {
+      result = await db
+        .from("students")
+        .select(fields)
+        .order("grade_level")
+        .limit(2000);
+    }
     if (!result.error) {
       return { rows: result.data || [], error: "" };
     }

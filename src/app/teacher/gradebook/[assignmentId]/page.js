@@ -46,12 +46,22 @@ export default async function ClassRecordPage({ params, searchParams }) {
     redirect(`/teacher/gradebook/${assignment.id}?term=${offeredTerm}`);
   }
 
-  const { data: students } = await supabase
+  let studentsRes = await supabase
     .from("students")
     .select("id, lrn, gender, profiles(first_name, last_name)")
     .eq("section_id", assignment.sections.id)
+    .is("deleted_at", null)
     .order("gender")
     .order("lrn");
+  if (studentsRes.error && /deleted_at/i.test(studentsRes.error.message || "")) {
+    studentsRes = await supabase
+      .from("students")
+      .select("id, lrn, gender, profiles(first_name, last_name)")
+      .eq("section_id", assignment.sections.id)
+      .order("gender")
+      .order("lrn");
+  }
+  const students = studentsRes.data;
 
   let classRecord = null;
   const withTerm = await supabase

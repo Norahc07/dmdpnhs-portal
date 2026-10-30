@@ -15,6 +15,13 @@ import {
 } from "@/lib/constants";
 import { sendSMS } from "@/lib/semaphore";
 import { FACULTY_POSITIONS } from "@/lib/grade-workflow";
+import {
+  clearOrphanStudentAuth,
+  findActiveStudentByLrn,
+  moveStudentToTrash,
+  purgeStudentRecord,
+  restoreStudentFromTrash,
+} from "@/lib/student-active";
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
@@ -147,8 +154,8 @@ export async function submitStudentActivation(form) {
   const parentPhone = String(form.parentPhone || "").trim();
   const parentAddress = String(form.parentAddress || "").trim();
 
-  if (!firstName || !lastName) {
-    return { error: "Enter your first and last name." };
+  if (!firstName || !middleName || !lastName) {
+    return { error: "Enter your first, middle, and last name." };
   }
   if (![7, 8, 9, 10, 11, 12].includes(gradeLevel)) {
     return { error: "Select your grade level." };
@@ -165,6 +172,9 @@ export async function submitStudentActivation(form) {
   if (!contactNumber || normalizePhone(contactNumber).length < 10) {
     return { error: "Enter a valid contact number. This is required for SMS notices." };
   }
+  if (!personalEmail) {
+    return { error: "Enter your personal email address." };
+  }
   if (!address) {
     return { error: "Enter your home address." };
   }
@@ -172,9 +182,14 @@ export async function submitStudentActivation(form) {
     `${parentFirstName} ${parentLastName}`.trim() || emergencyName;
   const guardianPhone = parentPhone || emergencyNumber;
   const guardianAddress = parentAddress || emergencyAddress;
-  if (!guardianName || !guardianPhone) {
+  if (!parentFirstName || !parentLastName || !guardianName) {
     return {
-      error: "Enter parent/guardian full name and contact number.",
+      error: "Enter parent/guardian first and last name.",
+    };
+  }
+  if (!guardianPhone) {
+    return {
+      error: "Enter parent/guardian contact number.",
     };
   }
   if (normalizePhone(guardianPhone).length < 10) {
@@ -183,6 +198,7 @@ export async function submitStudentActivation(form) {
   if (!guardianAddress) {
     return { error: "Enter parent/guardian address." };
   }
+  // Parent email is optional (parentEmail / parentEmailNone from OptionalEmailField).
 
   await admin
     .from("profiles")
@@ -365,17 +381,35 @@ export async function updateActivatedStudent(form) {
   const studentId = form.studentId;
   const firstName = String(form.firstName || "").trim();
   const lastName = String(form.lastName || "").trim();
-  const contactNumber = String(form.contactNumber || "").trim() || null;
+  const contactNumber = String(form.contactNumber || "").trim();
   const personalEmail = String(form.personalEmail || "").trim() || null;
   const sectionId = form.sectionId || null;
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
-  const parentPhone = String(form.parentPhone || "").trim() || null;
-  const parentAddress = String(form.parentAddress || "").trim() || null;
+  const parentPhone = String(form.parentPhone || "").trim();
+  const parentAddress = String(form.parentAddress || "").trim();
 
   if (!studentId) return { error: "Student id is required." };
   if (!firstName || !lastName) {
     return { error: "Student first and last name are required." };
+  }
+  if (!contactNumber || normalizePhone(contactNumber).length < 10) {
+    return { error: "Enter a valid student contact number." };
+  }
+  if (!sectionId) {
+    return { error: "Select a section for this student." };
+  }
+  if (!parentFirstName || !parentLastName) {
+    return { error: "Parent/guardian first and last name are required." };
+  }
+  if (!parentPhone || normalizePhone(parentPhone).length < 10) {
+    return { error: "Enter a valid parent/guardian contact number." };
+  }
+  if (!parentAddress) {
+    return { error: "Parent/guardian address is required." };
+  }
+  if (!personalEmail) {
+    return { error: "Student personal email is required." };
   }
 
   const { data: student } = await admin
@@ -407,8 +441,7 @@ export async function updateActivatedStudent(form) {
     contact_number: contactNumber,
     personal_email: personalEmail,
     section_id: sectionId,
-    emergency_contact_name:
-      `${parentFirstName} ${parentLastName}`.trim() || null,
+    emergency_contact_name: `${parentFirstName} ${parentLastName}`.trim(),
     emergency_contact_number: parentPhone,
     emergency_contact_address: parentAddress,
   };
@@ -432,45 +465,132 @@ export async function updateActivatedStudent(form) {
   return { ok: true };
 }
 
-/** Registrar permanently removes an activated student account */
+/** Registrar moves a student to Trash (soft delete). LRN becomes free for re-enrollment. */
 export async function deleteActivatedStudent(studentId) {
   const gate = await requireRegistrar();
   if (gate.error) return gate;
-  const { admin } = gate;
+  const { admin, user } = gate;
 
   if (!studentId) return { error: "Student id is required." };
 
   const { data: student } = await admin
     .from("students")
-    .select("id, profile_id, activation_status")
+    .select("id, profile_id, lrn, activation_status, deleted_at")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student) return { error: "Student not found." };
+  if (student.deleted_at) {
+    return { error: "This student is already in Trash." };
+  }
+
+  const moved = await moveStudentToTrash(admin, student, user?.id || null);
+  if (moved.error) return moved;
+
+  revalidatePath("/registrar/activations");
+  revalidatePath("/registrar/enrollment");
+  revalidatePath("/registrar/trash");
+  revalidatePath("/registrar");
+  revalidatePath("/student");
+  return {
+    ok: true,
+    message:
+      "Student moved to Trash. The LRN is free for a new enrollment, or you can restore this record from Trash.",
+  };
+}
+
+export async function listTrashedStudents() {
+  const gate = await requireRegistrar();
+  if (gate.error) return { ...gate, students: [] };
+  const { admin, db } = gate;
+  const client = admin || db;
+
+  let result = await client
+    .from("students")
+    .select(
+      "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, emergency_contact_name, emergency_contact_number, profile_id, deleted_at, deleted_by, profiles(first_name, last_name, email, status)"
+    )
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .limit(2000);
+
+  if (result.error && /deleted_at/i.test(result.error.message || "")) {
+    return {
+      students: [],
+      hint: "Student trash is not enabled yet. Apply supabase/student-trash.sql in the Supabase SQL editor.",
+    };
+  }
+  if (result.error) return { error: result.error.message, students: [] };
+
+  const sectionIds = [
+    ...new Set((result.data || []).map((s) => s.section_id).filter(Boolean)),
+  ];
+  let sectionsById = new Map();
+  if (sectionIds.length) {
+    const { data: sections } = await client
+      .from("sections")
+      .select("id, section_name, grade_level, school_year")
+      .in("id", sectionIds);
+    sectionsById = new Map((sections || []).map((s) => [s.id, s]));
+  }
+
+  const students = (result.data || []).map((row) => ({
+    ...row,
+    sections: row.section_id ? sectionsById.get(row.section_id) || null : null,
+  }));
+
+  return { students };
+}
+
+export async function restoreTrashedStudent(studentId) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  const { data: student } = await admin
+    .from("students")
+    .select(
+      "id, profile_id, lrn, activation_status, deleted_at, status"
+    )
     .eq("id", studentId)
     .maybeSingle();
   if (!student) return { error: "Student not found." };
 
-  await admin.from("parent_student_links").delete().eq("student_id", studentId);
+  const restored = await restoreStudentFromTrash(admin, student);
+  if (restored.error) return restored;
 
-  await admin.from("grades").delete().eq("student_id", studentId);
-  await admin.from("attendance").delete().eq("student_id", studentId);
-
-  const { error: studentError } = await admin
-    .from("students")
-    .delete()
-    .eq("id", studentId);
-  if (studentError) return { error: studentError.message };
-
-  if (student.profile_id) {
-    await admin.from("profiles").delete().eq("id", student.profile_id);
-    try {
-      await admin.auth.admin.deleteUser(student.profile_id);
-    } catch {
-      /* auth user may already be gone */
-    }
-  }
-
+  revalidatePath("/registrar/trash");
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/registrar");
-  return { ok: true };
+  revalidatePath("/student");
+  return { ok: true, message: "Student restored and is active in the system again." };
+}
+
+export async function permanentlyDeleteTrashedStudent(studentId) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const { admin } = gate;
+
+  const { data: student } = await admin
+    .from("students")
+    .select("id, profile_id, lrn, deleted_at")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student) return { error: "Student not found." };
+  if (!student.deleted_at) {
+    return {
+      error: "Move the student to Trash first before permanently deleting.",
+    };
+  }
+
+  const purged = await purgeStudentRecord(admin, student);
+  if (purged.error) return purged;
+
+  revalidatePath("/registrar/trash");
+  revalidatePath("/registrar/activations");
+  revalidatePath("/registrar/enrollment");
+  revalidatePath("/registrar");
+  return { ok: true, message: "Student permanently deleted from Trash." };
 }
 
 /** Registrar creates / enrolls a student stub (LRN + birthdate + placement) */
@@ -481,9 +601,9 @@ export async function enrollStudentByRegistrar(form) {
 
   const lrn = String(form.lrn || "").trim();
   const birthdate = String(form.birthdate || "").trim();
-  const firstName = String(form.firstName || "").trim() || "Student";
-  const lastName = String(form.lastName || "").trim() || lrn;
-  const gender = String(form.gender || "Male").trim();
+  const firstName = String(form.firstName || "").trim();
+  const lastName = String(form.lastName || "").trim();
+  const gender = String(form.gender || "").trim();
   const gradeLevel = Number(form.gradeLevel);
   const sectionId = form.sectionId || null;
   const parentFirstName = String(form.parentFirstName || "").trim();
@@ -496,8 +616,17 @@ export async function enrollStudentByRegistrar(form) {
   if (!birthdate || birthdate.replaceAll("-", "").length < 8) {
     return { error: "Enter a valid birthdate." };
   }
+  if (!firstName || !lastName) {
+    return { error: "Student first and last name are required." };
+  }
+  if (!gender || !["Male", "Female"].includes(gender)) {
+    return { error: "Select the student’s gender." };
+  }
   if (![7, 8, 9, 10, 11, 12].includes(gradeLevel)) {
     return { error: "Select a valid grade level." };
+  }
+  if (!sectionId) {
+    return { error: "Select a section for this student." };
   }
   const sectionGate = await assertSectionMatchesGrade(
     admin,
@@ -505,27 +634,48 @@ export async function enrollStudentByRegistrar(form) {
     gradeLevel
   );
   if (sectionGate?.error) return sectionGate;
-  if (parentPhone && normalizePhone(parentPhone).length < 10) {
+  if (!parentFirstName || !parentLastName) {
+    return { error: "Parent/guardian first and last name are required." };
+  }
+  if (!parentPhone || normalizePhone(parentPhone).length < 10) {
     return { error: "Enter a valid parent/guardian contact number." };
+  }
+  if (!parentAddress) {
+    return { error: "Parent/guardian address is required." };
   }
 
   const email = studentEmailFromLrn(lrn);
 
-  const { data: existing } = await admin
-    .from("students")
-    .select("id")
-    .eq("lrn", lrn)
-    .maybeSingle();
+  const { data: existing } = await findActiveStudentByLrn(admin, lrn, "id");
   if (existing) return { error: "A student with this LRN already exists." };
 
-  const { data: created, error: createError } =
-    await admin.auth.admin.createUser({
+  const orphan = await clearOrphanStudentAuth(admin, lrn);
+  if (orphan?.blocked) {
+    return { error: "A student with this LRN already exists." };
+  }
+
+  let created = null;
+  let createError = null;
+  ({ data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { role: "student", first_name: firstName, last_name: lastName },
+  }));
+
+  if (createError && /already|registered|exists/i.test(createError.message || "")) {
+    await clearOrphanStudentAuth(admin, lrn);
+    ({ data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: "student", first_name: firstName, last_name: lastName },
-    });
-
+      user_metadata: {
+        role: "student",
+        first_name: firstName,
+        last_name: lastName,
+      },
+    }));
+  }
   if (createError) return { error: createError.message };
   const userId = created.user.id;
 

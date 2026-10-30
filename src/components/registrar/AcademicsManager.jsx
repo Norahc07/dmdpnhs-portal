@@ -1883,23 +1883,33 @@ export function AcademicsManager({
                 </div>
                 <div className="space-y-1.5">
                   <Label>First name</Label>
-                  <Input name="firstName" placeholder="e.g. Juan" />
+                  <Input name="firstName" required placeholder="e.g. Juan" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Last name</Label>
-                  <Input name="lastName" placeholder="e.g. Dela Cruz" />
+                  <Input
+                    name="lastName"
+                    required
+                    placeholder="e.g. Dela Cruz"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Gender</Label>
-                  <select name="gender" defaultValue="Male" className={selectClass}>
-                    <option>Male</option>
-                    <option>Female</option>
+                  <select
+                    name="gender"
+                    required
+                    defaultValue="Male"
+                    className={selectClass}
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Grade level</Label>
                   <select
                     name="gradeLevel"
+                    required
                     value={enrollFormGrade}
                     onChange={(e) => {
                       setEnrollFormGrade(e.target.value);
@@ -1916,20 +1926,33 @@ export function AcademicsManager({
                 </div>
                 <div className="space-y-1.5">
                   <Label>Parent / guardian first name</Label>
-                  <Input name="parentFirstName" placeholder="e.g. Maria" />
+                  <Input
+                    name="parentFirstName"
+                    required
+                    placeholder="e.g. Maria"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Parent / guardian last name</Label>
-                  <Input name="parentLastName" placeholder="e.g. Dela Cruz" />
+                  <Input
+                    name="parentLastName"
+                    required
+                    placeholder="e.g. Dela Cruz"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Parent / guardian contact number</Label>
-                  <Input name="parentPhone" placeholder="09XXXXXXXXX" />
+                  <Input
+                    name="parentPhone"
+                    required
+                    placeholder="09XXXXXXXXX"
+                  />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Parent / guardian address</Label>
                   <Input
                     name="parentAddress"
+                    required
                     placeholder="House No., Street, Barangay, City"
                   />
                 </div>
@@ -1937,11 +1960,20 @@ export function AcademicsManager({
                   <Label>Section</Label>
                   <select
                     name="sectionId"
+                    required={sections.some(
+                      (s) => String(s.grade_level) === String(enrollFormGrade)
+                    )}
                     value={enrollFormSection}
                     onChange={(e) => setEnrollFormSection(e.target.value)}
                     className={selectClass}
                   >
-                    <option value="">— Assign later —</option>
+                    <option value="">
+                      {sections.some(
+                        (s) => String(s.grade_level) === String(enrollFormGrade)
+                      )
+                        ? "Select section"
+                        : "No sections for this grade"}
+                    </option>
                     {sections
                       .filter(
                         (s) =>

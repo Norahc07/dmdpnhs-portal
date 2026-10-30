@@ -39,11 +39,26 @@ export async function requireRole(allowedRoles) {
   let student = null;
   let studentAccess = null;
   if (profile.role === "student" && !roles.includes("student-activating")) {
-    const { data } = await supabase
+    if (profile.status === "trashed") {
+      redirect("/login/student?notice=trashed");
+    }
+    let studentRes = await supabase
       .from("students")
-      .select("id, activation_status, section_id, status")
+      .select("id, activation_status, section_id, status, deleted_at")
       .eq("profile_id", user.id)
+      .is("deleted_at", null)
       .maybeSingle();
+    if (studentRes.error && /deleted_at/i.test(studentRes.error.message || "")) {
+      studentRes = await supabase
+        .from("students")
+        .select("id, activation_status, section_id, status")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+    }
+    const data = studentRes.data;
+    if (!data) {
+      redirect("/login/student?notice=trashed");
+    }
     student = data;
 
     const activation = student?.activation_status || "active";

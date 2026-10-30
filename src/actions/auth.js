@@ -10,6 +10,7 @@ import {
   studentEmailFromLrn,
   teacherIdYearCode,
 } from "@/lib/constants";
+import { findActiveStudentByLrn } from "@/lib/student-active";
 
 /**
  * Auto Teacher ID: T{YY}-{XXXXX}
@@ -45,13 +46,11 @@ export async function loginStudent({ lrn, password }) {
   }
 
   const admin = createAdminClient();
-  const { data: student, error: studentError } = await admin
-    .from("students")
-    .select(
-      "id, profile_id, activation_status, profiles(id, email, status, role)"
-    )
-    .eq("lrn", cleanLrn)
-    .maybeSingle();
+  const { data: student, error: studentError } = await findActiveStudentByLrn(
+    admin,
+    cleanLrn,
+    "id, profile_id, activation_status, profiles(id, email, status, role)"
+  );
 
   if (studentError || !student) {
     return {
@@ -107,13 +106,11 @@ export async function registerStudent(form) {
   }
 
   const admin = createAdminClient();
-  const { data: student, error: studentError } = await admin
-    .from("students")
-    .select(
-      "id, birthdate, profile_id, status, section_id, activation_status, profiles(email, first_name, last_name)"
-    )
-    .eq("lrn", cleanLrn)
-    .maybeSingle();
+  const { data: student, error: studentError } = await findActiveStudentByLrn(
+    admin,
+    cleanLrn,
+    "id, birthdate, profile_id, status, section_id, activation_status, profiles(email, first_name, last_name)"
+  );
 
   if (studentError || !student) {
     return {
@@ -268,11 +265,11 @@ export async function resetStudentPassword(form) {
   }
 
   const admin = createAdminClient();
-  const { data: student } = await admin
-    .from("students")
-    .select("id, birthdate, profile_id, activation_status, profiles(email)")
-    .eq("lrn", cleanLrn)
-    .maybeSingle();
+  const { data: student } = await findActiveStudentByLrn(
+    admin,
+    cleanLrn,
+    "id, birthdate, profile_id, activation_status, profiles(email)"
+  );
 
   if (!student) {
     return { error: "Student record not found." };

@@ -321,6 +321,7 @@ function StudentEditSheet({
               <Input
                 value={contactNumber}
                 onChange={(e) => setContactNumber(e.target.value)}
+                required
                 placeholder="09XXXXXXXXX"
               />
             </div>
@@ -330,6 +331,7 @@ function StudentEditSheet({
                 type="email"
                 value={personalEmail}
                 onChange={(e) => setPersonalEmail(e.target.value)}
+                required
                 placeholder="you@email.com"
               />
             </div>
@@ -338,9 +340,10 @@ function StudentEditSheet({
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
+                required
                 className={selectClass}
               >
-                <option value="">— Unassigned —</option>
+                <option value="">Select section</option>
                 {sections
                   .filter(
                     (s) =>
@@ -365,6 +368,7 @@ function StudentEditSheet({
                   <Input
                     value={parentFirstName}
                     onChange={(e) => setParentFirstName(e.target.value)}
+                    required
                     placeholder="e.g. Maria"
                   />
                 </div>
@@ -373,6 +377,7 @@ function StudentEditSheet({
                   <Input
                     value={parentLastName}
                     onChange={(e) => setParentLastName(e.target.value)}
+                    required
                     placeholder="e.g. Dela Cruz"
                   />
                 </div>
@@ -382,6 +387,7 @@ function StudentEditSheet({
                 <Input
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
+                  required
                   placeholder="09XXXXXXXXX"
                 />
               </div>
@@ -390,6 +396,7 @@ function StudentEditSheet({
                 <Input
                   value={parentAddress}
                   onChange={(e) => setParentAddress(e.target.value)}
+                  required
                   placeholder="House No., Street, Barangay, City"
                 />
               </div>
@@ -774,7 +781,10 @@ export function PendingActivationsTable({
       setActivatedList((list) =>
         list.filter((r) => r.id !== deleteStudent.id)
       );
-      toast.success("Student deleted.");
+      toast.success(
+        result?.message ||
+          "Student moved to Trash. Restore it anytime, or re-enroll the same LRN."
+      );
       setDeleteStudent(null);
     });
   }
@@ -909,11 +919,11 @@ export function PendingActivationsTable({
           setDeleteStudent(null);
           setError("");
         }}
-        eyebrow="Delete student"
-        title={deleteStudent ? studentFullName(deleteStudent) : "Delete"}
+        eyebrow="Move to Trash"
+        title={deleteStudent ? studentFullName(deleteStudent) : "Trash"}
         subtitle={deleteStudent?.lrn ? `LRN ${deleteStudent.lrn}` : undefined}
-        description="This permanently removes the student account, activation record, and linked portal access. This cannot be undone."
-        closeLabel="Close delete student"
+        description="The learner leaves the active system and goes to Trash. The LRN can be enrolled again, or you can restore this record later."
+        closeLabel="Close move to trash"
       >
         <div className="flex flex-1 flex-col">
           <div className="flex-1 space-y-3 px-5 py-5 text-sm text-muted-foreground">
@@ -922,6 +932,10 @@ export function PendingActivationsTable({
               <span className="text-foreground">
                 {deleteStudent ? sectionLabel(deleteStudent) : "—"}
               </span>
+            </p>
+            <p>
+              Grades and attendance stay with the record in Trash until you
+              permanently delete them there.
             </p>
             {error ? <p className="text-rose-700">{error}</p> : null}
           </div>
@@ -945,7 +959,7 @@ export function PendingActivationsTable({
               disabled={pending}
               onClick={confirmDelete}
             >
-              {pending ? "Deleting…" : "Delete student"}
+              {pending ? "Moving…" : "Move to Trash"}
             </Button>
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   Megaphone,
   Settings,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import {
   EDUCATOR_PORTAL_GROUPS,
@@ -78,6 +79,7 @@ const NAV = {
     { href: "/registrar/activations", label: "Activations", icon: UserCheck },
     { href: "/registrar/academics", label: "Academics", icon: GraduationCap },
     { href: "/registrar/enrollment", label: "Enrollment", icon: BarChart3 },
+    { href: "/registrar/trash", label: "Trash", icon: Trash2 },
     { href: "/registrar/teachers", label: "Faculty", icon: Users },
     { href: "/registrar/grades", label: "Grade Lock", icon: Lock },
     { href: "/registrar/promotion", label: "Promotion", icon: ClipboardList },

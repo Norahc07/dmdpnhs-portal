@@ -124,11 +124,23 @@ export default async function TeacherAttendancePage({ searchParams }) {
 
   const sectionIds = Array.from(sectionMap.keys());
   if (sectionIds.length) {
-    const { data: studentRows } = await supabase
+    let studentCountRes = await supabase
       .from("students")
       .select("id, section_id")
       .in("section_id", sectionIds)
-      .eq("activation_status", "active");
+      .eq("activation_status", "active")
+      .is("deleted_at", null);
+    if (
+      studentCountRes.error &&
+      /deleted_at/i.test(studentCountRes.error.message || "")
+    ) {
+      studentCountRes = await supabase
+        .from("students")
+        .select("id, section_id")
+        .in("section_id", sectionIds)
+        .eq("activation_status", "active");
+    }
+    const studentRows = studentCountRes.data;
     const counts = {};
     for (const row of studentRows || []) {
       counts[row.section_id] = (counts[row.section_id] || 0) + 1;
@@ -245,12 +257,22 @@ export default async function TeacherAttendancePage({ searchParams }) {
     ? `Grade ${selectedSection.grade_level} · ${selectedSection.section_name}`
     : "Section";
 
-  const { data: students } = await supabase
+  let studentsRes = await supabase
     .from("students")
     .select("id, lrn, profiles(first_name, last_name)")
     .eq("section_id", selectedId)
     .eq("activation_status", "active")
+    .is("deleted_at", null)
     .order("lrn");
+  if (studentsRes.error && /deleted_at/i.test(studentsRes.error.message || "")) {
+    studentsRes = await supabase
+      .from("students")
+      .select("id, lrn, profiles(first_name, last_name)")
+      .eq("section_id", selectedId)
+      .eq("activation_status", "active")
+      .order("lrn");
+  }
+  const students = studentsRes.data;
 
   let attendanceQuery = supabase
     .from("attendance")

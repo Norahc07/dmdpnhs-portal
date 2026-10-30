@@ -150,9 +150,23 @@ export function deltaAbsolute(current, previous) {
 
 /** Server-side fetch for registrar dashboard analytics. */
 export async function fetchRegistrarAnalytics(supabase) {
+  let studentsQuery = await supabase
+    .from("students")
+    .select("id, gender, grade_level, section_id, status")
+    .eq("status", "enrolled")
+    .is("deleted_at", null);
+  if (
+    studentsQuery.error &&
+    /deleted_at/i.test(String(studentsQuery.error.message || ""))
+  ) {
+    studentsQuery = await supabase
+      .from("students")
+      .select("id, gender, grade_level, section_id, status")
+      .eq("status", "enrolled");
+  }
+
   const [
     { data: sections, error: sectionsError },
-    { data: students, error: studentsError },
     { data: assignments, error: assignmentsError },
     gradesResult,
     { data: classRecords, error: classRecordsError },
@@ -160,10 +174,6 @@ export async function fetchRegistrarAnalytics(supabase) {
     supabase
       .from("sections")
       .select("id, grade_level, section_name, school_year"),
-    supabase
-      .from("students")
-      .select("id, gender, grade_level, section_id, status")
-      .eq("status", "enrolled"),
     supabase
       .from("teacher_assignments")
       .select("id, teacher_id, school_year, section_id, subject_id"),
@@ -174,6 +184,9 @@ export async function fetchRegistrarAnalytics(supabase) {
       .from("class_records")
       .select("id, workflow_status, teacher_assignments(school_year)"),
   ]);
+
+  const students = studentsQuery.data;
+  const studentsError = studentsQuery.error;
 
   let grades = gradesResult.data || [];
   let gradesError = gradesResult.error;
