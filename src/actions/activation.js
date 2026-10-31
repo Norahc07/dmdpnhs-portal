@@ -17,6 +17,7 @@ import { FACULTY_POSITIONS } from "@/lib/grade-workflow";
 import {
   clearOrphanStudentAuth,
   findActiveStudentByLrn,
+  findAnyStudentByLrn,
   moveStudentToTrash,
   purgeStudentRecord,
   restoreStudentFromTrash,
@@ -600,12 +601,56 @@ export async function enrollStudentByRegistrar(form) {
 
   const email = studentEmailFromLrn(lrn);
 
-  const { data: existing } = await findActiveStudentByLrn(admin, lrn, "id");
-  if (existing) return { error: "A student with this LRN already exists." };
+  const { data: existing } = await findActiveStudentByLrn(
+    admin,
+    lrn,
+    "id, lrn, activation_status, status, grade_level, section_id, profile_id, profiles(first_name, last_name)"
+  );
+  if (existing) {
+    const name = [
+      existing.profiles?.first_name,
+      existing.profiles?.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const label = name || `LRN ${lrn}`;
+    const act = existing.activation_status || "enrolled";
+    return {
+      error: `A student with this LRN already exists: ${label} (${act}). Search Enrollment or Activations for ${lrn}.`,
+      existingStudentId: existing.id,
+      existingLrn: lrn,
+    };
+  }
+
+  const { data: anyRow } = await findAnyStudentByLrn(
+    admin,
+    lrn,
+    "id, deleted_at, profiles(first_name, last_name)"
+  );
+  if (anyRow?.deleted_at) {
+    const name = [
+      anyRow.profiles?.first_name,
+      anyRow.profiles?.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    return {
+      error: `LRN ${lrn}${name ? ` (${name})` : ""} is in Trash. Restore it from Registrar → Trash, or permanently delete it there before enrolling again.`,
+      trashedStudentId: anyRow.id,
+    };
+  }
 
   const orphan = await clearOrphanStudentAuth(admin, lrn);
   if (orphan?.blocked) {
-    return { error: "A student with this LRN already exists." };
+    return {
+      error: `A student with this LRN already exists. Search Enrollment or Activations for ${lrn}.`,
+      existingStudentId: orphan.studentId || null,
+    };
+  }
+  if (orphan?.error && !orphan?.cleared) {
+    return { error: orphan.error };
   }
 
   let created = null;
@@ -618,7 +663,16 @@ export async function enrollStudentByRegistrar(form) {
   }));
 
   if (createError && /already|registered|exists/i.test(createError.message || "")) {
-    await clearOrphanStudentAuth(admin, lrn);
+    const cleared = await clearOrphanStudentAuth(admin, lrn);
+    if (cleared?.blocked) {
+      return {
+        error: `A student with this LRN already exists. Search Enrollment or Activations for ${lrn}.`,
+        existingStudentId: cleared.studentId || null,
+      };
+    }
+    if (cleared?.error && !cleared?.cleared) {
+      return { error: cleared.error };
+    }
     ({ data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password,

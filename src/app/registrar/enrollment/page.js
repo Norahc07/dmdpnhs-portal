@@ -73,26 +73,28 @@ export default async function RegistrarEnrollmentPage() {
     admin = null;
   }
 
-  const [{ rows: sessionRows, error: sessionError }, sectionsRes] =
-    await Promise.all([
-      fetchEnrollmentStudents(supabase),
-      supabase
-        .from("sections")
-        .select(
-          "id, section_name, grade_level, school_year, track_strand, capacity, male_count, female_count"
-        )
-        .order("grade_level"),
-    ]);
+  // Always prefer admin so the list matches LRN uniqueness checks on enroll.
+  // Session RLS can omit students that still exist in the database.
+  const reader = admin || supabase;
+  const [{ rows, error: loadError }, sectionsRes] = await Promise.all([
+    fetchEnrollmentStudents(reader),
+    supabase
+      .from("sections")
+      .select(
+        "id, section_name, grade_level, school_year, track_strand, capacity, male_count, female_count"
+      )
+      .order("grade_level"),
+  ]);
 
-  let students = sessionRows;
-  let loadError = sessionError;
-  if (!students.length && admin) {
+  let students = rows;
+  let error = loadError;
+  if ((!students.length || error) && admin && reader !== admin) {
     const adminLoad = await fetchEnrollmentStudents(admin);
     if (adminLoad.rows.length) {
       students = adminLoad.rows;
-      loadError = "";
+      error = "";
     } else if (adminLoad.error) {
-      loadError = sessionError || adminLoad.error;
+      error = error || adminLoad.error;
     }
   }
 
@@ -109,8 +111,8 @@ export default async function RegistrarEnrollmentPage() {
         students={students}
         sections={sectionsRes.data || []}
         loadError={
-          loadError && !students.length
-            ? `Could not load enrollment: ${loadError}`
+          error && !students.length
+            ? `Could not load enrollment: ${error}`
             : ""
         }
       />

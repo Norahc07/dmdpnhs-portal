@@ -32,12 +32,36 @@ export async function findActiveStudentByLrn(db, lrn, fields = "id") {
     .select(fields)
     .eq("lrn", clean)
     .is("deleted_at", null)
+    .limit(1)
     .maybeSingle();
   if (result.error && isMissingDeletedAtColumn(result.error)) {
     result = await db
       .from("students")
       .select(fields)
       .eq("lrn", clean)
+      .limit(1)
+      .maybeSingle();
+  }
+  return result;
+}
+
+/** Find any student row for an LRN, including Trash. */
+export async function findAnyStudentByLrn(db, lrn, fields = "id, deleted_at") {
+  const clean = String(lrn || "").trim();
+  if (!clean) return { data: null, error: null };
+  let result = await db
+    .from("students")
+    .select(fields)
+    .eq("lrn", clean)
+    .order("deleted_at", { ascending: true, nullsFirst: true })
+    .limit(1)
+    .maybeSingle();
+  if (result.error && isMissingDeletedAtColumn(result.error)) {
+    result = await db
+      .from("students")
+      .select(fields)
+      .eq("lrn", clean)
+      .limit(1)
       .maybeSingle();
   }
   return result;
@@ -212,8 +236,27 @@ export async function clearOrphanStudentAuth(admin, lrn) {
     }
 
     if (linked?.id && linked.deleted_at) {
-      /* keep trashed account; email should already be renamed */
-      return { cleared: false, trashed: true };
+      /* Trashed row still holding the LRN email — rename it so re-enroll can proceed. */
+      try {
+        await admin.auth.admin.updateUserById(orphan.id, {
+          ban_duration: "876000h",
+          email: trashedAuthEmail(linked.id, lrn),
+          email_confirm: true,
+          user_metadata: {
+            trashed: true,
+            original_lrn: lrn || null,
+          },
+        });
+        return { cleared: true, trashed: true };
+      } catch (err) {
+        return {
+          cleared: false,
+          trashed: true,
+          error:
+            err?.message ||
+            "This LRN is in Trash and still holds the sign-in email. Permanently delete it from Trash, then enroll again.",
+        };
+      }
     }
 
     await admin.from("profiles").delete().eq("id", orphan.id);

@@ -99,9 +99,10 @@ export default async function RegistrarActivationsPage() {
     admin = null;
   }
 
+  const reader = admin || supabase;
   const [{ rows: registrarRows, error: registrarError }, sectionsRes] =
     await Promise.all([
-      fetchStudents(supabase),
+      fetchStudents(reader),
       supabase
         .from("sections")
         .select("id, section_name, grade_level, school_year")
@@ -111,7 +112,7 @@ export default async function RegistrarActivationsPage() {
 
   let students = registrarRows;
   let loadError = registrarError;
-  if (!students.length && admin) {
+  if ((!students.length || loadError) && admin && reader !== admin) {
     const adminLoad = await fetchStudents(admin);
     if (adminLoad.rows.length) {
       students = adminLoad.rows;
@@ -122,7 +123,10 @@ export default async function RegistrarActivationsPage() {
   }
 
   const sections = sectionsRes.data || [];
-  students = attachSections(await hydrateProfiles(supabase, students), sections);
+  students = attachSections(
+    await hydrateProfiles(admin || supabase, students),
+    sections
+  );
 
   const awaiting = students.filter(isAwaitingActivation);
   const activated = students.filter(isActivated);
