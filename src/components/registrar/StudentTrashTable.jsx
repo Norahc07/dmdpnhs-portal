@@ -18,6 +18,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
 
 function studentName(row) {
   const first = row?.profiles?.first_name || "";
@@ -70,6 +74,18 @@ export function StudentTrashTable({ students = [], hint = "" }) {
       return hay.includes(q);
     });
   }, [students, search]);
+
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(rows);
 
   function restore(row) {
     setBusyId(row.id);
@@ -163,7 +179,7 @@ export function StudentTrashTable({ students = [], hint = "" }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((row) => {
+                pageRows.map((row) => {
                   const busy = pending && busyId === row.id;
                   return (
                     <TableRow key={row.id}>
@@ -208,6 +224,16 @@ export function StudentTrashTable({ students = [], hint = "" }) {
             </TableBody>
           </Table>
         </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
       </div>
 
       {confirmPurge ? (

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   Eye,
   GraduationCap,
   MoreHorizontal,
   Pencil,
-  Phone,
   RotateCcw,
   ShieldCheck,
   Trash2,
@@ -41,11 +41,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { STATUS_BADGE_STYLES } from "@/lib/constants";
+import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
+import { GRADE_LEVELS, STATUS_BADGE_STYLES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-9 text-sm";
+
+/** Shared column widths so Pending + Activated tables align visually. */
+const COL = {
+  name: "w-[26%] min-w-[11rem]",
+  lrn: "w-[16%] min-w-[8.5rem]",
+  section: "w-[20%] min-w-[9rem]",
+  status: "w-[14%] min-w-[7rem]",
+  action: "w-[24%] min-w-[12rem]",
+};
+
+function ActivationsColGroup() {
+  return (
+    <colgroup>
+      <col className={COL.name} />
+      <col className={COL.lrn} />
+      <col className={COL.section} />
+      <col className={COL.status} />
+      <col className={COL.action} />
+    </colgroup>
+  );
+}
 
 function studentFullName(row) {
   return `${row.profiles?.first_name || ""} ${row.profiles?.last_name || ""}`.trim() || "—";
@@ -66,26 +91,76 @@ function splitParentName(fullName = "") {
   };
 }
 
-function DetailRow({ label, value }) {
+function formatBirthdateDisplay(value) {
+  if (!value) return null;
+  const raw = String(value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  try {
+    return new Date(`${raw}T00:00:00`).toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return raw;
+  }
+}
+
+function birthdateInputValue(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+const fieldLabelClass =
+  "text-[10px] font-semibold tracking-wide text-muted-foreground uppercase";
+const compactInputClass = "h-8 text-sm";
+const compactSelectClass = cn(selectClass, "h-8 py-0 text-sm");
+
+function FieldRead({ label, value, mono = false }) {
   return (
-    <div className="grid gap-1 border-b border-border/60 py-3 last:border-b-0 sm:grid-cols-[9rem_1fr] sm:gap-4">
-      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </dt>
-      <dd className="text-sm break-words text-foreground">{value || "—"}</dd>
+    <div className="min-w-0 space-y-0.5">
+      <p className={fieldLabelClass}>{label}</p>
+      <p
+        className={cn(
+          "truncate text-sm font-medium text-[#3d1212]",
+          mono && "font-mono text-xs tabular-nums"
+        )}
+        title={value || "—"}
+      >
+        {value || "—"}
+      </p>
     </div>
+  );
+}
+
+function FieldEdit({ label, htmlFor, children }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <Label htmlFor={htmlFor} className={fieldLabelClass}>
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function PanelSection({ title, children }) {
+  return (
+    <section className="rounded-xl border border-[#800000]/10 bg-[#faf7f5]/80 p-3">
+      <p className="mb-2.5 text-[10px] font-bold tracking-wide text-[#800000] uppercase">
+        {title}
+      </p>
+      {children}
+    </section>
   );
 }
 
 function SideSheet({
   open,
   onClose,
-  eyebrow,
-  title,
-  subtitle,
-  description,
   children,
   closeLabel = "Close panel",
+  labelledBy,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -116,75 +191,179 @@ function SideSheet({
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={labelledBy}
         className={cn(
-          "absolute inset-y-0 right-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl ring-1 ring-black/5 transition-transform duration-300 ease-out",
+          "absolute inset-y-0 right-0 flex h-dvh w-full max-w-lg flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-black/5 transition-transform duration-300 ease-out",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
-        <div className="border-b bg-gradient-to-br from-[#800000]/10 to-transparent px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium tracking-wide text-[#800000] uppercase">
-                {eyebrow}
-              </p>
-              <h2 className="mt-1 truncate text-lg font-semibold text-foreground">
-                {title}
-              </h2>
-              {subtitle ? (
-                <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
-          {description ? (
-            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              {description}
-            </p>
-          ) : null}
-        </div>
         {children}
       </aside>
     </div>
   );
 }
 
+function StudentPanelHeader({
+  eyebrow,
+  student,
+  onClose,
+  titleId = "student-panel-title",
+}) {
+  const initials = `${(student?.profiles?.first_name || "?").charAt(0)}${(
+    student?.profiles?.last_name || ""
+  ).charAt(0)}`;
+
+  return (
+    <div className="shrink-0 border-b border-[#800000]/10 bg-gradient-to-br from-[#800000]/10 via-[#faf7f5] to-white px-4 py-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#800000] text-sm font-bold text-white shadow-sm">
+            {initials}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold tracking-wide text-[#800000] uppercase">
+              {eyebrow}
+            </p>
+            <h2
+              id={titleId}
+              className="mt-0.5 truncate font-heading text-base font-bold text-[#3d1212]"
+            >
+              {student ? studentFullName(student) : "Student"}
+            </h2>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {student?.lrn ? (
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  LRN {student.lrn}
+                </span>
+              ) : null}
+              {student?.activation_status ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-5 px-1.5 text-[10px]",
+                    STATUS_BADGE_STYLES[student.activation_status] || ""
+                  )}
+                >
+                  {student.activation_status}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onClose}
+          aria-label="Close"
+          className="shrink-0"
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StudentPanelFooter({ children }) {
+  return (
+    <div className="shrink-0 border-t border-[#800000]/10 bg-white px-4 py-3">
+      <div className="flex gap-2">{children}</div>
+    </div>
+  );
+}
+
+function parentDisplayParts(student) {
+  const fromMapped = splitParentName(student?.parent_name);
+  if (fromMapped.first || fromMapped.last) return fromMapped;
+  return splitParentName(student?.emergency_contact_name);
+}
+
+function parentPhoneOf(student) {
+  return student?.parent_phone || student?.emergency_contact_number || "";
+}
+
 function StudentViewSheet({ student, open, onClose, onEdit }) {
+  const parent = parentDisplayParts(student);
+  const parentFull =
+    `${parent.first || ""} ${parent.last || ""}`.trim() || null;
+
   return (
     <SideSheet
       open={open}
       onClose={onClose}
-      eyebrow="Student details"
-      title={student ? studentFullName(student) : "Student"}
-      subtitle={student?.lrn ? `LRN ${student.lrn}` : undefined}
-      description="Full activation record for this learner."
       closeLabel="Close student details"
+      labelledBy="student-view-title"
     >
       {student ? (
         <>
-          <dl className="flex-1 overflow-y-auto px-5 py-2">
-            <DetailRow label="Student name" value={studentFullName(student)} />
-            <DetailRow label="LRN" value={student.lrn} />
-            <DetailRow label="Section" value={sectionLabel(student)} />
-            <DetailRow
-              label="Parent / guardian"
-              value={
-                student.parent_name || student.parent_phone
-                  ? `${student.parent_name || "Contact"} · ${student.parent_phone || "—"}`
-                  : null
-              }
-            />
-            <DetailRow label="Status" value={student.activation_status} />
-          </dl>
-          <div className="flex gap-2 border-t px-5 py-4">
+          <StudentPanelHeader
+            eyebrow="Student details"
+            student={student}
+            onClose={onClose}
+            titleId="student-view-title"
+          />
+          <div className="flex min-h-0 flex-1 flex-col justify-between gap-3 overflow-hidden px-4 py-3">
+            <div className="space-y-3">
+              <PanelSection title="Learner">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                  <FieldRead
+                    label="First name"
+                    value={student.profiles?.first_name || null}
+                  />
+                  <FieldRead
+                    label="Last name"
+                    value={student.profiles?.last_name || null}
+                  />
+                  <FieldRead
+                    label="Birthdate"
+                    value={formatBirthdateDisplay(student.birthdate)}
+                  />
+                  <FieldRead label="Gender" value={student.gender || null} />
+                  <FieldRead
+                    label="Grade level"
+                    value={
+                      student.grade_level != null
+                        ? `Grade ${student.grade_level}`
+                        : null
+                    }
+                  />
+                  <FieldRead label="Section" value={sectionLabel(student)} />
+                  <FieldRead label="LRN" value={student.lrn} mono />
+                  <FieldRead
+                    label="Status"
+                    value={student.activation_status || null}
+                  />
+                </div>
+              </PanelSection>
+
+              <PanelSection title="Parent / guardian">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                  <FieldRead
+                    label="First name"
+                    value={parent.first || null}
+                  />
+                  <FieldRead label="Last name" value={parent.last || null} />
+                  <div className="col-span-2">
+                    <FieldRead
+                      label="Contact number"
+                      value={parentPhoneOf(student) || null}
+                      mono
+                    />
+                  </div>
+                  {parentFull ? (
+                    <div className="col-span-2 rounded-lg border border-[#800000]/8 bg-white/70 px-2.5 py-2 text-xs text-muted-foreground">
+                      Contact listed as{" "}
+                      <span className="font-medium text-[#3d1212]">
+                        {parentFull}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </PanelSection>
+            </div>
+          </div>
+          <StudentPanelFooter>
             <Button
               type="button"
               variant="outline"
@@ -204,7 +383,7 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
               <Pencil className="size-4" />
               Edit
             </Button>
-          </div>
+          </StudentPanelFooter>
         </>
       ) : null}
     </SideSheet>
@@ -220,47 +399,61 @@ function StudentEditSheet({
   onClose,
   onSubmit,
 }) {
-  const parentParts = splitParentName(student?.parent_name);
+  const parentParts = parentDisplayParts(student);
   const [firstName, setFirstName] = useState(
     student?.profiles?.first_name || ""
   );
   const [lastName, setLastName] = useState(student?.profiles?.last_name || "");
+  const [birthdate, setBirthdate] = useState(
+    birthdateInputValue(student?.birthdate)
+  );
+  const [gender, setGender] = useState(student?.gender || "Male");
+  const [gradeLevel, setGradeLevel] = useState(
+    String(student?.grade_level || "")
+  );
   const [sectionId, setSectionId] = useState(student?.section_id || "");
   const [parentFirstName, setParentFirstName] = useState(parentParts.first);
   const [parentLastName, setParentLastName] = useState(parentParts.last);
-  const [parentPhone, setParentPhone] = useState(student?.parent_phone || "");
+  const [parentPhone, setParentPhone] = useState(parentPhoneOf(student));
 
   useEffect(() => {
     if (!open || !student) return;
-    const parts = splitParentName(student.parent_name);
+    const parts = parentDisplayParts(student);
     setFirstName(student.profiles?.first_name || "");
     setLastName(student.profiles?.last_name || "");
+    setBirthdate(birthdateInputValue(student.birthdate));
+    setGender(student.gender || "Male");
+    setGradeLevel(String(student.grade_level || ""));
     setSectionId(student.section_id || "");
     setParentFirstName(parts.first);
     setParentLastName(parts.last);
-    setParentPhone(student.parent_phone || "");
+    setParentPhone(parentPhoneOf(student));
   }, [open, student]);
+
+  const gradeSections = sections.filter(
+    (s) => !gradeLevel || String(s.grade_level) === String(gradeLevel)
+  );
 
   return (
     <SideSheet
       open={open}
       onClose={onClose}
-      eyebrow="Edit student"
-      title={student ? studentFullName(student) : "Student"}
-      subtitle={student?.lrn ? `LRN ${student.lrn}` : undefined}
-      description="Update learner and parent/guardian contact details."
       closeLabel="Close edit student"
+      labelledBy="student-edit-title"
     >
       {student ? (
         <form
           key={student.id}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex h-full min-h-0 flex-col overflow-hidden"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit({
               studentId: student.id,
               firstName,
               lastName,
+              birthdate,
+              gender,
+              gradeLevel,
               sectionId: sectionId || null,
               parentFirstName,
               parentLastName,
@@ -268,87 +461,150 @@ function StudentEditSheet({
             });
           }}
         >
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>First name</Label>
-                <Input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  placeholder="e.g. Juan"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Last name</Label>
-                <Input
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  placeholder="e.g. Dela Cruz"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Section</Label>
-              <select
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value)}
-                required
-                className={selectClass}
-              >
-                <option value="">Select section</option>
-                {sections
-                  .filter(
-                    (s) =>
-                      !student.grade_level ||
-                      String(s.grade_level) === String(student.grade_level)
-                  )
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.section_name}
-                      {s.school_year ? ` (${s.school_year})` : ""}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div className="rounded-xl border border-[#800000]/10 bg-[#faf7f5] p-3.5 space-y-3">
-              <p className="text-xs font-semibold tracking-wide text-[#800000] uppercase">
-                Parent / guardian
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>First name</Label>
+          <StudentPanelHeader
+            eyebrow="Edit student"
+            student={student}
+            onClose={onClose}
+            titleId="student-edit-title"
+          />
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-3">
+            <PanelSection title="Learner">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                <FieldEdit label="First name" htmlFor="edit-first-name">
                   <Input
+                    id="edit-first-name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    placeholder="e.g. Juan"
+                    className={compactInputClass}
+                  />
+                </FieldEdit>
+                <FieldEdit label="Last name" htmlFor="edit-last-name">
+                  <Input
+                    id="edit-last-name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    placeholder="e.g. Dela Cruz"
+                    className={compactInputClass}
+                  />
+                </FieldEdit>
+                <FieldEdit label="Birthdate" htmlFor="edit-birthdate">
+                  <Input
+                    id="edit-birthdate"
+                    type="date"
+                    value={birthdate}
+                    onChange={(e) => setBirthdate(e.target.value)}
+                    required
+                    className={compactInputClass}
+                  />
+                </FieldEdit>
+                <FieldEdit label="Gender" htmlFor="edit-gender">
+                  <select
+                    id="edit-gender"
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    required
+                    className={compactSelectClass}
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </FieldEdit>
+                <FieldEdit label="Grade level" htmlFor="edit-grade">
+                  <select
+                    id="edit-grade"
+                    value={gradeLevel}
+                    onChange={(e) => {
+                      setGradeLevel(e.target.value);
+                      setSectionId("");
+                    }}
+                    required
+                    className={compactSelectClass}
+                  >
+                    <option value="">Select grade</option>
+                    {GRADE_LEVELS.map((g) => (
+                      <option key={g} value={g}>
+                        Grade {g}
+                      </option>
+                    ))}
+                  </select>
+                </FieldEdit>
+                <FieldEdit label="Section" htmlFor="edit-section">
+                  <select
+                    id="edit-section"
+                    value={sectionId}
+                    onChange={(e) => setSectionId(e.target.value)}
+                    required
+                    className={compactSelectClass}
+                  >
+                    <option value="">Select section</option>
+                    {gradeSections.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.section_name}
+                        {s.school_year ? ` (${s.school_year})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </FieldEdit>
+                <div className="col-span-2">
+                  <FieldEdit label="LRN" htmlFor="edit-lrn">
+                    <Input
+                      id="edit-lrn"
+                      value={student.lrn || ""}
+                      disabled
+                      className={cn(compactInputClass, "bg-muted/50 font-mono")}
+                    />
+                  </FieldEdit>
+                </div>
+              </div>
+            </PanelSection>
+
+            <PanelSection title="Parent / guardian">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                <FieldEdit label="First name" htmlFor="edit-parent-first">
+                  <Input
+                    id="edit-parent-first"
                     value={parentFirstName}
                     onChange={(e) => setParentFirstName(e.target.value)}
                     required
                     placeholder="e.g. Maria"
+                    className={compactInputClass}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Last name</Label>
+                </FieldEdit>
+                <FieldEdit label="Last name" htmlFor="edit-parent-last">
                   <Input
+                    id="edit-parent-last"
                     value={parentLastName}
                     onChange={(e) => setParentLastName(e.target.value)}
                     required
                     placeholder="e.g. Dela Cruz"
+                    className={compactInputClass}
                   />
+                </FieldEdit>
+                <div className="col-span-2">
+                  <FieldEdit label="Contact number" htmlFor="edit-parent-phone">
+                    <Input
+                      id="edit-parent-phone"
+                      value={parentPhone}
+                      onChange={(e) => setParentPhone(e.target.value)}
+                      required
+                      placeholder="09XXXXXXXXX"
+                      className={cn(compactInputClass, "font-mono")}
+                    />
+                  </FieldEdit>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Contact number</Label>
-                <Input
-                  value={parentPhone}
-                  onChange={(e) => setParentPhone(e.target.value)}
-                  required
-                  placeholder="09XXXXXXXXX"
-                />
-              </div>
-            </div>
-            {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+            </PanelSection>
+
+            {error ? (
+              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {error}
+              </p>
+            ) : null}
           </div>
-          <div className="flex gap-2 border-t px-5 py-4">
+          <StudentPanelFooter>
             <Button
               type="button"
               variant="outline"
@@ -365,7 +621,7 @@ function StudentEditSheet({
             >
               {pending ? "Saving…" : "Save changes"}
             </Button>
-          </div>
+          </StudentPanelFooter>
         </form>
       ) : null}
     </SideSheet>
@@ -373,27 +629,48 @@ function StudentEditSheet({
 }
 
 function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(rows);
   const isEmpty = !rows.length;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
       <div className="overflow-x-auto">
-        <Table>
+        <Table className="w-full table-fixed">
+          <ActivationsColGroup />
           <TableHeader>
             <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
-              <TableHead className="font-semibold text-[#3d1212]">
+              <TableHead className={cn("font-semibold text-[#3d1212]", COL.name)}>
                 Student name
               </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">LRN</TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
-                Parent / guardian
+              <TableHead className={cn("font-semibold text-[#3d1212]", COL.lrn)}>
+                LRN
               </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
+              <TableHead
+                className={cn("font-semibold text-[#3d1212]", COL.section)}
+              >
                 Section
               </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
+              <TableHead
+                className={cn("font-semibold text-[#3d1212]", COL.status)}
+              >
                 Status
               </TableHead>
-              <TableHead className="text-right font-semibold text-[#3d1212]">
+              <TableHead
+                className={cn(
+                  "text-right font-semibold text-[#3d1212]",
+                  COL.action
+                )}
+              >
                 Action
               </TableHead>
             </TableRow>
@@ -401,7 +678,7 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
           <TableBody>
             {isEmpty ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="h-56 p-0">
+                <TableCell colSpan={5} className="h-56 p-0">
                   <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
                     <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
                       <Users className="size-7" />
@@ -412,8 +689,8 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
                       </p>
                       <p className="max-w-md text-sm text-muted-foreground">
                         Newly enrolled or registered learners appear here.
-                        Verify &amp; Approve after they submit emergency contact
-                        details.
+                        Use View / Edit for parent contacts, then Verify &amp;
+                        Approve when ready.
                       </p>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
@@ -430,29 +707,28 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
+              pageRows.map((row) => (
                 <TableRow key={row.id} className="hover:bg-[#800000]/2">
-                  <TableCell>
-                    <div className="flex items-center gap-2.5">
+                  <TableCell className={COL.name}>
+                    <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
                         {(row.profiles?.first_name || "?").charAt(0)}
                         {(row.profiles?.last_name || "").charAt(0)}
                       </span>
-                      <span className="font-medium text-[#3d1212]">
+                      <span className="truncate font-medium text-[#3d1212]">
                         {studentFullName(row)}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{row.lrn}</TableCell>
-                  <TableCell className="text-xs">
-                    <div>{row.parent_name || "—"}</div>
-                    <div className="inline-flex items-center gap-1 text-muted-foreground">
-                      <Phone className="size-3 shrink-0" />
-                      {row.parent_phone || "—"}
-                    </div>
+                  <TableCell
+                    className={cn("font-mono text-xs tabular-nums", COL.lrn)}
+                  >
+                    {row.lrn}
                   </TableCell>
-                  <TableCell className="text-sm">{sectionLabel(row)}</TableCell>
-                  <TableCell>
+                  <TableCell className={cn("truncate text-sm", COL.section)}>
+                    {sectionLabel(row)}
+                  </TableCell>
+                  <TableCell className={COL.status}>
                     <Badge
                       variant="outline"
                       className={
@@ -462,7 +738,7 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
                       {row.activation_status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className={cn("text-right", COL.action)}>
                     <div className="inline-flex flex-wrap items-center justify-end gap-2">
                       {row.activation_status === "pending" ? (
                         <>
@@ -523,30 +799,64 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
           </TableBody>
         </Table>
       </div>
+      <TablePaginationBar
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        changePageSize={changePageSize}
+        total={total}
+        totalPages={totalPages}
+        start={start}
+        end={end}
+      />
     </div>
   );
 }
 
 function ActivatedTable({ rows, onView, onEdit, onDelete }) {
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(rows);
   const isEmpty = !rows.length;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
       <div className="overflow-x-auto">
-        <Table>
+        <Table className="w-full table-fixed">
+          <ActivationsColGroup />
           <TableHeader>
             <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
-              <TableHead className="font-semibold text-[#3d1212]">
+              <TableHead className={cn("font-semibold text-[#3d1212]", COL.name)}>
                 Student name
               </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">LRN</TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
+              <TableHead className={cn("font-semibold text-[#3d1212]", COL.lrn)}>
+                LRN
+              </TableHead>
+              <TableHead
+                className={cn("font-semibold text-[#3d1212]", COL.section)}
+              >
                 Section
               </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
+              <TableHead
+                className={cn("font-semibold text-[#3d1212]", COL.status)}
+              >
                 Status
               </TableHead>
-              <TableHead className="w-12 text-right font-semibold text-[#3d1212]">
-                <span className="sr-only">Actions</span>
+              <TableHead
+                className={cn(
+                  "text-right font-semibold text-[#3d1212]",
+                  COL.action
+                )}
+              >
+                Action
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -571,22 +881,28 @@ function ActivatedTable({ rows, onView, onEdit, onDelete }) {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
+              pageRows.map((row) => (
                 <TableRow key={row.id} className="hover:bg-[#800000]/2">
-                  <TableCell>
-                    <div className="flex items-center gap-2.5">
+                  <TableCell className={COL.name}>
+                    <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
                         {(row.profiles?.first_name || "?").charAt(0)}
                         {(row.profiles?.last_name || "").charAt(0)}
                       </span>
-                      <span className="font-medium text-[#3d1212]">
+                      <span className="truncate font-medium text-[#3d1212]">
                         {studentFullName(row)}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{row.lrn}</TableCell>
-                  <TableCell className="text-sm">{sectionLabel(row)}</TableCell>
-                  <TableCell>
+                  <TableCell
+                    className={cn("font-mono text-xs tabular-nums", COL.lrn)}
+                  >
+                    {row.lrn}
+                  </TableCell>
+                  <TableCell className={cn("truncate text-sm", COL.section)}>
+                    {sectionLabel(row)}
+                  </TableCell>
+                  <TableCell className={COL.status}>
                     <Badge
                       variant="outline"
                       className={
@@ -596,7 +912,7 @@ function ActivatedTable({ rows, onView, onEdit, onDelete }) {
                       {row.activation_status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className={cn("text-right", COL.action)}>
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={
@@ -637,6 +953,16 @@ function ActivatedTable({ rows, onView, onEdit, onDelete }) {
           </TableBody>
         </Table>
       </div>
+      <TablePaginationBar
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        changePageSize={changePageSize}
+        total={total}
+        totalPages={totalPages}
+        start={start}
+        end={end}
+      />
     </div>
   );
 }
@@ -648,6 +974,7 @@ export function PendingActivationsTable({
   rows,
   loadError = "",
 }) {
+  const router = useRouter();
   const [pendingList, setPendingList] = useState(
     pendingRows.length ? pendingRows : rows || []
   );
@@ -698,10 +1025,18 @@ export function PendingActivationsTable({
   }
 
   function applyEditedRow(list, payload, section) {
+    const guardianName =
+      `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim();
     return list.map((row) =>
       row.id === payload.studentId
         ? {
             ...row,
+            birthdate: payload.birthdate || row.birthdate || null,
+            gender: payload.gender || row.gender || null,
+            grade_level:
+              payload.gradeLevel != null && payload.gradeLevel !== ""
+                ? Number(payload.gradeLevel)
+                : row.grade_level,
             section_id: payload.sectionId,
             sections: section
               ? {
@@ -715,8 +1050,9 @@ export function PendingActivationsTable({
               first_name: payload.firstName,
               last_name: payload.lastName,
             },
-            parent_name:
-              `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim(),
+            emergency_contact_name: guardianName,
+            emergency_contact_number: payload.parentPhone || "",
+            parent_name: guardianName,
             parent_phone: payload.parentPhone || "",
           }
         : row
@@ -740,9 +1076,10 @@ export function PendingActivationsTable({
           ? applyEditedRow([current], payload, section)[0]
           : current
       );
-      toast.success("Student updated.");
+      toast.success("Student details saved.");
       setEditStudent(null);
       setError("");
+      router.refresh();
     });
   }
 
@@ -903,50 +1240,72 @@ export function PendingActivationsTable({
           setDeleteStudent(null);
           setError("");
         }}
-        eyebrow="Move to Trash"
-        title={deleteStudent ? studentFullName(deleteStudent) : "Trash"}
-        subtitle={deleteStudent?.lrn ? `LRN ${deleteStudent.lrn}` : undefined}
-        description="The learner leaves the active system and goes to Trash. The LRN can be enrolled again, or you can restore this record later."
         closeLabel="Close move to trash"
+        labelledBy="student-trash-title"
       >
-        <div className="flex flex-1 flex-col">
-          <div className="flex-1 space-y-3 px-5 py-5 text-sm text-muted-foreground">
-            <p>
-              Section:{" "}
-              <span className="text-foreground">
-                {deleteStudent ? sectionLabel(deleteStudent) : "—"}
-              </span>
-            </p>
-            <p>
-              Grades and attendance stay with the record in Trash until you
-              permanently delete them there.
-            </p>
-            {error ? <p className="text-rose-700">{error}</p> : null}
-          </div>
-          <div className="flex gap-2 border-t px-5 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
+        {deleteStudent ? (
+          <>
+            <StudentPanelHeader
+              eyebrow="Move to Trash"
+              student={deleteStudent}
+              onClose={() => {
                 setDeleteStudent(null);
                 setError("");
               }}
-              disabled={pending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              className="flex-1"
-              disabled={pending}
-              onClick={confirmDelete}
-            >
-              {pending ? "Moving…" : "Move to Trash"}
-            </Button>
-          </div>
-        </div>
+              titleId="student-trash-title"
+            />
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-3">
+              <PanelSection title="Confirm removal">
+                <div className="space-y-2.5 text-sm text-muted-foreground">
+                  <div className="grid grid-cols-2 gap-3">
+                    <FieldRead
+                      label="Section"
+                      value={sectionLabel(deleteStudent)}
+                    />
+                    <FieldRead
+                      label="Status"
+                      value={deleteStudent.activation_status || null}
+                    />
+                  </div>
+                  <p className="rounded-lg border border-[#800000]/8 bg-white/70 px-2.5 py-2 text-xs leading-relaxed">
+                    The learner leaves the active system and goes to Trash. The
+                    LRN can be enrolled again, or you can restore this record
+                    later. Grades and attendance stay with the record until
+                    permanent delete.
+                  </p>
+                  {error ? (
+                    <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                      {error}
+                    </p>
+                  ) : null}
+                </div>
+              </PanelSection>
+            </div>
+            <StudentPanelFooter>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setDeleteStudent(null);
+                  setError("");
+                }}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1"
+                disabled={pending}
+                onClick={confirmDelete}
+              >
+                {pending ? "Moving…" : "Move to Trash"}
+              </Button>
+            </StudentPanelFooter>
+          </>
+        ) : null}
       </SideSheet>
     </div>
   );

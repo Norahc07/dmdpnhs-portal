@@ -1,7 +1,11 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PendingActivationsTable } from "@/components/registrar/PendingActivationsTable";
 import { requireRole } from "@/lib/auth-guard";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getCachedRegistrarSections,
+  getCachedRegistrarStudents,
+} from "@/lib/cache/registrar-data";
 
 export const metadata = { title: "Student Activations" };
 
@@ -14,59 +18,6 @@ function isAwaitingActivation(student) {
 
 function isActivated(student) {
   return String(student?.activation_status || "").trim().toLowerCase() === "active";
-}
-
-async function fetchStudents(db) {
-  const attempts = [
-    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, emergency_contact_name, emergency_contact_number, emergency_contact_address, profile_id, profiles(first_name, last_name, email, status)",
-    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profile_id, profiles(first_name, last_name, email, status)",
-    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profile_id, profiles(first_name, last_name)",
-    "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, profile_id",
-  ];
-
-  let lastError = "";
-  for (const fields of attempts) {
-    let result = await db
-      .from("students")
-      .select(fields)
-      .is("deleted_at", null)
-      .order("grade_level")
-      .limit(2000);
-    if (result.error && /deleted_at/i.test(result.error.message || "")) {
-      result = await db
-        .from("students")
-        .select(fields)
-        .order("grade_level")
-        .limit(2000);
-    }
-    if (!result.error) {
-      return { rows: result.data || [], error: "" };
-    }
-    lastError = result.error.message || "Could not load students.";
-  }
-  return { rows: [], error: lastError };
-}
-
-async function hydrateProfiles(db, students) {
-  const missingIds = [
-    ...new Set(
-      (students || [])
-        .filter((row) => row.profile_id && !row.profiles)
-        .map((row) => row.profile_id)
-    ),
-  ];
-  if (!missingIds.length) return students || [];
-
-  const { data: profiles } = await db
-    .from("profiles")
-    .select("id, first_name, last_name, email, status")
-    .in("id", missingIds);
-
-  const byId = new Map((profiles || []).map((p) => [p.id, p]));
-  return (students || []).map((row) => ({
-    ...row,
-    profiles: row.profiles || byId.get(row.profile_id) || null,
-  }));
 }
 
 function attachSections(students, sections) {
@@ -89,49 +40,41 @@ function withEmergencyContact(students) {
   }));
 }
 
-export default async function RegistrarActivationsPage() {
-  const { supabase, profile } = await requireRole("registrar");
+function ActivationsTableFallback() {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+      Loading activations…
+    </div>
+  );
+}
 
-  let admin = null;
-  try {
-    admin = createAdminClient();
-  } catch {
-    admin = null;
-  }
-
-  const reader = admin || supabase;
-  const [{ rows: registrarRows, error: registrarError }, sectionsRes] =
+async function ActivationsBody() {
+  const [{ rows: studentsRaw, error: loadError }, { rows: sections }] =
     await Promise.all([
-      fetchStudents(reader),
-      supabase
-        .from("sections")
-        .select("id, section_name, grade_level, school_year")
-        .order("grade_level")
-        .order("section_name"),
+      getCachedRegistrarStudents(),
+      getCachedRegistrarSections(),
     ]);
 
-  let students = registrarRows;
-  let loadError = registrarError;
-  if ((!students.length || loadError) && admin && reader !== admin) {
-    const adminLoad = await fetchStudents(admin);
-    if (adminLoad.rows.length) {
-      students = adminLoad.rows;
-      loadError = "";
-    } else if (adminLoad.error) {
-      loadError = registrarError || adminLoad.error;
-    }
-  }
+  const students = attachSections(studentsRaw, sections);
+  const pendingRows = withEmergencyContact(students.filter(isAwaitingActivation));
+  const activatedRows = withEmergencyContact(students.filter(isActivated));
 
-  const sections = sectionsRes.data || [];
-  students = attachSections(
-    await hydrateProfiles(admin || supabase, students),
-    sections
+  return (
+    <PendingActivationsTable
+      pendingRows={pendingRows}
+      activatedRows={activatedRows}
+      sections={sections}
+      loadError={
+        loadError && !students.length
+          ? `Could not load activations: ${loadError}`
+          : ""
+      }
+    />
   );
+}
 
-  const awaiting = students.filter(isAwaitingActivation);
-  const activated = students.filter(isActivated);
-  const pendingRows = withEmergencyContact(awaiting);
-  const activatedRows = withEmergencyContact(activated);
+export default async function RegistrarActivationsPage() {
+  const { profile } = await requireRole("registrar");
 
   return (
     <AppShell
@@ -140,16 +83,9 @@ export default async function RegistrarActivationsPage() {
       title="Student activations"
       subtitle="Newly enrolled or registered learners stay here until they submit personal and emergency contact details and you Verify & Approve."
     >
-      <PendingActivationsTable
-        pendingRows={pendingRows}
-        activatedRows={activatedRows}
-        sections={sections}
-        loadError={
-          loadError && !students.length
-            ? `Could not load activations: ${loadError}`
-            : ""
-        }
-      />
+      <Suspense fallback={<ActivationsTableFallback />}>
+        <ActivationsBody />
+      </Suspense>
     </AppShell>
   );
 }

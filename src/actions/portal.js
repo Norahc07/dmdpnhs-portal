@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidateRegistrarCaches } from "@/lib/cache/revalidate-registrar";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+
 import { normalizeComponentWeights } from "@/lib/class-record";
 import { computeDepEdGrade } from "@/lib/deped-grades";
 import { SCHOOL_SHORT, SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
@@ -648,6 +650,7 @@ export async function promoteStudents({ studentIds, newGradeLevel, newSectionId,
     .in("id", studentIds);
 
   if (error) return { error: error.message };
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/students");
   revalidatePath("/registrar/promotion");
   revalidatePath("/registrar/enrollment");

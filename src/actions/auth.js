@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { invalidateRegistrarCaches } from "@/lib/cache/revalidate-registrar";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -11,6 +12,7 @@ import {
   teacherIdYearCode,
 } from "@/lib/constants";
 import { findActiveStudentByLrn } from "@/lib/student-active";
+
 
 /**
  * Auto Teacher ID: T{YY}-{XXXXX}
@@ -238,6 +240,7 @@ export async function registerStudent(form) {
     };
   }
 
+  invalidateRegistrarCaches();
   revalidatePath("/student/activate");
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar");
@@ -537,6 +540,14 @@ export async function changeStudentPassword(payload) {
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  try {
+    const { cookies } = await import("next/headers");
+    const { AUTH_GATE_COOKIE } = await import("@/lib/auth-gate");
+    const jar = await cookies();
+    jar.set(AUTH_GATE_COOKIE, "", { path: "/", maxAge: 0 });
+  } catch {
+    /* cookie jar unavailable outside request */
+  }
   revalidatePath("/", "layout");
   redirect("/login");
 }

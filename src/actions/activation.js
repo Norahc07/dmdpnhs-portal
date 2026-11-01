@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { invalidateRegistrarCaches } from "@/lib/cache/revalidate-registrar";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
 import {
   formatBirthdatePassword,
   isSeniorHighGrade,
@@ -228,6 +230,7 @@ export async function submitStudentActivation(form) {
 
   revalidatePath("/student");
   revalidatePath("/student/pending");
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   redirect("/student?notice=pending");
 }
@@ -337,6 +340,7 @@ export async function approveStudentActivation({ studentId, approve }) {
     }
   }
 
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar");
   revalidatePath("/student");
@@ -347,24 +351,38 @@ export async function approveStudentActivation({ studentId, approve }) {
 export async function updateActivatedStudent(form) {
   const gate = await requireRegistrar();
   if (gate.error) return gate;
-  const { admin } = gate;
+  const admin = gate.admin || gate.db;
+  if (!admin) return { error: "Database client unavailable." };
 
   const studentId = form.studentId;
   const firstName = String(form.firstName || "").trim();
   const lastName = String(form.lastName || "").trim();
+  const birthdate = String(form.birthdate || "").trim();
+  const gender = String(form.gender || "").trim();
+  const gradeLevel = Number(form.gradeLevel);
   const sectionId = form.sectionId || null;
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
+  const guardianName = `${parentFirstName} ${parentLastName}`.trim();
 
   if (!studentId) return { error: "Student id is required." };
   if (!firstName || !lastName) {
     return { error: "Student first and last name are required." };
   }
+  if (!birthdate || birthdate.replaceAll("-", "").length < 8) {
+    return { error: "Enter a valid birthdate." };
+  }
+  if (!gender || !["Male", "Female"].includes(gender)) {
+    return { error: "Select the student’s gender." };
+  }
+  if (![7, 8, 9, 10, 11, 12].includes(gradeLevel)) {
+    return { error: "Select a valid grade level." };
+  }
   if (!sectionId) {
     return { error: "Select a section for this student." };
   }
-  if (!parentFirstName || !parentLastName) {
+  if (!parentFirstName || !parentLastName || !guardianName) {
     return { error: "Parent/guardian first and last name are required." };
   }
   if (!parentPhone || normalizePhone(parentPhone).length < 10) {
@@ -381,7 +399,7 @@ export async function updateActivatedStudent(form) {
   const sectionGate = await assertSectionMatchesGrade(
     admin,
     sectionId,
-    student.grade_level
+    gradeLevel
   );
   if (sectionGate?.error) return sectionGate;
 
@@ -397,31 +415,51 @@ export async function updateActivatedStudent(form) {
   }
 
   const studentPatch = {
-    contact_number: null,
-    personal_email: null,
+    birthdate,
+    gender,
+    grade_level: gradeLevel,
     section_id: sectionId,
-    emergency_contact_name: `${parentFirstName} ${parentLastName}`.trim(),
+    emergency_contact_name: guardianName,
     emergency_contact_number: parentPhone,
-    emergency_contact_address: null,
   };
   let { error: studentError } = await admin
     .from("students")
     .update(studentPatch)
     .eq("id", studentId);
-  if (studentError && /emergency_contact_address/i.test(studentError.message || "")) {
-    delete studentPatch.emergency_contact_address;
-    const retry = await admin
-      .from("students")
-      .update(studentPatch)
-      .eq("id", studentId);
-    studentError = retry.error;
-  }
   if (studentError) return { error: studentError.message };
 
+  // Confirm parent contacts actually persisted (avoids silent column/RLS misses).
+  const { data: saved } = await admin
+    .from("students")
+    .select("id, emergency_contact_name, emergency_contact_number")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (
+    !saved ||
+    String(saved.emergency_contact_name || "").trim() !== guardianName ||
+    String(saved.emergency_contact_number || "").trim() !== parentPhone
+  ) {
+    return {
+      error:
+        "Could not save parent/guardian contact details. Check that emergency contact columns exist on students.",
+    };
+  }
+
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/student");
-  return { ok: true };
+  return {
+    ok: true,
+    student: {
+      emergency_contact_name: guardianName,
+      emergency_contact_number: parentPhone,
+      birthdate,
+      gender,
+      grade_level: gradeLevel,
+      section_id: sectionId,
+    },
+  };
 }
 
 /** Registrar moves a student to Trash (soft delete). LRN becomes free for re-enrollment. */
@@ -445,6 +483,7 @@ export async function deleteActivatedStudent(studentId) {
   const moved = await moveStudentToTrash(admin, student, user?.id || null);
   if (moved.error) return moved;
 
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/registrar/trash");
@@ -518,6 +557,7 @@ export async function restoreTrashedStudent(studentId) {
   if (restored.error) return restored;
 
   revalidatePath("/registrar/trash");
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/registrar");
@@ -546,6 +586,7 @@ export async function permanentlyDeleteTrashedStudent(studentId) {
   if (purged.error) return purged;
 
   revalidatePath("/registrar/trash");
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/registrar");
@@ -734,6 +775,7 @@ export async function enrollStudentByRegistrar(form) {
 
   revalidatePath("/registrar/students");
   revalidatePath("/registrar/enrollment");
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/academics");
   return {
@@ -1083,6 +1125,7 @@ export async function createSection(form) {
   });
 
   if (error) return { error: error.message };
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/academics");
   revalidatePath("/registrar/enrollment");
   return { ok: true };
@@ -1143,6 +1186,7 @@ export async function updateSection(form) {
     .eq("id", id);
 
   if (error) return { error: error.message };
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/academics");
   revalidatePath("/registrar/enrollment");
   return { ok: true };
@@ -1163,6 +1207,7 @@ export async function deleteSection(id) {
   const { error } = await gate.supabase.from("sections").delete().eq("id", id);
   if (error) return { error: error.message };
 
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/academics");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/registrar/teachers");

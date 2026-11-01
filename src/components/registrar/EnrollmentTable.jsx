@@ -28,6 +28,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
+import {
   GRADE_LEVELS,
   SCHOOL_YEAR_DEFAULT,
   STATUS_BADGE_STYLES,
@@ -144,6 +148,18 @@ export function EnrollmentTable({ students, sections, loadError = "" }) {
   const incompleteCount = students.filter(
     (s) => s.activation_status === "incomplete"
   ).length;
+
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(rows);
 
   function submitEnroll(formData) {
     setFormError("");
@@ -304,71 +320,83 @@ export function EnrollmentTable({ students, sections, loadError = "" }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>LRN</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Section</TableHead>
-              <TableHead>Activation</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 && (
+      <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
-                  {learnersInOtherYears > 0 ? (
-                    <>
-                      No enrollment records for SY {schoolYear}.{" "}
-                      {learnersInOtherYears} learner
-                      {learnersInOtherYears === 1 ? "" : "s"} are in another
-                      school year — switch the SY filter above.
-                    </>
-                  ) : (
-                    "No enrollment records for these filters."
-                  )}
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>LRN</TableHead>
+                <TableHead>Gender</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>Section</TableHead>
+                <TableHead>Activation</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            )}
-            {rows.map((stu) => {
-              const sec = stu.section_id ? sectionById[stu.section_id] : null;
-              const act = stu.activation_status || "—";
-              return (
-                <TableRow key={stu.id}>
-                  <TableCell className="font-medium">
-                    {stu.profiles?.first_name} {stu.profiles?.last_name}
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-muted-foreground">
+                    {learnersInOtherYears > 0 ? (
+                      <>
+                        No enrollment records for SY {schoolYear}.{" "}
+                        {learnersInOtherYears} learner
+                        {learnersInOtherYears === 1 ? "" : "s"} are in another
+                        school year — switch the SY filter above.
+                      </>
+                    ) : (
+                      "No enrollment records for these filters."
+                    )}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{stu.lrn}</TableCell>
-                  <TableCell>{stu.gender}</TableCell>
-                  <TableCell>{stu.grade_level}</TableCell>
-                  <TableCell>
-                    {sec
-                      ? `${sec.section_name}${
-                          sec.school_year ? ` · ${sec.school_year}` : ""
-                        }`
-                      : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "border-0 capitalize",
-                        activationBadgeClass(act)
-                      )}
-                    >
-                      {act}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{stu.status}</TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+              )}
+              {pageRows.map((stu) => {
+                const sec = stu.section_id ? sectionById[stu.section_id] : null;
+                const act = stu.activation_status || "—";
+                return (
+                  <TableRow key={stu.id}>
+                    <TableCell className="font-medium">
+                      {stu.profiles?.first_name} {stu.profiles?.last_name}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{stu.lrn}</TableCell>
+                    <TableCell>{stu.gender}</TableCell>
+                    <TableCell>{stu.grade_level}</TableCell>
+                    <TableCell>
+                      {sec
+                        ? `${sec.section_name}${
+                            sec.school_year ? ` · ${sec.school_year}` : ""
+                          }`
+                        : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "border-0 capitalize",
+                          activationBadgeClass(act)
+                        )}
+                      >
+                        {act}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{stu.status}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
       </div>
 
       <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>

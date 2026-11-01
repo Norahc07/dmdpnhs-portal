@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -48,6 +49,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DEFAULT_PAGE_SIZE,
+  TablePaginationBar,
+} from "@/components/ui/table-pagination";
 import {
   ENROLLMENT_STATUSES,
   SCHOOL_YEAR_DEFAULT,
@@ -102,52 +107,73 @@ function CapacityBar({ used, capacity }) {
 }
 
 function FixedTable({ table, emptyLabel, colgroup }) {
+  const pagination = table.getState().pagination || {
+    pageIndex: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+  };
+  const total = table.getPrePaginationRowModel().rows.length;
+  const totalPages = Math.max(1, table.getPageCount() || 1);
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize;
+  const end = Math.min(start + pagination.pageSize, total);
+
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-      <Table className="table-fixed w-full min-w-[36rem]">
-        {colgroup}
-        <TableHeader>
-          {table.getHeaderGroups().map((hg) => (
-            <TableRow
-              key={hg.id}
-              className="bg-[#800000]/5 hover:bg-[#800000]/5"
-            >
-              {hg.headers.map((header) => (
-                <TableHead key={header.id} className="text-xs">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="align-middle text-sm">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
+    <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+      <div className="overflow-x-auto">
+        <Table className="table-fixed w-full min-w-[36rem]">
+          {colgroup}
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow
+                key={hg.id}
+                className="bg-[#800000]/5 hover:bg-[#800000]/5"
+              >
+                {hg.headers.map((header) => (
+                  <TableHead key={header.id} className="text-xs">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
                 ))}
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell
-                colSpan={table.getAllColumns().length}
-                className="h-24 text-center text-sm text-muted-foreground"
-              >
-                {emptyLabel}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="align-middle text-sm">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={table.getAllColumns().length}
+                  className="h-24 text-center text-sm text-muted-foreground"
+                >
+                  {emptyLabel}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <TablePaginationBar
+        page={pagination.pageIndex + 1}
+        setPage={(next) => table.setPageIndex(Math.max(0, Number(next) - 1))}
+        pageSize={pagination.pageSize}
+        changePageSize={(next) => table.setPageSize(Number(next))}
+        total={total}
+        totalPages={totalPages}
+        start={start}
+        end={end}
+      />
     </div>
   );
 }
@@ -459,16 +485,27 @@ export function PromotionManager({ sections = [] }) {
     ]
   );
 
+  const [sourcePagination, setSourcePagination] = useState({
+    pageIndex: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+  const [targetPagination, setTargetPagination] = useState({
+    pageIndex: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+
   const sourceTable = useReactTable({
     data: filteredSource,
     columns: sourceColumns,
-    state: { rowSelection },
+    state: { rowSelection, pagination: sourcePagination },
     enableRowSelection: (row) =>
       !["retained", "remedial"].includes(
         String(row.original.eosyStatus).toLowerCase()
       ),
     onRowSelectionChange: setRowSelection,
+    onPaginationChange: setSourcePagination,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getRowId: (row) => row.id,
     autoResetAll: false,
   });
@@ -476,7 +513,10 @@ export function PromotionManager({ sections = [] }) {
   const targetTable = useReactTable({
     data: targetStudents,
     columns: targetColumns,
+    state: { pagination: targetPagination },
+    onPaginationChange: setTargetPagination,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getRowId: (row) => row.id,
     autoResetAll: false,
   });

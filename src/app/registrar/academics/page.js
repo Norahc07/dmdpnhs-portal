@@ -1,6 +1,10 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { AcademicsManager } from "@/components/registrar/AcademicsManager";
 import { requireRole } from "@/lib/auth-guard";
+import {
+  getCachedRegistrarSections,
+  getCachedRegistrarStudents,
+} from "@/lib/cache/registrar-data";
 
 export const metadata = { title: "Academics" };
 
@@ -9,10 +13,10 @@ export default async function RegistrarAcademicsPage() {
 
   const [
     { data: subjects },
-    { data: sections },
+    sectionsCached,
     { data: teachers },
     { data: assignments },
-    { data: students },
+    studentsCached,
   ] = await Promise.all([
     supabase
       .from("subjects")
@@ -20,12 +24,7 @@ export default async function RegistrarAcademicsPage() {
         "id, subject_name, grade_level, track_strand, department_id, written_weight, performance_weight, assessment_weight"
       )
       .order("grade_level"),
-    supabase
-      .from("sections")
-      .select(
-        "id, section_name, grade_level, school_year, track_strand, capacity, male_count, female_count, location"
-      )
-      .order("grade_level"),
+    getCachedRegistrarSections(),
     supabase
       .from("teachers")
       .select(
@@ -38,29 +37,21 @@ export default async function RegistrarAcademicsPage() {
         "id, teacher_id, section_id, subject_id, school_year, teachers(id, teacher_id, profiles(first_name, last_name)), sections(section_name, grade_level), subjects(subject_name, grade_level)"
       )
       .order("created_at", { ascending: false }),
-    (async () => {
-      let result = await supabase
-        .from("students")
-        .select(
-          "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name), sections(section_name, grade_level)"
-        )
-        .is("deleted_at", null)
-        .in("activation_status", ["active", "pending"])
-        .order("lrn")
-        .limit(500);
-      if (result.error && /deleted_at/i.test(result.error.message || "")) {
-        result = await supabase
-          .from("students")
-          .select(
-            "id, lrn, gender, grade_level, section_id, status, activation_status, profiles(first_name, last_name), sections(section_name, grade_level)"
-          )
-          .in("activation_status", ["active", "pending"])
-          .order("lrn")
-          .limit(500);
-      }
-      return result;
-    })(),
+    getCachedRegistrarStudents(),
   ]);
+
+  const sections = sectionsCached.rows || [];
+  const sectionById = new Map(sections.map((s) => [s.id, s]));
+  const students = (studentsCached.rows || [])
+    .filter((s) => {
+      const a = String(s.activation_status || "").toLowerCase();
+      return a === "active" || a === "pending";
+    })
+    .slice(0, 500)
+    .map((s) => ({
+      ...s,
+      sections: s.section_id ? sectionById.get(s.section_id) || null : null,
+    }));
 
   const activeTeachers = (teachers || []).filter(
     (t) => t.profiles?.status === "active"
@@ -75,10 +66,10 @@ export default async function RegistrarAcademicsPage() {
     >
       <AcademicsManager
         subjects={subjects || []}
-        sections={sections || []}
+        sections={sections}
         teachers={activeTeachers}
         assignments={assignments || []}
-        students={students || []}
+        students={students}
       />
     </AppShell>
   );

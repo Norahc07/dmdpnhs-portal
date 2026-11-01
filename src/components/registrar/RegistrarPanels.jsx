@@ -28,11 +28,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 
 export function PendingTeachersTable({ teachers = [] }) {
   const [pending, startTransition] = useTransition();
   const isEmpty = teachers.length === 0;
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(teachers);
 
   function act(profileId, approve) {
     startTransition(async () => {
@@ -122,7 +137,7 @@ export function PendingTeachersTable({ teachers = [] }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                teachers.map((t) => (
+                pageRows.map((t) => (
                   <TableRow key={t.id} className="hover:bg-[#800000]/2">
                     <TableCell>
                       <div className="flex items-center gap-2.5">
@@ -179,6 +194,16 @@ export function PendingTeachersTable({ teachers = [] }) {
             </TableBody>
           </Table>
         </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
       </div>
     </div>
   );
@@ -227,6 +252,18 @@ export function DocumentRequestsAdmin({ requests = [] }) {
       : tab === "claimed"
         ? buckets.claimed
         : buckets.pending;
+
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(rows);
 
   function advance(id, status) {
     startTransition(async () => {
@@ -296,128 +333,140 @@ export function DocumentRequestsAdmin({ requests = [] }) {
         })}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-[#800000]/10">
-        <Table className="table-fixed w-full min-w-[40rem]">
-          <colgroup>
-            <col className="w-[32%]" />
-            <col className="w-[18%]" />
-            <col className="w-[18%]" />
-            <col className="w-[18%]" />
-            <col className="w-[14%]" />
-          </colgroup>
-          <TableHeader>
-            <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
-              <TableHead className="font-semibold text-[#3d1212]">
-                Learner
-              </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
-                Document
-              </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
-                Status
-              </TableHead>
-              <TableHead className="font-semibold text-[#3d1212]">
-                Requested
-              </TableHead>
-              <TableHead className="text-right font-semibold text-[#3d1212]">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="h-48 p-0">
-                  <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
-                      {tab === "claimed" ? (
-                        <PackageCheck className="size-7" />
-                      ) : (
-                        <FileText className="size-7" />
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-heading text-base font-bold text-[#3d1212]">
-                        {tab === "pending"
-                          ? "No pending requests"
-                          : tab === "ready"
-                            ? "Nothing ready for pickup"
-                            : "No claimed documents yet"}
-                      </p>
-                      <p className="max-w-md text-sm text-muted-foreground">
-                        {tab === "pending"
-                          ? "New SF9, SF10, and Good Moral requests will appear here."
-                          : tab === "ready"
-                            ? "Mark pending requests as Ready for Pickup to fill this tab."
-                            : "Mark ready documents as Already Claimed after the learner picks them up."}
-                      </p>
-                    </div>
-                  </div>
-                </TableCell>
+      <div className="overflow-hidden rounded-lg border border-[#800000]/10">
+        <div className="overflow-x-auto">
+          <Table className="table-fixed w-full min-w-[40rem]">
+            <colgroup>
+              <col className="w-[32%]" />
+              <col className="w-[18%]" />
+              <col className="w-[18%]" />
+              <col className="w-[18%]" />
+              <col className="w-[14%]" />
+            </colgroup>
+            <TableHeader>
+              <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
+                <TableHead className="font-semibold text-[#3d1212]">
+                  Learner
+                </TableHead>
+                <TableHead className="font-semibold text-[#3d1212]">
+                  Document
+                </TableHead>
+                <TableHead className="font-semibold text-[#3d1212]">
+                  Status
+                </TableHead>
+                <TableHead className="font-semibold text-[#3d1212]">
+                  Requested
+                </TableHead>
+                <TableHead className="text-right font-semibold text-[#3d1212]">
+                  Actions
+                </TableHead>
               </TableRow>
-            ) : (
-              rows.map((r) => (
-                <TableRow key={r.id} className="hover:bg-[#800000]/2">
-                  <TableCell>
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
-                        {(r.students?.profiles?.first_name || "?").charAt(0)}
-                        {(r.students?.profiles?.last_name || "").charAt(0)}
-                      </span>
-                      <span className="truncate font-medium text-[#3d1212]">
-                        {r.students?.profiles?.last_name},{" "}
-                        {r.students?.profiles?.first_name}
-                      </span>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="h-48 p-0">
+                    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                      <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
+                        {tab === "claimed" ? (
+                          <PackageCheck className="size-7" />
+                        ) : (
+                          <FileText className="size-7" />
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-heading text-base font-bold text-[#3d1212]">
+                          {tab === "pending"
+                            ? "No pending requests"
+                            : tab === "ready"
+                              ? "Nothing ready for pickup"
+                              : "No claimed documents yet"}
+                        </p>
+                        <p className="max-w-md text-sm text-muted-foreground">
+                          {tab === "pending"
+                            ? "New SF9, SF10, and Good Moral requests will appear here."
+                            : tab === "ready"
+                              ? "Mark pending requests as Ready for Pickup to fill this tab."
+                              : "Mark ready documents as Already Claimed after the learner picks them up."}
+                        </p>
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="inline-flex max-w-full items-center gap-1.5 truncate text-sm">
-                      <FileText className="size-3.5 shrink-0 text-[#800000]/70" />
-                      <span className="truncate">{r.document_type}</span>
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={r.status} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    <span className="block truncate">
-                      {new Date(r.requested_at).toLocaleString("en-PH")}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {r.status === "Ready for Pickup" ? (
-                      <Button
-                        size="sm"
-                        disabled={pending}
-                        variant="outline"
-                        className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-                        onClick={() => advance(r.id, "Already Claimed")}
-                      >
-                        Mark claimed
-                        <PackageCheck className="size-3.5" />
-                      </Button>
-                    ) : r.status === "Already Claimed" ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-700">
-                        <CheckCircle2 className="size-3.5" />
-                        Claimed
-                      </span>
-                    ) : (
-                      <Button
-                        size="sm"
-                        disabled={pending}
-                        className="bg-[#800000] hover:bg-[#6a0000]"
-                        onClick={() => advance(r.id, "Ready for Pickup")}
-                      >
-                        Ready for Pickup
-                        <ArrowRight className="size-3.5" />
-                      </Button>
-                    )}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                pageRows.map((r) => (
+                  <TableRow key={r.id} className="hover:bg-[#800000]/2">
+                    <TableCell>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
+                          {(r.students?.profiles?.first_name || "?").charAt(0)}
+                          {(r.students?.profiles?.last_name || "").charAt(0)}
+                        </span>
+                        <span className="truncate font-medium text-[#3d1212]">
+                          {r.students?.profiles?.last_name},{" "}
+                          {r.students?.profiles?.first_name}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex max-w-full items-center gap-1.5 truncate text-sm">
+                        <FileText className="size-3.5 shrink-0 text-[#800000]/70" />
+                        <span className="truncate">{r.document_type}</span>
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={r.status} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <span className="block truncate">
+                        {new Date(r.requested_at).toLocaleString("en-PH")}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {r.status === "Ready for Pickup" ? (
+                        <Button
+                          size="sm"
+                          disabled={pending}
+                          variant="outline"
+                          className="border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                          onClick={() => advance(r.id, "Already Claimed")}
+                        >
+                          Mark claimed
+                          <PackageCheck className="size-3.5" />
+                        </Button>
+                      ) : r.status === "Already Claimed" ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-700">
+                          <CheckCircle2 className="size-3.5" />
+                          Claimed
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled={pending}
+                          className="bg-[#800000] hover:bg-[#6a0000]"
+                          onClick={() => advance(r.id, "Ready for Pickup")}
+                        >
+                          Ready for Pickup
+                          <ArrowRight className="size-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
       </div>
     </div>
   );

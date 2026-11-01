@@ -48,10 +48,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
+import {
   DEPARTMENT_BAND_OPTIONS,
   FACULTY_POSITIONS,
   FACULTY_POSITION_LABELS,
 } from "@/lib/grade-workflow";
+
 import {
   isSeniorHighGrade,
   SCHOOL_YEAR_DEFAULT,
@@ -84,9 +89,14 @@ function loadsForBand(loads, band) {
 }
 
 /** Keeps column widths stable across Junior / Senior / Unassigned tabs. */
-function FixedTable({ children, minWidth = "56rem", className }) {
+function FixedTable({ children, minWidth = "56rem", className, wrapperClassName }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+    <div
+      className={cn(
+        "overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]",
+        wrapperClassName
+      )}
+    >
       <Table
         className={cn("table-fixed w-full", className)}
         style={{ minWidth }}
@@ -757,8 +767,24 @@ function TeachersTable({
 }) {
   const hasMenu = showActions && (onAssign || onEdit || onDelete);
   const colCount = hasMenu ? 7 : 6;
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(rows);
+
   return (
-    <FixedTable minWidth={showActions ? "56rem" : "50rem"}>
+    <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white">
+    <FixedTable
+      minWidth={showActions ? "56rem" : "50rem"}
+      wrapperClassName="rounded-none border-0 shadow-none"
+    >
       <colgroup>
         <col className="w-[7.5rem]" />
         <col className="w-[12rem]" />
@@ -789,7 +815,7 @@ function TeachersTable({
             </TableCell>
           </TableRow>
         )}
-        {rows.map((t) => {
+        {pageRows.map((t) => {
           const allLoads = assignmentsByTeacher[t.id] || [];
           const assignments = loadBand
             ? loadsForBand(allLoads, loadBand)
@@ -913,6 +939,17 @@ function TeachersTable({
         })}
       </TableBody>
     </FixedTable>
+    <TablePaginationBar
+      page={page}
+      setPage={setPage}
+      pageSize={pageSize}
+      changePageSize={changePageSize}
+      total={total}
+      totalPages={totalPages}
+      start={start}
+      end={end}
+    />
+    </div>
   );
 }
 

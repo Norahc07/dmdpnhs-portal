@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { invalidateRegistrarCaches } from "@/lib/cache/revalidate-registrar";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -9,6 +10,7 @@ import {
   SECTION_CAPACITY_DEFAULT,
   nextSchoolYear,
 } from "@/lib/constants";
+
 
 async function requireRegistrar() {
   const supabase = await createClient();
@@ -28,6 +30,7 @@ async function requireRegistrar() {
 }
 
 function revalidatePromotionPaths() {
+  invalidateRegistrarCaches();
   revalidatePath("/registrar/promotion");
   revalidatePath("/registrar/students");
   revalidatePath("/registrar/enrollment");

@@ -21,6 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
 import { StatusBadge } from "@/components/layout/StatusBadge";
 
 export function PromotionPanel({ students, sections }) {
@@ -29,6 +33,17 @@ export function PromotionPanel({ students, sections }) {
   const [sectionId, setSectionId] = useState("");
   const [status, setStatus] = useState("promoted");
   const [pending, startTransition] = useTransition();
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(students);
 
   const filteredSections = useMemo(() => {
     if (!gradeLevel) return sections;
@@ -156,48 +171,60 @@ export function PromotionPanel({ students, sections }) {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
-              <TableHead>
-                <input
-                  type="checkbox"
-                  checked={
-                    students.length > 0 && selected.length === students.length
-                  }
-                  onChange={toggleAll}
-                />
-              </TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>LRN</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Section</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {students.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
+                <TableHead>
                   <input
                     type="checkbox"
-                    checked={selected.includes(s.id)}
-                    onChange={() => toggle(s.id)}
+                    checked={
+                      students.length > 0 && selected.length === students.length
+                    }
+                    onChange={toggleAll}
                   />
-                </TableCell>
-                <TableCell className="font-medium">
-                  {s.profiles?.last_name}, {s.profiles?.first_name}
-                </TableCell>
-                <TableCell>{s.lrn}</TableCell>
-                <TableCell>{s.grade_level}</TableCell>
-                <TableCell>{s.sections?.section_name || "—"}</TableCell>
-                <TableCell>
-                  <StatusBadge status={s.status} />
-                </TableCell>
+                </TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>LRN</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>Section</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {pageRows.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(s.id)}
+                      onChange={() => toggle(s.id)}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {s.profiles?.last_name}, {s.profiles?.first_name}
+                  </TableCell>
+                  <TableCell>{s.lrn}</TableCell>
+                  <TableCell>{s.grade_level}</TableCell>
+                  <TableCell>{s.sections?.section_name || "—"}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={s.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
       </div>
     </div>
   );

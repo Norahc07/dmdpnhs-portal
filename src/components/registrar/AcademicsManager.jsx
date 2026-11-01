@@ -50,6 +50,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  TablePaginationBar,
+  usePagedRows,
+} from "@/components/ui/table-pagination";
+import {
   DEFAULT_COMPONENT_WEIGHTS,
   normalizeComponentWeights,
 } from "@/lib/class-record";
@@ -90,9 +94,14 @@ function EmptyRow({ colSpan, message }) {
 }
 
 /** Keeps column widths stable across grade tabs / empty vs filled states. */
-function FixedTable({ children, minWidth = "44rem", className }) {
+function FixedTable({ children, minWidth = "44rem", className, wrapperClassName }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+    <div
+      className={cn(
+        "overflow-x-auto rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]",
+        wrapperClassName
+      )}
+    >
       <Table
         className={cn("table-fixed w-full", className)}
         style={{ minWidth }}
@@ -993,6 +1002,8 @@ export function AcademicsManager({
     });
   }, [students, enrollGrade, enrollSection, enrollQ]);
 
+  const studentPaging = usePagedRows(filteredStudents);
+
   const assignGradeOptions = useMemo(
     () => (assignBand === "shs" ? [11, 12] : [7, 8, 9, 10]),
     [assignBand]
@@ -1057,6 +1068,8 @@ export function AcademicsManager({
   const filteredAssignments = useMemo(() => {
     return assignmentsByGrade[Number(assignGrade)] || [];
   }, [assignmentsByGrade, assignGrade]);
+
+  const assignmentPaging = usePagedRows(filteredAssignments);
 
   function openModal(type) {
     setFormError("");
@@ -1568,59 +1581,71 @@ export function AcademicsManager({
               />
             </div>
           </Toolbar>
-          <FixedTable minWidth="56rem">
-            <colgroup>
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "12%" }} />
-            </colgroup>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>LRN</TableHead>
-                <TableHead>Gender</TableHead>
-                <TableHead>Grade</TableHead>
-                <TableHead>Section</TableHead>
-                <TableHead>Activation</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.length === 0 && (
-                <EmptyRow colSpan={7} message="No enrolled students found." />
-              )}
-              {filteredStudents.map((stu) => (
-                <TableRow key={stu.id}>
-                  <TruncateCell
-                    className="font-medium"
-                    title={`${stu.profiles?.last_name || ""}, ${stu.profiles?.first_name || ""}`}
-                  >
-                    {stu.profiles?.last_name}, {stu.profiles?.first_name}
-                  </TruncateCell>
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {stu.lrn}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {stu.gender}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {stu.grade_level}
-                  </TableCell>
-                  <TruncateCell>
-                    {stu.sections?.section_name || "—"}
-                  </TruncateCell>
-                  <TruncateCell>{stu.activation_status || "—"}</TruncateCell>
-                  <TruncateCell>{stu.status}</TruncateCell>
+          <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white">
+            <FixedTable minWidth="56rem" wrapperClassName="rounded-none border-0 shadow-none">
+              <colgroup>
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>LRN</TableHead>
+                  <TableHead>Gender</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Section</TableHead>
+                  <TableHead>Activation</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </FixedTable>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.length === 0 && (
+                  <EmptyRow colSpan={7} message="No enrolled students found." />
+                )}
+                {studentPaging.pageRows.map((stu) => (
+                  <TableRow key={stu.id}>
+                    <TruncateCell
+                      className="font-medium"
+                      title={`${stu.profiles?.last_name || ""}, ${stu.profiles?.first_name || ""}`}
+                    >
+                      {stu.profiles?.last_name}, {stu.profiles?.first_name}
+                    </TruncateCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                      {stu.lrn}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {stu.gender}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {stu.grade_level}
+                    </TableCell>
+                    <TruncateCell>
+                      {stu.sections?.section_name || "—"}
+                    </TruncateCell>
+                    <TruncateCell>{stu.activation_status || "—"}</TruncateCell>
+                    <TruncateCell>{stu.status}</TruncateCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </FixedTable>
+            <TablePaginationBar
+              page={studentPaging.page}
+              setPage={studentPaging.setPage}
+              pageSize={studentPaging.pageSize}
+              changePageSize={studentPaging.changePageSize}
+              total={studentPaging.total}
+              totalPages={studentPaging.totalPages}
+              start={studentPaging.start}
+              end={studentPaging.end}
+            />
+          </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Showing {filteredStudents.length} of {students.length} students
+            Filtered {filteredStudents.length} of {students.length} students
           </p>
         </TabsContent>
 
@@ -1737,68 +1762,83 @@ export function AcademicsManager({
             const rows = filteredAssignments;
             return (
               <>
-                <FixedTable minWidth="52rem">
-                  <colgroup>
-                    <col style={{ width: "26%" }} />
-                    <col style={{ width: "22%" }} />
-                    <col style={{ width: "24%" }} />
-                    <col style={{ width: "14%" }} />
-                    <col style={{ width: "14%" }} />
-                  </colgroup>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Teacher</TableHead>
-                      <TableHead>Section</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>School year</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.length === 0 && (
-                      <EmptyRow
-                        colSpan={5}
-                        message={
-                          assignQ.trim() || assignSubject !== "all"
-                            ? `No Grade ${g} assignments match your filters.`
-                            : `No Grade ${g} teacher assignments yet.`
-                        }
-                      />
-                    )}
-                    {rows.map((a) => {
-                      const teacherName = `${a.teachers?.profiles?.first_name || ""} ${a.teachers?.profiles?.last_name || ""}`.trim();
-                      return (
-                        <TableRow key={a.id}>
-                          <TruncateCell
-                            className="font-medium"
-                            title={teacherName || undefined}
-                          >
-                            {teacherName || "—"}
-                          </TruncateCell>
-                          <TruncateCell>
-                            {a.sections?.section_name || "—"}
-                          </TruncateCell>
-                          <TruncateCell>
-                            {a.subjects?.subject_name || "—"}
-                          </TruncateCell>
-                          <TableCell className="whitespace-nowrap">
-                            {a.school_year}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={pending}
-                              onClick={() => removeAssignment(a.id)}
+                <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white">
+                  <FixedTable
+                    minWidth="52rem"
+                    wrapperClassName="rounded-none border-0 shadow-none"
+                  >
+                    <colgroup>
+                      <col style={{ width: "26%" }} />
+                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "24%" }} />
+                      <col style={{ width: "14%" }} />
+                      <col style={{ width: "14%" }} />
+                    </colgroup>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Teacher</TableHead>
+                        <TableHead>Section</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>School year</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.length === 0 && (
+                        <EmptyRow
+                          colSpan={5}
+                          message={
+                            assignQ.trim() || assignSubject !== "all"
+                              ? `No Grade ${g} assignments match your filters.`
+                              : `No Grade ${g} teacher assignments yet.`
+                          }
+                        />
+                      )}
+                      {assignmentPaging.pageRows.map((a) => {
+                        const teacherName = `${a.teachers?.profiles?.first_name || ""} ${a.teachers?.profiles?.last_name || ""}`.trim();
+                        return (
+                          <TableRow key={a.id}>
+                            <TruncateCell
+                              className="font-medium"
+                              title={teacherName || undefined}
                             >
-                              Remove
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </FixedTable>
+                              {teacherName || "—"}
+                            </TruncateCell>
+                            <TruncateCell>
+                              {a.sections?.section_name || "—"}
+                            </TruncateCell>
+                            <TruncateCell>
+                              {a.subjects?.subject_name || "—"}
+                            </TruncateCell>
+                            <TableCell className="whitespace-nowrap">
+                              {a.school_year}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={pending}
+                                onClick={() => removeAssignment(a.id)}
+                              >
+                                Remove
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </FixedTable>
+                  <TablePaginationBar
+                    page={assignmentPaging.page}
+                    setPage={assignmentPaging.setPage}
+                    pageSize={assignmentPaging.pageSize}
+                    changePageSize={assignmentPaging.changePageSize}
+                    total={assignmentPaging.total}
+                    totalPages={assignmentPaging.totalPages}
+                    start={assignmentPaging.start}
+                    end={assignmentPaging.end}
+                  />
+                </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Grade {g}: {rows.length} assignment
                   {rows.length === 1 ? "" : "s"}

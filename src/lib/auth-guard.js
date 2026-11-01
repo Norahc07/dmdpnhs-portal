@@ -1,25 +1,17 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ROLE_HOME } from "@/lib/constants";
-import { countUnreadAnnouncementsForStudent } from "@/lib/announcements";
+import { getRequestAuth, getRequestProfile } from "@/lib/auth-session";
 import {
   findSecretarySection,
   isSectionSecretary,
 } from "@/lib/class-secretary";
 
 export async function requireRole(allowedRoles) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRequestAuth();
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await getRequestProfile(user.id);
 
   if (!profile) redirect("/login");
 
