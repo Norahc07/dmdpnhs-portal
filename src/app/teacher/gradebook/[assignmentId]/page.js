@@ -11,6 +11,7 @@ import {
   humssTermLabel,
   isHumssGrade12,
 } from "@/lib/humss-academic-record";
+import { listSubjectEnrolledStudentIds } from "@/lib/shs-subject-enrollment";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
 export const metadata = { title: "Class Record" };
@@ -61,7 +62,19 @@ export default async function ClassRecordPage({ params, searchParams }) {
       .order("gender")
       .order("lrn");
   }
-  const students = studentsRes.data;
+  let students = studentsRes.data || [];
+
+  // Prefer subject-registered SHS learners when enrollments exist for this load.
+  const enrolledIds = await listSubjectEnrolledStudentIds(supabase, {
+    sectionId: assignment.sections.id,
+    subjectId: assignment.subjects.id,
+    schoolYear: assignment.school_year,
+    term: offeredTerm || term,
+  });
+  if (Array.isArray(enrolledIds) && enrolledIds.length > 0) {
+    const allow = new Set(enrolledIds);
+    students = students.filter((s) => allow.has(s.id));
+  }
 
   let classRecord = null;
   const withTerm = await supabase

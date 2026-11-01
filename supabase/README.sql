@@ -14,3 +14,5 @@
 -- Optional: announcements.sql (teacher posts to sections + student notifications)
 -- Optional: student-documents.sql (required uploads + review statuses)
 -- Optional: seed-grade12-humss-2025-2026.sql (Grade 12 HUMSS-A through HUMSS-H)
+-- Optional: shs-term-subjects.sql (academic_term, subject_kind, student current_term,
+--           student_subject_enrollments) then seed-grade12-humss-subjects.sql

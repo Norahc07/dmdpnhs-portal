@@ -35,7 +35,9 @@ import {
   GRADE_LEVELS,
   SCHOOL_YEAR_DEFAULT,
   STATUS_BADGE_STYLES,
+  isSeniorHighGrade,
 } from "@/lib/constants";
+import { GRADE_TERMS } from "@/lib/grades-terms";
 import { cn } from "@/lib/utils";
 
 const selectClass =
@@ -56,6 +58,7 @@ export function EnrollmentTable({ students, sections, loadError = "" }) {
   const [formError, setFormError] = useState("");
   const [formGrade, setFormGrade] = useState("7");
   const [formSection, setFormSection] = useState("");
+  const [formTerm, setFormTerm] = useState("1");
 
   const schoolYears = useMemo(() => {
     const years = new Set(sections.map((s) => s.school_year).filter(Boolean));
@@ -209,6 +212,7 @@ export function EnrollmentTable({ students, sections, loadError = "" }) {
             setFormError("");
             setFormGrade("7");
             setFormSection("");
+            setFormTerm("1");
             setEnrollOpen(true);
           }}
           className="bg-[#800000] hover:bg-[#6a0000]"
@@ -549,6 +553,29 @@ export function EnrollmentTable({ students, sections, loadError = "" }) {
                 </p>
               ) : null}
             </div>
+            {isSeniorHighGrade(formGrade) ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="enroll-term">Current term</Label>
+                <select
+                  id="enroll-term"
+                  name="currentTerm"
+                  required
+                  value={formTerm}
+                  onChange={(e) => setFormTerm(e.target.value)}
+                  className={selectClass}
+                >
+                  {GRADE_TERMS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <input type="hidden" name="enrollTermSubjects" value="1" />
+                <p className="text-xs text-muted-foreground">
+                  Also enrolls all catalog subjects for this strand and term.
+                </p>
+              </div>
+            ) : null}
             {formError ? (
               <p className="text-sm text-rose-700 sm:col-span-2">{formError}</p>
             ) : null}

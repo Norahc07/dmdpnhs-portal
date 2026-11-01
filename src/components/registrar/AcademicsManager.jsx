@@ -58,6 +58,7 @@ import {
   normalizeComponentWeights,
 } from "@/lib/class-record";
 import { GRADE_LEVELS, SCHOOL_YEAR_DEFAULT, SHS_STRANDS, isSeniorHighGrade, nextStrandSectionLetter, strandSectionName } from "@/lib/constants";
+import { GRADE_TERMS } from "@/lib/grades-terms";
 import { cn } from "@/lib/utils";
 
 const selectClass =
@@ -568,7 +569,7 @@ function AddSubjectModal({ defaultBand, defaultGrade, pending, formError, onSubm
         </DialogTitle>
         <DialogDescription>
           {shs
-            ? "Include track/strand and DepEd component weights for Grades 11–12."
+            ? "Set strand, term (1–3), major/minor, and DepEd component weights."
             : "Set subject name, grade, and Written / Performance / Exam weights (must total 100)."}
         </DialogDescription>
       </DialogHeader>
@@ -579,6 +580,8 @@ function AddSubjectModal({ defaultBand, defaultGrade, pending, formError, onSubm
           const fd = Object.fromEntries(new FormData(e.currentTarget));
           if (!isSeniorHighGrade(fd.gradeLevel)) {
             fd.trackStrand = "";
+            fd.academicTerm = "";
+            fd.subjectKind = "major";
           }
           fd.writtenWeight = weights.written;
           fd.performanceWeight = weights.performance;
@@ -606,21 +609,52 @@ function AddSubjectModal({ defaultBand, defaultGrade, pending, formError, onSubm
           </select>
         </div>
         {shs ? (
-          <div className="space-y-1.5">
-            <Label>Track / Strand</Label>
-            <select
-              name="trackStrand"
-              defaultValue={SHS_STRANDS[0]}
-              className={selectClass}
-              required
-            >
-              {SHS_STRANDS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="space-y-1.5">
+              <Label>Track / Strand</Label>
+              <select
+                name="trackStrand"
+                defaultValue={SHS_STRANDS[0]}
+                className={selectClass}
+                required
+              >
+                {SHS_STRANDS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Term</Label>
+                <select
+                  name="academicTerm"
+                  defaultValue="1"
+                  className={selectClass}
+                  required
+                >
+                  {GRADE_TERMS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Subject kind</Label>
+                <select
+                  name="subjectKind"
+                  defaultValue="major"
+                  className={selectClass}
+                  required
+                >
+                  <option value="major">Major (strand)</option>
+                  <option value="minor">Minor (shared / core)</option>
+                </select>
+              </div>
+            </div>
+          </>
         ) : null}
 
         <div className="rounded-lg border bg-neutral-50 p-3">
@@ -911,6 +945,9 @@ export function AcademicsManager({
 
   const [subjectBand, setSubjectBand] = useState("jhs"); // jhs | shs
   const [subjectGrade, setSubjectGrade] = useState("7");
+  const [subjectStrand, setSubjectStrand] = useState("all");
+  const [subjectTerm, setSubjectTerm] = useState("all");
+  const [subjectKind, setSubjectKind] = useState("all");
 
   const [sectionBand, setSectionBand] = useState("jhs"); // jhs | shs
   const [sectionGrade, setSectionGrade] = useState("7");
@@ -920,6 +957,7 @@ export function AcademicsManager({
   const [enrollQ, setEnrollQ] = useState("");
   const [enrollFormGrade, setEnrollFormGrade] = useState("7");
   const [enrollFormSection, setEnrollFormSection] = useState("");
+  const [enrollFormTerm, setEnrollFormTerm] = useState("1");
 
   const [assignBand, setAssignBand] = useState("jhs"); // jhs | shs
   const [assignGrade, setAssignGrade] = useState("7");
@@ -935,14 +973,42 @@ export function AcademicsManager({
     const map = {};
     for (const g of subjectGradeOptions) {
       map[g] = localSubjects.filter((s) => {
-      const isShs = isSeniorHighGrade(s.grade_level);
-      if (subjectBand === "jhs" && isShs) return false;
-      if (subjectBand === "shs" && !isShs) return false;
-        return Number(s.grade_level) === g;
+        const isShs = isSeniorHighGrade(s.grade_level);
+        if (subjectBand === "jhs" && isShs) return false;
+        if (subjectBand === "shs" && !isShs) return false;
+        if (Number(s.grade_level) !== g) return false;
+        if (subjectBand === "shs") {
+          if (
+            subjectStrand !== "all" &&
+            String(s.track_strand || "") !== subjectStrand
+          ) {
+            return false;
+          }
+          if (
+            subjectTerm !== "all" &&
+            Number(s.academic_term) !== Number(subjectTerm)
+          ) {
+            return false;
+          }
+          if (
+            subjectKind !== "all" &&
+            String(s.subject_kind || "major") !== subjectKind
+          ) {
+            return false;
+          }
+        }
+        return true;
       });
     }
     return map;
-  }, [localSubjects, subjectBand, subjectGradeOptions]);
+  }, [
+    localSubjects,
+    subjectBand,
+    subjectGradeOptions,
+    subjectStrand,
+    subjectTerm,
+    subjectKind,
+  ]);
 
   const bandSubjectTotal = useMemo(
     () =>
@@ -1235,20 +1301,60 @@ export function AcademicsManager({
             })}
             </div>
 
+          {subjectBand === "shs" ? (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <select
+                value={subjectStrand}
+                onChange={(e) => setSubjectStrand(e.target.value)}
+                className={cn(selectClass, "h-9 w-auto min-w-[10rem]")}
+              >
+                <option value="all">All strands</option>
+                {SHS_STRANDS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={subjectTerm}
+                onChange={(e) => setSubjectTerm(e.target.value)}
+                className={cn(selectClass, "h-9 w-auto min-w-[8rem]")}
+              >
+                <option value="all">All terms</option>
+                {GRADE_TERMS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={subjectKind}
+                onChange={(e) => setSubjectKind(e.target.value)}
+                className={cn(selectClass, "h-9 w-auto min-w-[8rem]")}
+              >
+                <option value="all">All kinds</option>
+                <option value="major">Major</option>
+                <option value="minor">Minor</option>
+              </select>
+            </div>
+          ) : null}
+
           {(() => {
             const g = Number(subjectGrade);
             const rows = subjectsByGrade[g] || [];
-            const colSpan = subjectBand === "shs" ? 4 : 3;
+            const colSpan = subjectBand === "shs" ? 6 : 3;
             return (
               <>
-                  <FixedTable minWidth={subjectBand === "shs" ? "48rem" : "40rem"}>
+                  <FixedTable minWidth={subjectBand === "shs" ? "56rem" : "40rem"}>
                     <colgroup>
                       {subjectBand === "shs" ? (
                         <>
-                          <col style={{ width: "34%" }} />
-                          <col style={{ width: "30%" }} />
-                          <col style={{ width: "18%" }} />
-                          <col style={{ width: "18%" }} />
+                          <col style={{ width: "28%" }} />
+                          <col style={{ width: "20%" }} />
+                          <col style={{ width: "12%" }} />
+                          <col style={{ width: "12%" }} />
+                          <col style={{ width: "14%" }} />
+                          <col style={{ width: "14%" }} />
                         </>
                       ) : (
                         <>
@@ -1262,7 +1368,11 @@ export function AcademicsManager({
                 <TableRow>
                   <TableHead>Subject</TableHead>
                   {subjectBand === "shs" ? (
-                    <TableHead>Track / Strand</TableHead>
+                    <>
+                      <TableHead>Track / Strand</TableHead>
+                      <TableHead>Term</TableHead>
+                      <TableHead>Kind</TableHead>
+                    </>
                   ) : null}
                   <TableHead>Weights (W/P/E)</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -1283,9 +1393,19 @@ export function AcademicsManager({
                       {s.subject_name}
                             </TruncateCell>
                     {subjectBand === "shs" ? (
-                              <TruncateCell>
-                                {s.track_strand || "—"}
-                              </TruncateCell>
+                              <>
+                                <TruncateCell>
+                                  {s.track_strand || "—"}
+                                </TruncateCell>
+                                <TableCell className="whitespace-nowrap text-xs">
+                                  {s.academic_term
+                                    ? `Term ${s.academic_term}`
+                                    : "—"}
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap text-xs capitalize">
+                                  {s.subject_kind || "major"}
+                                </TableCell>
+                              </>
                     ) : null}
                             <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {w.written}/{w.performance}/{w.assessment}
@@ -1311,9 +1431,9 @@ export function AcademicsManager({
                     Grade {g}: {rows.length} subject
                     {rows.length === 1 ? "" : "s"} ·{" "}
                     {subjectBand === "shs" ? "Senior High" : "Junior High"}{" "}
-                    total {bandSubjectTotal}. Grade 12 HUMSS academic records
-                    use Final Grade and Remarks only (no quiz, activity, PT, or
-                    exam scores).
+                    total {bandSubjectTotal}. SHS subjects are offered by term;
+                    enroll students into the current term’s catalog from
+                    Enrollment / Activations.
                   </p>
               </>
             );
@@ -2026,6 +2146,29 @@ export function AcademicsManager({
                     </p>
                   ) : null}
                 </div>
+                {isSeniorHighGrade(enrollFormGrade) ? (
+                  <div className="space-y-1.5">
+                    <Label>Current term</Label>
+                    <select
+                      name="currentTerm"
+                      required
+                      value={enrollFormTerm}
+                      onChange={(e) => setEnrollFormTerm(e.target.value)}
+                      className={selectClass}
+                    >
+                      {GRADE_TERMS.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input type="hidden" name="enrollTermSubjects" value="1" />
+                    <p className="text-xs text-muted-foreground">
+                      Enrolls this learner in all catalog subjects for the
+                      section strand and selected term.
+                    </p>
+                  </div>
+                ) : null}
                 {formError ? (
                   <p className="text-sm text-rose-700 sm:col-span-2">{formError}</p>
                 ) : null}
@@ -2104,6 +2247,8 @@ export function AcademicsManager({
                       <option key={s.id} value={s.id}>
                           {s.subject_name}
                           {s.track_strand ? ` · ${s.track_strand}` : ""}
+                          {s.academic_term ? ` · Term ${s.academic_term}` : ""}
+                          {s.subject_kind === "minor" ? " · minor" : ""}
                       </option>
                     ))}
                   </select>

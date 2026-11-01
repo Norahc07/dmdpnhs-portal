@@ -45,7 +45,6 @@ const STUDENT_ICONS = {
   "/student/notifications": Bell,
   "/student/profile": UserRound,
   "/student/settings": Settings,
-  "/student/password": KeyRound,
 };
 
 const EDUCATOR_ICONS = {

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import {
   approveStudentActivation,
   deleteActivatedStudent,
+  enrollStudentTermSubjects,
   updateActivatedStudent,
 } from "@/actions/activation";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +54,8 @@ import {
   hasGuardianDetailsReady as guardianContactsReady,
   resolveActivationStatus,
 } from "@/lib/activation-status";
-import { GRADE_LEVELS, STATUS_BADGE_STYLES } from "@/lib/constants";
+import { GRADE_LEVELS, STATUS_BADGE_STYLES, isSeniorHighGrade } from "@/lib/constants";
+import { GRADE_TERMS } from "@/lib/grades-terms";
 import { cn } from "@/lib/utils";
 
 const selectClass =
@@ -433,6 +435,10 @@ function StudentEditSheet({
     String(student?.grade_level || "")
   );
   const [sectionId, setSectionId] = useState(student?.section_id || "");
+  const [currentTerm, setCurrentTerm] = useState(
+    String(student?.current_term || "1")
+  );
+  const [enrollTermSubjects, setEnrollTermSubjects] = useState(false);
   const [parentFirstName, setParentFirstName] = useState(parentParts.first);
   const [parentLastName, setParentLastName] = useState(parentParts.last);
   const [parentPhone, setParentPhone] = useState(parentPhoneOf(student));
@@ -446,6 +452,8 @@ function StudentEditSheet({
     setGender(student.gender || "Male");
     setGradeLevel(String(student.grade_level || ""));
     setSectionId(student.section_id || "");
+    setCurrentTerm(String(student.current_term || "1"));
+    setEnrollTermSubjects(false);
     setParentFirstName(parts.first);
     setParentLastName(parts.last);
     setParentPhone(parentPhoneOf(student));
@@ -476,6 +484,11 @@ function StudentEditSheet({
               gender,
               gradeLevel,
               sectionId: sectionId || null,
+              currentTerm: isSeniorHighGrade(gradeLevel) ? currentTerm : "",
+              enrollTermSubjects:
+                isSeniorHighGrade(gradeLevel) && enrollTermSubjects
+                  ? "1"
+                  : "0",
               parentFirstName,
               parentLastName,
               parentPhone,
@@ -565,10 +578,47 @@ function StudentEditSheet({
                       <option key={s.id} value={s.id}>
                         {s.section_name}
                         {s.school_year ? ` (${s.school_year})` : ""}
+                        {s.track_strand ? ` · ${s.track_strand}` : ""}
                       </option>
                     ))}
                   </select>
                 </FieldEdit>
+                {isSeniorHighGrade(gradeLevel) ? (
+                  <>
+                    <FieldEdit label="Current term" htmlFor="edit-term">
+                      <select
+                        id="edit-term"
+                        value={currentTerm}
+                        onChange={(e) => setCurrentTerm(e.target.value)}
+                        className={compactSelectClass}
+                      >
+                        {GRADE_TERMS.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FieldEdit>
+                    <div className="col-span-2 flex items-start gap-2 rounded-lg border border-[#800000]/10 bg-[#fffaf7] px-3 py-2">
+                      <input
+                        id="edit-enroll-term"
+                        type="checkbox"
+                        checked={enrollTermSubjects}
+                        onChange={(e) =>
+                          setEnrollTermSubjects(e.target.checked)
+                        }
+                        className="mt-0.5"
+                      />
+                      <label
+                        htmlFor="edit-enroll-term"
+                        className="text-xs leading-relaxed text-[#3d1212]"
+                      >
+                        Enroll in current-term subjects for this strand
+                        (registrar subject registration).
+                      </label>
+                    </div>
+                  </>
+                ) : null}
                 <div className="col-span-2">
                   <FieldEdit label="LRN" htmlFor="edit-lrn">
                     <Input
@@ -1107,7 +1157,14 @@ function PendingTable({
   );
 }
 
-function ActivatedTable({ rows, sections = [], onView, onEdit, onDelete }) {
+function ActivatedTable({
+  rows,
+  sections = [],
+  onView,
+  onEdit,
+  onDelete,
+  onEnrollTerm,
+}) {
   const query = useActivationsQuery(rows);
   const {
     pageRows,
@@ -1253,6 +1310,14 @@ function ActivatedTable({ rows, sections = [], onView, onEdit, onDelete }) {
                             <Pencil className="size-4" />
                             Edit
                           </DropdownMenuItem>
+                          {isSeniorHighGrade(row.grade_level) ? (
+                            <DropdownMenuItem
+                              onClick={() => onEnrollTerm?.(row)}
+                            >
+                              <GraduationCap className="size-4" />
+                              Enroll term subjects
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
@@ -1363,11 +1428,16 @@ export function PendingActivationsTable({
                 ? Number(payload.gradeLevel)
                 : row.grade_level,
             section_id: payload.sectionId,
+            current_term:
+              payload.currentTerm != null && payload.currentTerm !== ""
+                ? Number(payload.currentTerm)
+                : row.current_term,
             sections: section
               ? {
                   section_name: section.section_name,
                   grade_level: section.grade_level,
                   school_year: section.school_year,
+                  track_strand: section.track_strand,
                 }
               : row.sections,
             profiles: {
@@ -1385,6 +1455,33 @@ export function PendingActivationsTable({
           }
         : row
     );
+  }
+
+  function enrollTermSubjects(row) {
+    if (!isSeniorHighGrade(row.grade_level)) {
+      toast.error("Term subjects are for Senior High only.");
+      return;
+    }
+    setError("");
+    startTransition(async () => {
+      const result = await enrollStudentTermSubjects({
+        studentId: row.id,
+        term: row.current_term || 1,
+      });
+      if (result?.error) {
+        setError(result.error);
+        toast.error(result.error);
+        return;
+      }
+      setActivatedList((list) =>
+        list.map((r) =>
+          r.id === row.id
+            ? { ...r, current_term: result.term || r.current_term || 1 }
+            : r
+        )
+      );
+      toast.success(result.message || "Term subjects enrolled.");
+    });
   }
 
   function saveEdit(payload) {
@@ -1536,6 +1633,7 @@ export function PendingActivationsTable({
               setError("");
               setDeleteStudent(row);
             }}
+            onEnrollTerm={enrollTermSubjects}
           />
         </TabsContent>
       </Tabs>

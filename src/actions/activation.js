@@ -30,6 +30,8 @@ import {
   isReadyForRegistrarApproval,
   normalizePhoneDigits,
 } from "@/lib/activation-status";
+import { normalizeGradeTerm } from "@/lib/grades-terms";
+import { enrollStudentInTermSubjects } from "@/lib/shs-subject-enrollment";
 
 function normalizePhone(value) {
   return normalizePhoneDigits(value);
@@ -427,6 +429,18 @@ export async function updateActivatedStudent(form) {
   const gender = String(form.gender || "").trim();
   const gradeLevel = Number(form.gradeLevel);
   const sectionId = form.sectionId || null;
+  const currentTermRaw = form.currentTerm;
+  const currentTerm =
+    isSeniorHighGrade(gradeLevel) &&
+    currentTermRaw !== "" &&
+    currentTermRaw != null
+      ? normalizeGradeTerm(currentTermRaw)
+      : isSeniorHighGrade(gradeLevel)
+        ? null
+        : undefined;
+  const enrollTermSubjects =
+    String(form.enrollTermSubjects || "").toLowerCase() === "1" ||
+    String(form.enrollTermSubjects || "").toLowerCase() === "true";
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
@@ -448,6 +462,14 @@ export async function updateActivatedStudent(form) {
   if (!sectionId) {
     return { error: "Select a section for this student." };
   }
+  if (
+    isSeniorHighGrade(gradeLevel) &&
+    currentTermRaw !== "" &&
+    currentTermRaw != null &&
+    ![1, 2, 3].includes(Number(currentTermRaw))
+  ) {
+    return { error: "Select Term 1, 2, or 3." };
+  }
   if (!parentFirstName || !parentLastName || !guardianName) {
     return { error: "Parent/guardian first and last name are required." };
   }
@@ -457,7 +479,7 @@ export async function updateActivatedStudent(form) {
 
   const { data: student } = await admin
     .from("students")
-    .select("id, profile_id, activation_status, grade_level")
+    .select("id, profile_id, activation_status, grade_level, current_term")
     .eq("id", studentId)
     .maybeSingle();
   if (!student) return { error: "Student not found." };
@@ -488,6 +510,9 @@ export async function updateActivatedStudent(form) {
     emergency_contact_name: guardianName,
     emergency_contact_number: parentPhone,
   };
+  if (currentTerm !== undefined) {
+    studentPatch.current_term = currentTerm;
+  }
   // Registrar-captured guardian details mean the learner is ready to verify.
   if (
     String(student.activation_status || "").toLowerCase() === "incomplete" &&
@@ -499,6 +524,14 @@ export async function updateActivatedStudent(form) {
     .from("students")
     .update(studentPatch)
     .eq("id", studentId);
+  if (studentError && /current_term/i.test(studentError.message || "")) {
+    delete studentPatch.current_term;
+    const retry = await admin
+      .from("students")
+      .update(studentPatch)
+      .eq("id", studentId);
+    studentError = retry.error;
+  }
   if (studentError) return { error: studentError.message };
 
   // Confirm parent contacts actually persisted (avoids silent column/RLS misses).
@@ -518,15 +551,38 @@ export async function updateActivatedStudent(form) {
     };
   }
 
+  let termMessage = "";
+  const termToEnroll =
+    currentTerm != null ? currentTerm : Number(student.current_term) || null;
+  if (enrollTermSubjects && isSeniorHighGrade(gradeLevel) && termToEnroll) {
+    const { data: section } = await admin
+      .from("sections")
+      .select("id, track_strand")
+      .eq("id", sectionId)
+      .maybeSingle();
+    const enrolled = await enrollStudentInTermSubjects(admin, {
+      studentId,
+      sectionId,
+      gradeLevel,
+      strand: section?.track_strand,
+      term: termToEnroll,
+      schoolYear: SCHOOL_YEAR_DEFAULT,
+    });
+    if (enrolled.error) return { error: enrolled.error };
+    termMessage = enrolled.message || "";
+  }
+
   invalidateRegistrarCaches();
   revalidatePath("/registrar/activations");
   revalidatePath("/registrar/enrollment");
   revalidatePath("/student");
   return {
     ok: true,
+    message: termMessage || undefined,
     student: {
       emergency_contact_name: guardianName,
       emergency_contact_number: parentPhone,
+      current_term: currentTerm !== undefined ? currentTerm : student.current_term,
       birthdate,
       gender,
       grade_level: gradeLevel,
@@ -679,6 +735,16 @@ export async function enrollStudentByRegistrar(form) {
   const gender = String(form.gender || "").trim();
   const gradeLevel = Number(form.gradeLevel);
   const sectionId = form.sectionId || null;
+  const currentTermRaw = form.currentTerm;
+  const currentTerm =
+    isSeniorHighGrade(gradeLevel) &&
+    currentTermRaw !== "" &&
+    currentTermRaw != null
+      ? normalizeGradeTerm(currentTermRaw)
+      : null;
+  const enrollTermSubjects =
+    String(form.enrollTermSubjects || "1") !== "0" &&
+    String(form.enrollTermSubjects || "true").toLowerCase() !== "false";
   const parentFirstName = String(form.parentFirstName || "").trim();
   const parentLastName = String(form.parentLastName || "").trim();
   const parentPhone = String(form.parentPhone || "").trim();
@@ -699,6 +765,9 @@ export async function enrollStudentByRegistrar(form) {
   }
   if (!sectionId) {
     return { error: "Select a section for this student." };
+  }
+  if (isSeniorHighGrade(gradeLevel) && ![1, 2, 3].includes(Number(currentTermRaw))) {
+    return { error: "Select the student’s current term (1, 2, or 3)." };
   }
   const sectionGate = await assertSectionMatchesGrade(
     admin,
@@ -830,21 +899,69 @@ export async function enrollStudentByRegistrar(form) {
     emergency_contact_number: parentPhone || null,
     emergency_contact_address: null,
   };
+  if (currentTerm != null) {
+    studentInsert.current_term = currentTerm;
+  }
 
-  let { error: studentError } = await admin
+  let { data: insertedStudent, error: studentError } = await admin
     .from("students")
-    .insert(studentInsert);
+    .insert(studentInsert)
+    .select("id")
+    .maybeSingle();
 
   if (studentError && /emergency_contact_address/i.test(studentError.message || "")) {
     delete studentInsert.emergency_contact_address;
-    const retry = await admin.from("students").insert(studentInsert);
+    const retry = await admin
+      .from("students")
+      .insert(studentInsert)
+      .select("id")
+      .maybeSingle();
     studentError = retry.error;
+    insertedStudent = retry.data;
+  }
+
+  if (studentError && /current_term/i.test(studentError.message || "")) {
+    delete studentInsert.current_term;
+    const retry = await admin
+      .from("students")
+      .insert(studentInsert)
+      .select("id")
+      .maybeSingle();
+    studentError = retry.error;
+    insertedStudent = retry.data;
   }
 
   if (studentError) {
     await admin.from("profiles").delete().eq("id", userId);
     await admin.auth.admin.deleteUser(userId);
     return { error: studentError.message };
+  }
+
+  let termMessage = "";
+  if (
+    enrollTermSubjects &&
+    insertedStudent?.id &&
+    isSeniorHighGrade(gradeLevel) &&
+    currentTerm != null
+  ) {
+    const { data: section } = await admin
+      .from("sections")
+      .select("id, track_strand")
+      .eq("id", sectionId)
+      .maybeSingle();
+    const enrolled = await enrollStudentInTermSubjects(admin, {
+      studentId: insertedStudent.id,
+      sectionId,
+      gradeLevel,
+      strand: section?.track_strand,
+      term: currentTerm,
+      schoolYear: SCHOOL_YEAR_DEFAULT,
+    });
+    if (enrolled.error) {
+      termMessage = ` Subject enrollment skipped: ${enrolled.error}`;
+    } else if (enrolled.message) {
+      termMessage = ` ${enrolled.message}`;
+    }
   }
 
   revalidatePath("/registrar/students");
@@ -854,7 +971,7 @@ export async function enrollStudentByRegistrar(form) {
   revalidatePath("/registrar/academics");
   return {
     ok: true,
-    message: `Enrolled LRN ${lrn}. They appear under Pending activations for Verify & Approve. Sign-in: LRN and birthdate (YYYYMMDD).`,
+    message: `Enrolled LRN ${lrn}. They appear under Pending activations for Verify & Approve. Sign-in: LRN and birthdate (YYYYMMDD).${termMessage}`,
     lrn,
   };
 }
@@ -1148,6 +1265,15 @@ export async function createSubject(form) {
   const writtenWeight = Number(form.writtenWeight ?? 40);
   const performanceWeight = Number(form.performanceWeight ?? 40);
   const assessmentWeight = Number(form.assessmentWeight ?? 20);
+  const subjectKindRaw = String(form.subjectKind || "major")
+    .trim()
+    .toLowerCase();
+  const subjectKind = subjectKindRaw === "minor" ? "minor" : "major";
+  const academicTermRaw = form.academicTerm;
+  const academicTerm =
+    academicTermRaw === "" || academicTermRaw == null
+      ? null
+      : normalizeGradeTerm(academicTermRaw);
 
   if (!subjectName) return { error: "Subject name is required." };
   if (![7, 8, 9, 10, 11, 12].includes(gradeLevel)) {
@@ -1156,15 +1282,46 @@ export async function createSubject(form) {
   if (writtenWeight + performanceWeight + assessmentWeight !== 100) {
     return { error: "DepEd weights must total 100." };
   }
+  if (isSeniorHighGrade(gradeLevel)) {
+    if (!trackStrand) {
+      return { error: "Select a track/strand for Senior High subjects." };
+    }
+    if (![1, 2, 3].includes(Number(academicTermRaw))) {
+      return { error: "Select Term 1, 2, or 3 for Senior High subjects." };
+    }
+  }
 
-  const { error } = await gate.supabase.from("subjects").insert({
+  const row = {
     subject_name: subjectName,
     grade_level: gradeLevel,
     track_strand: trackStrand,
     written_weight: writtenWeight,
     performance_weight: performanceWeight,
     assessment_weight: assessmentWeight,
-  });
+  };
+  if (isSeniorHighGrade(gradeLevel)) {
+    row.academic_term = academicTerm;
+    row.subject_kind = subjectKind;
+  }
+
+  let { error } = await gate.supabase.from("subjects").insert(row);
+  if (
+    error &&
+    /academic_term|subject_kind/i.test(error.message || "")
+  ) {
+    delete row.academic_term;
+    delete row.subject_kind;
+    const retry = await gate.supabase.from("subjects").insert(row);
+    error = retry.error;
+    if (!error) {
+      revalidatePath("/registrar/academics");
+      return {
+        ok: true,
+        message:
+          "Subject saved without term/kind columns. Apply supabase/shs-term-subjects.sql to enable SHS term catalogs.",
+      };
+    }
+  }
 
   if (error) return { error: error.message };
   revalidatePath("/registrar/academics");
@@ -1287,6 +1444,70 @@ export async function deleteSection(id) {
   revalidatePath("/registrar/teachers");
   revalidatePath("/teacher");
   return { ok: true };
+}
+
+/**
+ * Registrar: set current_term (optional) and enroll the student into that
+ * strand’s catalog subjects for the term.
+ */
+export async function enrollStudentTermSubjects(form) {
+  const gate = await requireRegistrar();
+  if (gate.error) return gate;
+  const admin = gate.admin || createAdminClient();
+
+  const studentId = form.studentId;
+  if (!studentId) return { error: "Student id is required." };
+
+  const { data: student } = await admin
+    .from("students")
+    .select("id, grade_level, section_id, current_term")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student) return { error: "Student not found." };
+  if (!isSeniorHighGrade(student.grade_level)) {
+    return { error: "Term subject enrollment is for Senior High (Grades 11–12)." };
+  }
+  if (!student.section_id) {
+    return { error: "Assign a section before enrolling term subjects." };
+  }
+
+  const termRaw = form.term ?? form.currentTerm ?? student.current_term;
+  if (![1, 2, 3].includes(Number(termRaw))) {
+    return { error: "Select Term 1, 2, or 3." };
+  }
+  const term = normalizeGradeTerm(termRaw);
+
+  const { error: termErr } = await admin
+    .from("students")
+    .update({ current_term: term })
+    .eq("id", studentId);
+  if (termErr && !/current_term/i.test(termErr.message || "")) {
+    return { error: termErr.message };
+  }
+
+  const { data: section } = await admin
+    .from("sections")
+    .select("id, track_strand, grade_level")
+    .eq("id", student.section_id)
+    .maybeSingle();
+
+  const result = await enrollStudentInTermSubjects(admin, {
+    studentId,
+    sectionId: student.section_id,
+    gradeLevel: student.grade_level,
+    strand: section?.track_strand,
+    term,
+    schoolYear: String(form.schoolYear || SCHOOL_YEAR_DEFAULT).trim(),
+  });
+  if (result.error) return result;
+
+  invalidateRegistrarCaches();
+  revalidatePath("/registrar/activations");
+  revalidatePath("/registrar/enrollment");
+  revalidatePath("/registrar/academics");
+  revalidatePath("/student");
+  revalidatePath("/teacher");
+  return result;
 }
 
 export async function assignTeacher(form) {

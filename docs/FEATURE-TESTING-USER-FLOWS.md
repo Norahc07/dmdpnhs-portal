@@ -103,7 +103,7 @@ Expected: student continues to personal details / activation. Faculty lands on p
 
 ### 1.5 Change password
 
-1. Student: `/student/password` **and** Profile → **Password management**.
+1. Student: Profile → **Password management** (`/student/profile`).
 2. Teacher: `/teacher/password`.
 3. Enter current password, new password, confirm.
 
@@ -177,6 +177,18 @@ Expected: bounce to that user’s home portal. No other role’s modules.
 4. Assign a teacher + subject to a section for SY 2025–2026.
 
 Expected: section appears on the teacher’s **Student Management** and **Academic Records**. Student profile shows Grade Level, Section, School Year (locked).
+
+### 3.1a Registrar — SHS term subjects (foundation)
+
+**SQL first:** apply `supabase/shs-term-subjects.sql`, then `supabase/seed-grade12-humss-subjects.sql` (HUMSS G12 Term 1–3 catalog).
+
+1. Academics → **Subjects** → Senior High.
+2. Add or filter by **strand**, **term (1–3)**, and **major/minor**.
+3. Enroll an SHS learner (Enrollment or Academics → Enroll) with **section** + **current term**.
+4. Confirm message that term subjects were enrolled (or Activations → Edit → check “Enroll in current-term subjects”, or **Enroll term subjects** on an activated row).
+5. Assign Teacher A to HUMSS-A + MIL and Teacher B to HUMSS-B + MIL (same subject, different sections).
+
+Expected: student dashboard / grades prefer that term’s enrolled subjects. Gradebook roster for a load prefers students registered in that subject+term when enrollment rows exist; otherwise falls back to the whole section. Student self-enrollment windows are **not** in this release.
 
 ### 3.2 Teacher — section rosters
 
@@ -346,7 +358,6 @@ Walk the **Modules** then **Account** groups while signed in as an enrolled stud
 | Notifications | `/student/notifications` | Unread posts |
 | Profile | `/student/profile` | Name, LRN, grade, section, SY, photo, account, password |
 | Account Settings | `/student/settings` | Sign-in ID = LRN, status, shortcuts |
-| Change Password | `/student/password` | Current + new password |
 
 Also confirm: unenrolled/pending students still see dashboard/profile/calendar, but not grades/attendance/schedule/announcements.
 

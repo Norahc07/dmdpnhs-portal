@@ -25,15 +25,36 @@ import {
   resolveAcademicFinalGrade,
   resolveAcademicRemarks,
 } from "@/lib/humss-academic-record";
+import { listStudentEnrolledSubjects } from "@/lib/shs-subject-enrollment";
 
 async function loadStudentWithSection(admin, studentId) {
   const { data: student, error } = await admin
     .from("students")
-    .select("id, section_id, grade_level, lrn, profiles(first_name, last_name)")
+    .select(
+      "id, section_id, grade_level, current_term, lrn, profiles(first_name, last_name)"
+    )
     .eq("id", studentId)
     .maybeSingle();
+  if (error && /current_term/i.test(error.message || "")) {
+    const retry = await admin
+      .from("students")
+      .select("id, section_id, grade_level, lrn, profiles(first_name, last_name)")
+      .eq("id", studentId)
+      .maybeSingle();
+    if (retry.error || !retry.data) {
+      return {
+        student: null,
+        error: retry.error?.message || "Student not found.",
+      };
+    }
+    return loadStudentSectionJoin(admin, retry.data);
+  }
   if (error || !student) return { student: null, error: error?.message || "Student not found." };
 
+  return loadStudentSectionJoin(admin, student);
+}
+
+async function loadStudentSectionJoin(admin, student) {
   let section = null;
   if (student.section_id) {
     const { data } = await admin
@@ -114,18 +135,28 @@ export async function getStudentSemestralGrades({
     };
   }
 
-  const { data: assignments } = await admin
+  let { data: assignments } = await admin
     .from("teacher_assignments")
     .select(
       `
       id,
       subject_id,
       school_year,
-      subjects ( id, subject_name, written_weight, performance_weight, assessment_weight )
+      subjects ( id, subject_name, written_weight, performance_weight, assessment_weight, academic_term, subject_kind )
     `
     )
     .eq("section_id", student.section_id)
     .eq("school_year", sy);
+
+  const enrolledSubjects = await listStudentEnrolledSubjects(admin, {
+    studentId: sid,
+    schoolYear: sy,
+    term: student.current_term || null,
+  });
+  if (enrolledSubjects.length && assignments?.length) {
+    const allow = new Set(enrolledSubjects.map((s) => s.id));
+    assignments = assignments.filter((a) => allow.has(a.subject_id));
+  }
 
   if (!assignments?.length) {
     return { student, schoolYear: sy, rows: [] };

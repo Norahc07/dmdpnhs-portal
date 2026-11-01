@@ -77,7 +77,7 @@ export const STUDENT_PORTAL_MODULES = [
   {
     href: "/student/profile",
     label: "Profile",
-    description: "Photo, personal details, and guardian contacts.",
+    description: "Photo, personal details, guardian contacts, and password.",
     group: "account",
     always: true,
   },
@@ -85,13 +85,6 @@ export const STUDENT_PORTAL_MODULES = [
     href: "/student/settings",
     label: "Account Settings",
     description: "Account status, sign-in details, and shortcuts.",
-    group: "account",
-    always: true,
-  },
-  {
-    href: "/student/password",
-    label: "Change Password",
-    description: "Update the password you use with your LRN.",
     group: "account",
     always: true,
   },

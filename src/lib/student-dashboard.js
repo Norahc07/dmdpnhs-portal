@@ -119,15 +119,55 @@ export async function loadStudentClassSchedule(supabase, student) {
       }));
 
   if (!periods.length) {
+    // SHS: prefer subjects the registrar enrolled for the student's current term.
+    try {
+      const { listStudentEnrolledSubjects } = await import(
+        "@/lib/shs-subject-enrollment"
+      );
+      const { SCHOOL_YEAR_DEFAULT, isSeniorHighGrade } = await import(
+        "@/lib/constants"
+      );
+      if (isSeniorHighGrade(student.grade_level)) {
+        const enrolled = await listStudentEnrolledSubjects(supabase, {
+          studentId: student.id,
+          schoolYear: SCHOOL_YEAR_DEFAULT,
+          term: student.current_term || null,
+        });
+        if (enrolled.length) {
+          return {
+            periods: [],
+            subjects: enrolled.map((subject) => ({
+              id: subject.id,
+              subject_name: subject.subject_name,
+              schedule_label: "TBA",
+              teacher_name: null,
+              teacher_email: null,
+              teacher_code: null,
+            })),
+          };
+        }
+      }
+    } catch {
+      /* enrollment helper optional */
+    }
+
     const { data: subjects } = await supabase
       .from("subjects")
-      .select("id, subject_name")
+      .select("id, subject_name, academic_term, track_strand")
       .eq("grade_level", student.grade_level || 0)
       .order("subject_name");
 
+    let catalog = subjects || [];
+    if (student.current_term) {
+      const termMatched = catalog.filter(
+        (s) => Number(s.academic_term) === Number(student.current_term)
+      );
+      if (termMatched.length) catalog = termMatched;
+    }
+
     return {
       periods: [],
-      subjects: (subjects || []).map((subject) => ({
+      subjects: catalog.map((subject) => ({
         id: subject.id,
         subject_name: subject.subject_name,
         schedule_label: "TBA",

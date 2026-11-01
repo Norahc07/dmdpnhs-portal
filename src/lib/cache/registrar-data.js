@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/cache/tags";
 
 const STUDENT_FIELDS =
-  "id, lrn, birthdate, gender, grade_level, section_id, status, activation_status, emergency_contact_name, emergency_contact_number, profile_id, profiles(first_name, last_name, email, status)";
+  "id, lrn, birthdate, gender, grade_level, section_id, current_term, status, activation_status, emergency_contact_name, emergency_contact_number, profile_id, profiles(first_name, last_name, email, status)";
 
 async function loadStudentsUncached() {
   let admin;
@@ -25,6 +25,18 @@ async function loadStudentsUncached() {
     result = await admin
       .from("students")
       .select(STUDENT_FIELDS)
+      .order("grade_level")
+      .order("lrn")
+      .limit(5000);
+  }
+
+  if (result.error && /current_term/i.test(result.error.message || "")) {
+    result = await admin
+      .from("students")
+      .select(
+        "id, lrn, birthdate, gender, grade_level, section_id, status, activation_status, emergency_contact_name, emergency_contact_number, profile_id, profiles(first_name, last_name, email, status)"
+      )
+      .is("deleted_at", null)
       .order("grade_level")
       .order("lrn")
       .limit(5000);

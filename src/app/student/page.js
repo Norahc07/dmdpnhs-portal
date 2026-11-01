@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import {
   EnrolledSubjectsPanel,
-  StudentModuleGrid,
   StudentProfileBanner,
   TodaySchedulePanel,
 } from "@/components/student/StudentDashboard";
@@ -95,7 +94,7 @@ export default async function StudentDashboardPage({ searchParams }) {
       role="student"
       profile={profile}
       title="Dashboard"
-      subtitle="Your student portal home — records, schedule, announcements, and account tools."
+      subtitle="Your student portal home — profile, today’s schedule, and enrolled subjects."
       studentAccess={{
         activated,
         enrolled,
@@ -176,15 +175,6 @@ export default async function StudentDashboardPage({ searchParams }) {
           termLabel={termLabel}
           activated={activated}
           enrolled={enrolled}
-        />
-
-        <StudentModuleGrid
-          studentAccess={{
-            activated,
-            enrolled,
-            isSecretary: Boolean(studentAccess?.isSecretary),
-            unreadAnnouncements: studentAccess?.unreadAnnouncements || 0,
-          }}
         />
 
         {activated ? (

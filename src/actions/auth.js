@@ -605,7 +605,9 @@ export async function changeAccountPassword({
   if (error) return { error: error.message };
 
   const home = profile.role === "teacher" ? "/teacher" : "/student";
-  revalidatePath(`${home}/password`);
+  if (profile.role === "teacher") {
+    revalidatePath(`${home}/password`);
+  }
   revalidatePath(`${home}/settings`);
   revalidatePath(`${home}/profile`);
   return { ok: true };

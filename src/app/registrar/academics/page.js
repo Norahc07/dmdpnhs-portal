@@ -11,19 +11,30 @@ export const metadata = { title: "Academics" };
 export default async function RegistrarAcademicsPage() {
   const { supabase, profile } = await requireRole("registrar");
 
+  let subjectsRes = await supabase
+    .from("subjects")
+    .select(
+      "id, subject_name, grade_level, track_strand, academic_term, subject_kind, department_id, written_weight, performance_weight, assessment_weight"
+    )
+    .order("grade_level");
+  if (
+    subjectsRes.error &&
+    /academic_term|subject_kind/i.test(subjectsRes.error.message || "")
+  ) {
+    subjectsRes = await supabase
+      .from("subjects")
+      .select(
+        "id, subject_name, grade_level, track_strand, department_id, written_weight, performance_weight, assessment_weight"
+      )
+      .order("grade_level");
+  }
+
   const [
-    { data: subjects },
     sectionsCached,
     { data: teachers },
     { data: assignments },
     studentsCached,
   ] = await Promise.all([
-    supabase
-      .from("subjects")
-      .select(
-        "id, subject_name, grade_level, track_strand, department_id, written_weight, performance_weight, assessment_weight"
-      )
-      .order("grade_level"),
     getCachedRegistrarSections(),
     supabase
       .from("teachers")
@@ -34,11 +45,13 @@ export default async function RegistrarAcademicsPage() {
     supabase
       .from("teacher_assignments")
       .select(
-        "id, teacher_id, section_id, subject_id, school_year, teachers(id, teacher_id, profiles(first_name, last_name)), sections(section_name, grade_level), subjects(subject_name, grade_level)"
+        "id, teacher_id, section_id, subject_id, school_year, teachers(id, teacher_id, profiles(first_name, last_name)), sections(section_name, grade_level, track_strand), subjects(subject_name, grade_level, track_strand, academic_term)"
       )
       .order("created_at", { ascending: false }),
     getCachedRegistrarStudents(),
   ]);
+
+  const subjects = subjectsRes.data;
 
   const sections = sectionsCached.rows || [];
   const sectionById = new Map(sections.map((s) => [s.id, s]));
