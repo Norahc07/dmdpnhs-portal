@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CheckCircle2,
   Eye,
   GraduationCap,
@@ -25,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,11 +49,16 @@ import {
   TablePaginationBar,
   usePagedRows,
 } from "@/components/ui/table-pagination";
+import {
+  hasGuardianDetailsReady as guardianContactsReady,
+  resolveActivationStatus,
+} from "@/lib/activation-status";
 import { GRADE_LEVELS, STATUS_BADGE_STYLES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-9 text-sm";
+const filterSelectClass = "h-9 rounded-md border border-input bg-white pl-3 pr-9 text-sm";
 
 /** Shared column widths so Pending + Activated tables align visually. */
 const COL = {
@@ -236,15 +245,15 @@ function StudentPanelHeader({
                   LRN {student.lrn}
                 </span>
               ) : null}
-              {student?.activation_status ? (
+              {student ? (
                 <Badge
                   variant="outline"
                   className={cn(
                     "h-5 px-1.5 text-[10px]",
-                    STATUS_BADGE_STYLES[student.activation_status] || ""
+                    STATUS_BADGE_STYLES[displayActivationStatus(student)] || ""
                   )}
                 >
-                  {student.activation_status}
+                  {displayActivationStatus(student)}
                 </Badge>
               ) : null}
             </div>
@@ -283,10 +292,30 @@ function parentPhoneOf(student) {
   return student?.parent_phone || student?.emergency_contact_number || "";
 }
 
+function hasGuardianDetailsReady(student) {
+  return guardianContactsReady({
+    ...student,
+    emergency_contact_name:
+      student?.emergency_contact_name || student?.parent_name || "",
+    emergency_contact_number: parentPhoneOf(student),
+  });
+}
+
+function displayActivationStatus(student) {
+  return resolveActivationStatus({
+    ...student,
+    emergency_contact_name:
+      student?.emergency_contact_name || student?.parent_name || "",
+    emergency_contact_number: parentPhoneOf(student),
+  });
+}
+
+function canVerifyActivation(student) {
+  return displayActivationStatus(student) === "pending";
+}
+
 function StudentViewSheet({ student, open, onClose, onEdit }) {
   const parent = parentDisplayParts(student);
-  const parentFull =
-    `${parent.first || ""} ${parent.last || ""}`.trim() || null;
 
   return (
     <SideSheet
@@ -332,7 +361,7 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
                   <FieldRead label="LRN" value={student.lrn} mono />
                   <FieldRead
                     label="Status"
-                    value={student.activation_status || null}
+                    value={displayActivationStatus(student) || null}
                   />
                 </div>
               </PanelSection>
@@ -351,14 +380,6 @@ function StudentViewSheet({ student, open, onClose, onEdit }) {
                       mono
                     />
                   </div>
-                  {parentFull ? (
-                    <div className="col-span-2 rounded-lg border border-[#800000]/8 bg-white/70 px-2.5 py-2 text-xs text-muted-foreground">
-                      Contact listed as{" "}
-                      <span className="font-medium text-[#3d1212]">
-                        {parentFull}
-                      </span>
-                    </div>
-                  ) : null}
                 </div>
               </PanelSection>
             </div>
@@ -628,7 +649,252 @@ function StudentEditSheet({
   );
 }
 
-function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
+function SortableHead({ label, column, sortKey, sortDir, onSort, className }) {
+  const active = sortKey === column;
+  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead className={cn("font-semibold text-[#3d1212]", className)}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-md px-0.5 py-0.5 text-left hover:text-[#800000]",
+          active && "text-[#800000]"
+        )}
+      >
+        {label}
+        <Icon
+          className={cn("size-3.5 shrink-0", active ? "opacity-100" : "opacity-40")}
+          aria-hidden
+        />
+      </button>
+    </TableHead>
+  );
+}
+
+function useActivationsQuery(rows, { includeStatusFilter = false } = {}) {
+  const [search, setSearch] = useState("");
+  const [gradeLevel, setGradeLevel] = useState("all");
+  const [sectionId, setSectionId] = useState("all");
+  const [gender, setGender] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortKey, setSortKey] = useState("name");
+  const [sortDir, setSortDir] = useState("asc");
+
+  function toggleSort(key) {
+    if (sortKey === key) {
+      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const filteredSorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = (rows || []).filter((row) => {
+      if (
+        gradeLevel !== "all" &&
+        String(row.grade_level ?? row.sections?.grade_level ?? "") !==
+          String(gradeLevel)
+      ) {
+        return false;
+      }
+      if (sectionId !== "all" && String(row.section_id || "") !== String(sectionId)) {
+        return false;
+      }
+      if (
+        gender !== "all" &&
+        String(row.gender || "").toLowerCase() !== String(gender).toLowerCase()
+      ) {
+        return false;
+      }
+      if (
+        includeStatusFilter &&
+        statusFilter !== "all" &&
+        displayActivationStatus(row) !== statusFilter
+      ) {
+        return false;
+      }
+      if (q) {
+        const hay = [
+          studentFullName(row),
+          row.lrn,
+          sectionLabel(row),
+          displayActivationStatus(row),
+          row.parent_name,
+          row.emergency_contact_name,
+          row.parent_phone,
+          row.emergency_contact_number,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    list = [...list].sort((a, b) => {
+      let av = "";
+      let bv = "";
+      if (sortKey === "lrn") {
+        av = String(a.lrn || "");
+        bv = String(b.lrn || "");
+      } else if (sortKey === "section") {
+        av = sectionLabel(a);
+        bv = sectionLabel(b);
+      } else if (sortKey === "status") {
+        av = displayActivationStatus(a);
+        bv = displayActivationStatus(b);
+      } else if (sortKey === "grade") {
+        av = Number(a.grade_level ?? a.sections?.grade_level ?? 0);
+        bv = Number(b.grade_level ?? b.sections?.grade_level ?? 0);
+        return (av - bv) * dir;
+      } else {
+        av = studentFullName(a).toLowerCase();
+        bv = studentFullName(b).toLowerCase();
+      }
+      return av.localeCompare(bv, undefined, { numeric: true }) * dir;
+    });
+
+    return list;
+  }, [
+    rows,
+    search,
+    gradeLevel,
+    sectionId,
+    gender,
+    statusFilter,
+    includeStatusFilter,
+    sortKey,
+    sortDir,
+  ]);
+
+  return {
+    filteredSorted,
+    search,
+    setSearch,
+    gradeLevel,
+    setGradeLevel,
+    sectionId,
+    setSectionId,
+    gender,
+    setGender,
+    statusFilter,
+    setStatusFilter,
+    sortKey,
+    sortDir,
+    toggleSort,
+  };
+}
+
+function ActivationsTableToolbar({
+  sections = [],
+  includeStatusFilter = false,
+  query,
+}) {
+  const {
+    search,
+    setSearch,
+    gradeLevel,
+    setGradeLevel,
+    sectionId,
+    setSectionId,
+    gender,
+    setGender,
+    statusFilter,
+    setStatusFilter,
+  } = query;
+
+  const sectionOptions = useMemo(() => {
+    return [...sections]
+      .filter((s) => {
+        if (gradeLevel === "all") return true;
+        return String(s.grade_level) === String(gradeLevel);
+      })
+      .sort(
+        (a, b) =>
+          Number(a.grade_level) - Number(b.grade_level) ||
+          String(a.section_name).localeCompare(String(b.section_name))
+      );
+  }, [sections, gradeLevel]);
+
+  return (
+    <div className="flex flex-wrap gap-2 rounded-2xl border border-[#800000]/10 bg-[#faf7f5]/80 p-3">
+      <SearchInput
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search name, LRN, parent…"
+        className="w-full min-w-[14rem] sm:w-64"
+        aria-label="Search students"
+      />
+      <select
+        value={gradeLevel}
+        onChange={(e) => {
+          setGradeLevel(e.target.value);
+          setSectionId("all");
+        }}
+        className={filterSelectClass}
+        aria-label="Filter by grade"
+      >
+        <option value="all">All grades</option>
+        {GRADE_LEVELS.map((g) => (
+          <option key={g} value={g}>
+            Grade {g}
+          </option>
+        ))}
+      </select>
+      <select
+        value={sectionId}
+        onChange={(e) => setSectionId(e.target.value)}
+        className={filterSelectClass}
+        aria-label="Filter by section"
+      >
+        <option value="all">All sections</option>
+        {sectionOptions.map((s) => (
+          <option key={s.id} value={s.id}>
+            Grade {s.grade_level} · {s.section_name}
+          </option>
+        ))}
+      </select>
+      <select
+        value={gender}
+        onChange={(e) => setGender(e.target.value)}
+        className={filterSelectClass}
+        aria-label="Filter by gender"
+      >
+        <option value="all">All genders</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+      {includeStatusFilter ? (
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={filterSelectClass}
+          aria-label="Filter by activation status"
+        >
+          <option value="all">All statuses</option>
+          <option value="incomplete">Incomplete</option>
+          <option value="pending">Pending</option>
+        </select>
+      ) : null}
+    </div>
+  );
+}
+
+function PendingTable({
+  rows,
+  sections = [],
+  pending,
+  onApprove,
+  onReturn,
+  onView,
+  onEdit,
+}) {
+  const query = useActivationsQuery(rows, { includeStatusFilter: true });
   const {
     pageRows,
     page,
@@ -639,133 +905,331 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
     totalPages,
     start,
     end,
-  } = usePagedRows(rows);
-  const isEmpty = !rows.length;
+  } = usePagedRows(query.filteredSorted);
+  const sourceEmpty = !rows.length;
+  const filterEmpty = !sourceEmpty && !query.filteredSorted.length;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-      <div className="overflow-x-auto">
-        <Table className="w-full table-fixed">
-          <ActivationsColGroup />
-          <TableHeader>
-            <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
-              <TableHead className={cn("font-semibold text-[#3d1212]", COL.name)}>
-                Student name
-              </TableHead>
-              <TableHead className={cn("font-semibold text-[#3d1212]", COL.lrn)}>
-                LRN
-              </TableHead>
-              <TableHead
-                className={cn("font-semibold text-[#3d1212]", COL.section)}
-              >
-                Section
-              </TableHead>
-              <TableHead
-                className={cn("font-semibold text-[#3d1212]", COL.status)}
-              >
-                Status
-              </TableHead>
-              <TableHead
-                className={cn(
-                  "text-right font-semibold text-[#3d1212]",
-                  COL.action
-                )}
-              >
-                Action
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isEmpty ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="h-56 p-0">
-                  <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
-                      <Users className="size-7" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-heading text-base font-bold text-[#3d1212]">
-                        No students awaiting activation
-                      </p>
-                      <p className="max-w-md text-sm text-muted-foreground">
-                        Newly enrolled or registered learners appear here.
-                        Use View / Edit for parent contacts, then Verify &amp;
-                        Approve when ready.
-                      </p>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[#800000]/10 bg-[#800000]/5 px-2.5 py-1">
-                        <GraduationCap className="size-3.5 text-[#800000]" />
-                        Enrolled first
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[#800000]/10 bg-[#800000]/5 px-2.5 py-1">
-                        <ShieldCheck className="size-3.5 text-[#800000]" />
-                        Then activate
-                      </span>
-                    </div>
-                  </div>
-                </TableCell>
+    <div className="space-y-3">
+      <ActivationsTableToolbar
+        sections={sections}
+        includeStatusFilter
+        query={query}
+      />
+      <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+        <div className="overflow-x-auto">
+          <Table className="w-full table-fixed">
+            <ActivationsColGroup />
+            <TableHeader>
+              <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
+                <SortableHead
+                  label="Student name"
+                  column="name"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.name}
+                />
+                <SortableHead
+                  label="LRN"
+                  column="lrn"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.lrn}
+                />
+                <SortableHead
+                  label="Section"
+                  column="section"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.section}
+                />
+                <SortableHead
+                  label="Status"
+                  column="status"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.status}
+                />
+                <TableHead
+                  className={cn(
+                    "text-right font-semibold text-[#3d1212]",
+                    COL.action
+                  )}
+                >
+                  Action
+                </TableHead>
               </TableRow>
-            ) : (
-              pageRows.map((row) => (
-                <TableRow key={row.id} className="hover:bg-[#800000]/2">
-                  <TableCell className={COL.name}>
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
-                        {(row.profiles?.first_name || "?").charAt(0)}
-                        {(row.profiles?.last_name || "").charAt(0)}
-                      </span>
-                      <span className="truncate font-medium text-[#3d1212]">
-                        {studentFullName(row)}
-                      </span>
+            </TableHeader>
+            <TableBody>
+              {sourceEmpty || filterEmpty ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="h-56 p-0">
+                    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                      <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
+                        <Users className="size-7" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-heading text-base font-bold text-[#3d1212]">
+                          {filterEmpty
+                            ? "No matching pending students"
+                            : "No students awaiting activation"}
+                        </p>
+                        <p className="max-w-md text-sm text-muted-foreground">
+                          {filterEmpty
+                            ? "Try clearing search or filters to see more learners."
+                            : "Newly enrolled or registered learners appear here. Use View / Edit for parent contacts, then Verify & Approve when ready."}
+                        </p>
+                      </div>
+                      {!filterEmpty ? (
+                        <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#800000]/10 bg-[#800000]/5 px-2.5 py-1">
+                            <GraduationCap className="size-3.5 text-[#800000]" />
+                            Enrolled first
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#800000]/10 bg-[#800000]/5 px-2.5 py-1">
+                            <ShieldCheck className="size-3.5 text-[#800000]" />
+                            Then activate
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   </TableCell>
-                  <TableCell
-                    className={cn("font-mono text-xs tabular-nums", COL.lrn)}
-                  >
-                    {row.lrn}
-                  </TableCell>
-                  <TableCell className={cn("truncate text-sm", COL.section)}>
-                    {sectionLabel(row)}
-                  </TableCell>
-                  <TableCell className={COL.status}>
-                    <Badge
-                      variant="outline"
-                      className={
-                        STATUS_BADGE_STYLES[row.activation_status] || ""
-                      }
-                    >
-                      {row.activation_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className={cn("text-right", COL.action)}>
-                    <div className="inline-flex flex-wrap items-center justify-end gap-2">
-                      {row.activation_status === "pending" ? (
-                        <>
-                          <Button
-                            size="sm"
-                            disabled={pending}
-                            className="bg-[#800000] hover:bg-[#6a0000]"
-                            onClick={() => onApprove(row.id)}
-                          >
-                            <CheckCircle2 className="size-3.5" />
-                            Verify &amp; Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={pending}
-                            onClick={() => onReturn(row.id)}
-                          >
-                            <RotateCcw className="size-3.5" />
-                            Return
-                          </Button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Waiting for student details
+                </TableRow>
+              ) : (
+                pageRows.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-[#800000]/2">
+                    <TableCell className={COL.name}>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
+                          {(row.profiles?.first_name || "?").charAt(0)}
+                          {(row.profiles?.last_name || "").charAt(0)}
                         </span>
-                      )}
+                        <span className="truncate font-medium text-[#3d1212]">
+                          {studentFullName(row)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className={cn("font-mono text-xs tabular-nums", COL.lrn)}
+                    >
+                      {row.lrn}
+                    </TableCell>
+                    <TableCell className={cn("truncate text-sm", COL.section)}>
+                      {sectionLabel(row)}
+                    </TableCell>
+                    <TableCell className={COL.status}>
+                      <Badge
+                        variant="outline"
+                        className={
+                          STATUS_BADGE_STYLES[displayActivationStatus(row)] || ""
+                        }
+                      >
+                        {displayActivationStatus(row)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={cn("text-right", COL.action)}>
+                      <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                        {canVerifyActivation(row) ? (
+                          <>
+                            <Button
+                              size="sm"
+                              disabled={pending}
+                              className="bg-[#800000] hover:bg-[#6a0000]"
+                              onClick={() => onApprove(row.id)}
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                              Verify &amp; Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={pending}
+                              onClick={() => onReturn(row.id)}
+                            >
+                              <RotateCcw className="size-3.5" />
+                              Return
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Waiting for parent/guardian contacts
+                          </span>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="text-muted-foreground"
+                                aria-label={`Actions for ${studentFullName(row)}`}
+                              />
+                            }
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-36">
+                            <DropdownMenuItem onClick={() => onView?.(row)}>
+                              <Eye className="size-4" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onEdit?.(row)}>
+                              <Pencil className="size-4" />
+                              Edit
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ActivatedTable({ rows, sections = [], onView, onEdit, onDelete }) {
+  const query = useActivationsQuery(rows);
+  const {
+    pageRows,
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    total,
+    totalPages,
+    start,
+    end,
+  } = usePagedRows(query.filteredSorted);
+  const sourceEmpty = !rows.length;
+  const filterEmpty = !sourceEmpty && !query.filteredSorted.length;
+
+  return (
+    <div className="space-y-3">
+      <ActivationsTableToolbar sections={sections} query={query} />
+      <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+        <div className="overflow-x-auto">
+          <Table className="w-full table-fixed">
+            <ActivationsColGroup />
+            <TableHeader>
+              <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
+                <SortableHead
+                  label="Student name"
+                  column="name"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.name}
+                />
+                <SortableHead
+                  label="LRN"
+                  column="lrn"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.lrn}
+                />
+                <SortableHead
+                  label="Section"
+                  column="section"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.section}
+                />
+                <SortableHead
+                  label="Status"
+                  column="status"
+                  sortKey={query.sortKey}
+                  sortDir={query.sortDir}
+                  onSort={query.toggleSort}
+                  className={COL.status}
+                />
+                <TableHead
+                  className={cn(
+                    "text-right font-semibold text-[#3d1212]",
+                    COL.action
+                  )}
+                >
+                  Action
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sourceEmpty || filterEmpty ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="h-56 p-0">
+                    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                      <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
+                        <Users className="size-7" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-heading text-base font-bold text-[#3d1212]">
+                          {filterEmpty
+                            ? "No matching activated students"
+                            : "No activated students yet"}
+                        </p>
+                        <p className="max-w-md text-sm text-muted-foreground">
+                          {filterEmpty
+                            ? "Try clearing search or filters to see more learners."
+                            : "Approved activations will show up here after you verify pending requests."}
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pageRows.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-[#800000]/2">
+                    <TableCell className={COL.name}>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
+                          {(row.profiles?.first_name || "?").charAt(0)}
+                          {(row.profiles?.last_name || "").charAt(0)}
+                        </span>
+                        <span className="truncate font-medium text-[#3d1212]">
+                          {studentFullName(row)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className={cn("font-mono text-xs tabular-nums", COL.lrn)}
+                    >
+                      {row.lrn}
+                    </TableCell>
+                    <TableCell className={cn("truncate text-sm", COL.section)}>
+                      {sectionLabel(row)}
+                    </TableCell>
+                    <TableCell className={COL.status}>
+                      <Badge
+                        variant="outline"
+                        className={
+                          STATUS_BADGE_STYLES[displayActivationStatus(row)] || ""
+                        }
+                      >
+                        {displayActivationStatus(row)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={cn("text-right", COL.action)}>
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
@@ -781,188 +1245,42 @@ function PendingTable({ rows, pending, onApprove, onReturn, onView, onEdit }) {
                           <MoreHorizontal className="size-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-36">
-                          <DropdownMenuItem onClick={() => onView?.(row)}>
+                          <DropdownMenuItem onClick={() => onView(row)}>
                             <Eye className="size-4" />
                             View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onEdit?.(row)}>
+                          <DropdownMenuItem onClick={() => onEdit(row)}>
                             <Pencil className="size-4" />
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => onDelete(row)}
+                          >
+                            <Trash2 className="size-4" />
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationBar
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          changePageSize={changePageSize}
+          total={total}
+          totalPages={totalPages}
+          start={start}
+          end={end}
+        />
       </div>
-      <TablePaginationBar
-        page={page}
-        setPage={setPage}
-        pageSize={pageSize}
-        changePageSize={changePageSize}
-        total={total}
-        totalPages={totalPages}
-        start={start}
-        end={end}
-      />
-    </div>
-  );
-}
-
-function ActivatedTable({ rows, onView, onEdit, onDelete }) {
-  const {
-    pageRows,
-    page,
-    setPage,
-    pageSize,
-    changePageSize,
-    total,
-    totalPages,
-    start,
-    end,
-  } = usePagedRows(rows);
-  const isEmpty = !rows.length;
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-      <div className="overflow-x-auto">
-        <Table className="w-full table-fixed">
-          <ActivationsColGroup />
-          <TableHeader>
-            <TableRow className="bg-[#800000]/3 hover:bg-[#800000]/3">
-              <TableHead className={cn("font-semibold text-[#3d1212]", COL.name)}>
-                Student name
-              </TableHead>
-              <TableHead className={cn("font-semibold text-[#3d1212]", COL.lrn)}>
-                LRN
-              </TableHead>
-              <TableHead
-                className={cn("font-semibold text-[#3d1212]", COL.section)}
-              >
-                Section
-              </TableHead>
-              <TableHead
-                className={cn("font-semibold text-[#3d1212]", COL.status)}
-              >
-                Status
-              </TableHead>
-              <TableHead
-                className={cn(
-                  "text-right font-semibold text-[#3d1212]",
-                  COL.action
-                )}
-              >
-                Action
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isEmpty ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="h-56 p-0">
-                  <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-2xl bg-[#800000]/8 text-[#800000] ring-1 ring-[#800000]/10">
-                      <Users className="size-7" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-heading text-base font-bold text-[#3d1212]">
-                        No activated students yet
-                      </p>
-                      <p className="max-w-md text-sm text-muted-foreground">
-                        Approved activations will show up here after you verify
-                        pending requests.
-                      </p>
-                    </div>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              pageRows.map((row) => (
-                <TableRow key={row.id} className="hover:bg-[#800000]/2">
-                  <TableCell className={COL.name}>
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#800000]/10 text-xs font-bold text-[#800000]">
-                        {(row.profiles?.first_name || "?").charAt(0)}
-                        {(row.profiles?.last_name || "").charAt(0)}
-                      </span>
-                      <span className="truncate font-medium text-[#3d1212]">
-                        {studentFullName(row)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell
-                    className={cn("font-mono text-xs tabular-nums", COL.lrn)}
-                  >
-                    {row.lrn}
-                  </TableCell>
-                  <TableCell className={cn("truncate text-sm", COL.section)}>
-                    {sectionLabel(row)}
-                  </TableCell>
-                  <TableCell className={COL.status}>
-                    <Badge
-                      variant="outline"
-                      className={
-                        STATUS_BADGE_STYLES[row.activation_status] || ""
-                      }
-                    >
-                      {row.activation_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className={cn("text-right", COL.action)}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-muted-foreground"
-                            aria-label={`Actions for ${studentFullName(row)}`}
-                          />
-                        }
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-36">
-                        <DropdownMenuItem onClick={() => onView(row)}>
-                          <Eye className="size-4" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEdit(row)}>
-                          <Pencil className="size-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => onDelete(row)}
-                        >
-                          <Trash2 className="size-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <TablePaginationBar
-        page={page}
-        setPage={setPage}
-        pageSize={pageSize}
-        changePageSize={changePageSize}
-        total={total}
-        totalPages={totalPages}
-        start={start}
-        end={end}
-      />
     </div>
   );
 }
@@ -1027,6 +1345,13 @@ export function PendingActivationsTable({
   function applyEditedRow(list, payload, section) {
     const guardianName =
       `${payload.parentFirstName || ""} ${payload.parentLastName || ""}`.trim();
+    const phone = String(payload.parentPhone || "").replace(/\D/g, "");
+    const promoteToPending =
+      guardianName &&
+      phone.length >= 10 &&
+      String(
+        list.find((r) => r.id === payload.studentId)?.activation_status || ""
+      ).toLowerCase() === "incomplete";
     return list.map((row) =>
       row.id === payload.studentId
         ? {
@@ -1054,6 +1379,9 @@ export function PendingActivationsTable({
             emergency_contact_number: payload.parentPhone || "",
             parent_name: guardianName,
             parent_phone: payload.parentPhone || "",
+            activation_status: promoteToPending
+              ? "pending"
+              : row.activation_status,
           }
         : row
     );
@@ -1143,9 +1471,8 @@ export function PendingActivationsTable({
                   Pending approvals
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Incomplete = still filling details. Pending = ready to call
-                  the parent number and Approve. Use Edit to correct learner or
-                  guardian details anytime.
+                  Incomplete = missing parent contacts. Pending = details
+                  complete — call the parent number, then Verify &amp; Approve.
                 </p>
               </div>
             </div>
@@ -1163,6 +1490,7 @@ export function PendingActivationsTable({
           ) : null}
           <PendingTable
             rows={pendingList}
+            sections={sortedSections}
             pending={pending}
             onApprove={(id) => act(id, true)}
             onReturn={(id) => act(id, false)}
@@ -1198,6 +1526,7 @@ export function PendingActivationsTable({
           </div>
           <ActivatedTable
             rows={activatedList}
+            sections={sortedSections}
             onView={setViewStudent}
             onEdit={(row) => {
               setError("");

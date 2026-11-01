@@ -935,9 +935,9 @@ export function AcademicsManager({
     const map = {};
     for (const g of subjectGradeOptions) {
       map[g] = localSubjects.filter((s) => {
-        const isShs = isSeniorHighGrade(s.grade_level);
-        if (subjectBand === "jhs" && isShs) return false;
-        if (subjectBand === "shs" && !isShs) return false;
+      const isShs = isSeniorHighGrade(s.grade_level);
+      if (subjectBand === "jhs" && isShs) return false;
+      if (subjectBand === "shs" && !isShs) return false;
         return Number(s.grade_level) === g;
       });
     }
@@ -1038,14 +1038,14 @@ export function AcademicsManager({
           assignSubject !== "all" &&
           a.subjects?.subject_name !== assignSubject
         ) {
-          return false;
-        }
+        return false;
+      }
         if (q) {
           const hay = `${a.teachers?.profiles?.first_name || ""} ${a.teachers?.profiles?.last_name || ""} ${a.sections?.section_name || ""} ${a.subjects?.subject_name || ""} ${a.school_year || ""}`;
           if (!hay.toLowerCase().includes(q)) return false;
         }
-        return true;
-      });
+      return true;
+    });
     }
     return map;
   }, [
@@ -1162,35 +1162,35 @@ export function AcademicsManager({
         <TabsContent value="subjects" className="rounded-2xl border border-[#800000]/10 bg-white p-4 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
+            <Button
+              type="button"
                 variant="outline"
-                className={
-                  subjectBand === "jhs"
+              className={
+                subjectBand === "jhs"
                     ? "border-[#800000]/20 bg-[#800000]/10 text-[#800000] ring-1 ring-[#800000]/12"
-                    : "border-[#800000]/20 text-[#800000]"
-                }
-                onClick={() => {
-                  setSubjectBand("jhs");
+                  : "border-[#800000]/20 text-[#800000]"
+              }
+              onClick={() => {
+                setSubjectBand("jhs");
                   setSubjectGrade("7");
-                }}
-              >
-                Junior High (7–10)
-              </Button>
-              <Button
-                type="button"
+              }}
+            >
+              Junior High (7–10)
+            </Button>
+            <Button
+              type="button"
                 variant="outline"
-                className={
-                  subjectBand === "shs"
+              className={
+                subjectBand === "shs"
                     ? "border-[#800000]/20 bg-[#800000]/10 text-[#800000] ring-1 ring-[#800000]/12"
-                    : "border-[#800000]/20 text-[#800000]"
-                }
-                onClick={() => {
-                  setSubjectBand("shs");
+                  : "border-[#800000]/20 text-[#800000]"
+              }
+              onClick={() => {
+                setSubjectBand("shs");
                   setSubjectGrade("11");
-                }}
-              >
-                Senior High (11–12)
+              }}
+            >
+              Senior High (11–12)
               </Button>
             </div>
             <Button
@@ -1219,7 +1219,7 @@ export function AcademicsManager({
                       : "border-transparent font-medium text-muted-foreground hover:border-[#800000]/30 hover:text-[#5c2a2a]"
                   )}
                 >
-                  Grade {g}
+                    Grade {g}
                   <span
                     className={cn(
                       "rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
@@ -1233,7 +1233,7 @@ export function AcademicsManager({
                 </button>
               );
             })}
-          </div>
+            </div>
 
           {(() => {
             const g = Number(subjectGrade);
@@ -1258,56 +1258,56 @@ export function AcademicsManager({
                         </>
                       )}
                     </colgroup>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Subject</TableHead>
-                        {subjectBand === "shs" ? (
-                          <TableHead>Track / Strand</TableHead>
-                        ) : null}
-                        <TableHead>Weights (W/P/E)</TableHead>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Subject</TableHead>
+                  {subjectBand === "shs" ? (
+                    <TableHead>Track / Strand</TableHead>
+                  ) : null}
+                  <TableHead>Weights (W/P/E)</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                       {rows.length === 0 && (
-                        <EmptyRow
+                  <EmptyRow
                           colSpan={colSpan}
                           message={`No Grade ${g} subjects yet. Add a subject for this grade.`}
                         />
                       )}
                       {rows.map((s) => {
-                        const w = normalizeComponentWeights(s);
-                        return (
-                          <TableRow key={s.id}>
+                  const w = normalizeComponentWeights(s);
+                  return (
+                  <TableRow key={s.id}>
                             <TruncateCell className="font-medium">
-                              {s.subject_name}
+                      {s.subject_name}
                             </TruncateCell>
-                            {subjectBand === "shs" ? (
+                    {subjectBand === "shs" ? (
                               <TruncateCell>
                                 {s.track_strand || "—"}
                               </TruncateCell>
-                            ) : null}
+                    ) : null}
                             <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                              {w.written}/{w.performance}/{w.assessment}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-[#800000]/20 text-[#800000]"
+                      {w.written}/{w.performance}/{w.assessment}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-[#800000]/20 text-[#800000]"
                                 onClick={() => setEditSubject(s)}
-                              >
-                                <Pencil className="size-3.5" />
-                                Weights
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
+                      >
+                        <Pencil className="size-3.5" />
+                        Weights
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  );
+                })}
+              </TableBody>
                   </FixedTable>
-                  <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground">
                     Grade {g}: {rows.length} subject
                     {rows.length === 1 ? "" : "s"} ·{" "}
                     {subjectBand === "shs" ? "Senior High" : "Junior High"}{" "}
@@ -1365,7 +1365,7 @@ export function AcademicsManager({
                 Add section
               </Button>
             </div>
-          </div>
+            </div>
 
           <div className="mb-3 flex flex-wrap gap-1 border-b border-[#800000]/15">
             {sectionGradeOptions.map((g) => {
@@ -1413,19 +1413,19 @@ export function AcademicsManager({
                     <col style={{ width: "24%" }} />
                     <col style={{ width: "6%" }} />
                   </colgroup>
-                  <TableHeader>
-                    <TableRow>
+              <TableHeader>
+                <TableRow>
                       <TableHead>Section</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead className="whitespace-nowrap">Male</TableHead>
                       <TableHead className="whitespace-nowrap">Female</TableHead>
-                      <TableHead>Adviser</TableHead>
+                  <TableHead>Adviser</TableHead>
                       <TableHead className="text-right">
                         <span className="sr-only">Actions</span>
                       </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                     {rows.length === 0 && (
                       <EmptyRow
                         colSpan={6}
@@ -1434,10 +1434,10 @@ export function AcademicsManager({
                     )}
                     {rows.map((s) => {
                       const adviser = resolveSectionAdviser(s, teachers);
-                      return (
-                        <TableRow key={s.id}>
+                  return (
+                    <TableRow key={s.id}>
                           <TruncateCell className="font-medium">
-                            {s.section_name}
+                        {s.section_name}
                           </TruncateCell>
                           <TruncateCell
                             className="text-muted-foreground"
@@ -1447,7 +1447,7 @@ export function AcademicsManager({
                           </TruncateCell>
                           <TableCell className="tabular-nums text-muted-foreground">
                             {s.male_count != null ? s.male_count : "—"}
-                          </TableCell>
+                      </TableCell>
                           <TableCell className="tabular-nums text-muted-foreground">
                             {s.female_count != null ? s.female_count : "—"}
                           </TableCell>
@@ -1508,18 +1508,18 @@ export function AcademicsManager({
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
                 </FixedTable>
-                <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground">
                   Grade {g}: {rows.length} section
                   {rows.length === 1 ? "" : "s"} ·{" "}
                   {sectionBand === "shs" ? "Senior High" : "Junior High"} total{" "}
                   {bandSectionTotal}.
-                </p>
+          </p>
               </>
             );
           })()}
@@ -1687,30 +1687,30 @@ export function AcademicsManager({
               </Button>
             </div>
             <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-1">
+            <div className="space-y-1">
                 <Label className="text-xs">Subject</Label>
-                <select
+              <select
                   value={assignSubject}
                   onChange={(e) => setAssignSubject(e.target.value)}
-                  className={selectClass}
-                >
+                className={selectClass}
+              >
                   <option value="all">All subjects</option>
                   {assignSubjectOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Search</Label>
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Search</Label>
                 <SearchInput
-                  value={assignQ}
-                  onChange={(e) => setAssignQ(e.target.value)}
+                value={assignQ}
+                onChange={(e) => setAssignQ(e.target.value)}
                   placeholder="Teacher, section…"
                   className="w-52"
-                />
-              </div>
+              />
+            </div>
               <Button
                 type="button"
                 onClick={() => openModal("assign")}
@@ -1774,16 +1774,16 @@ export function AcademicsManager({
                       <col style={{ width: "14%" }} />
                       <col style={{ width: "14%" }} />
                     </colgroup>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Teacher</TableHead>
-                        <TableHead>Section</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>School year</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Section</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>School year</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                       {rows.length === 0 && (
                         <EmptyRow
                           colSpan={5}
@@ -1797,7 +1797,7 @@ export function AcademicsManager({
                       {assignmentPaging.pageRows.map((a) => {
                         const teacherName = `${a.teachers?.profiles?.first_name || ""} ${a.teachers?.profiles?.last_name || ""}`.trim();
                         return (
-                          <TableRow key={a.id}>
+                  <TableRow key={a.id}>
                             <TruncateCell
                               className="font-medium"
                               title={teacherName || undefined}
@@ -1812,21 +1812,21 @@ export function AcademicsManager({
                             </TruncateCell>
                             <TableCell className="whitespace-nowrap">
                               {a.school_year}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={pending}
-                                onClick={() => removeAssignment(a.id)}
-                              >
-                                Remove
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() => removeAssignment(a.id)}
+                      >
+                        Remove
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                         );
                       })}
-                    </TableBody>
+              </TableBody>
                   </FixedTable>
                   <TablePaginationBar
                     page={assignmentPaging.page}
@@ -1838,8 +1838,8 @@ export function AcademicsManager({
                     start={assignmentPaging.start}
                     end={assignmentPaging.end}
                   />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
                   Grade {g}: {rows.length} assignment
                   {rows.length === 1 ? "" : "s"}
                   {assignQ.trim() ? " matching search" : ""} ·{" "}
@@ -2012,11 +2012,11 @@ export function AcademicsManager({
                           String(s.grade_level) === String(enrollFormGrade)
                       )
                       .map((s) => (
-                        <option key={s.id} value={s.id}>
+                      <option key={s.id} value={s.id}>
                           {s.section_name} ({s.school_year})
                           {s.track_strand ? ` · ${s.track_strand}` : ""}
-                        </option>
-                      ))}
+                      </option>
+                    ))}
                   </select>
                   {!sections.some(
                     (s) => String(s.grade_level) === String(enrollFormGrade)
@@ -2085,11 +2085,11 @@ export function AcademicsManager({
                         (s) => Number(s.grade_level) === Number(assignGrade)
                       )
                       .map((s) => (
-                        <option key={s.id} value={s.id}>
+                      <option key={s.id} value={s.id}>
                           {s.section_name} ({s.school_year})
                           {s.track_strand ? ` · ${s.track_strand}` : ""}
-                        </option>
-                      ))}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -2101,11 +2101,11 @@ export function AcademicsManager({
                         (s) => Number(s.grade_level) === Number(assignGrade)
                       )
                       .map((s) => (
-                        <option key={s.id} value={s.id}>
+                      <option key={s.id} value={s.id}>
                           {s.subject_name}
                           {s.track_strand ? ` · ${s.track_strand}` : ""}
-                        </option>
-                      ))}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">

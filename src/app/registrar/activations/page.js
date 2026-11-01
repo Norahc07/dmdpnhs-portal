@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PendingActivationsTable } from "@/components/registrar/PendingActivationsTable";
+import { syncIncompleteActivationsWithContacts } from "@/actions/activation";
 import { requireRole } from "@/lib/auth-guard";
+import { resolveActivationStatus } from "@/lib/activation-status";
 import {
   getCachedRegistrarSections,
   getCachedRegistrarStudents,
@@ -10,14 +12,12 @@ import {
 export const metadata = { title: "Student Activations" };
 
 function isAwaitingActivation(student) {
-  const status = String(student?.activation_status || "")
-    .trim()
-    .toLowerCase();
-  return status === "pending" || status === "incomplete" || !status;
+  const status = resolveActivationStatus(student);
+  return status === "pending" || status === "incomplete";
 }
 
 function isActivated(student) {
-  return String(student?.activation_status || "").trim().toLowerCase() === "active";
+  return resolveActivationStatus(student) === "active";
 }
 
 function attachSections(students, sections) {
@@ -31,13 +31,19 @@ function attachSections(students, sections) {
 }
 
 function withEmergencyContact(students) {
-  return (students || []).map((stu) => ({
-    ...stu,
-    parent_name: stu.emergency_contact_name || "",
-    parent_phone: stu.emergency_contact_number || "",
-    parent_email: "",
-    parent_access_code_shown: "",
-  }));
+  return (students || []).map((stu) => {
+    const mapped = {
+      ...stu,
+      parent_name: stu.emergency_contact_name || "",
+      parent_phone: stu.emergency_contact_number || "",
+      parent_email: "",
+      parent_access_code_shown: "",
+    };
+    return {
+      ...mapped,
+      activation_status: resolveActivationStatus(mapped),
+    };
+  });
 }
 
 function ActivationsTableFallback() {
@@ -49,6 +55,9 @@ function ActivationsTableFallback() {
 }
 
 async function ActivationsBody() {
+  // Persist incomplete → pending when guardian contacts already exist.
+  await syncIncompleteActivationsWithContacts();
+
   const [{ rows: studentsRaw, error: loadError }, { rows: sections }] =
     await Promise.all([
       getCachedRegistrarStudents(),
@@ -56,7 +65,9 @@ async function ActivationsBody() {
     ]);
 
   const students = attachSections(studentsRaw, sections);
-  const pendingRows = withEmergencyContact(students.filter(isAwaitingActivation));
+  const pendingRows = withEmergencyContact(
+    students.filter(isAwaitingActivation)
+  );
   const activatedRows = withEmergencyContact(students.filter(isActivated));
 
   return (
@@ -81,7 +92,7 @@ export default async function RegistrarActivationsPage() {
       role="registrar"
       profile={profile}
       title="Student activations"
-      subtitle="Newly enrolled or registered learners stay here until they submit personal and emergency contact details and you Verify & Approve."
+      subtitle="Incomplete = missing parent contacts. Pending = details on file — call to verify, then Approve."
     >
       <Suspense fallback={<ActivationsTableFallback />}>
         <ActivationsBody />

@@ -25,8 +25,14 @@ import {
   restoreStudentFromTrash,
 } from "@/lib/student-active";
 
+import {
+  hasGuardianDetailsReady,
+  isReadyForRegistrarApproval,
+  normalizePhoneDigits,
+} from "@/lib/activation-status";
+
 function normalizePhone(value) {
-  return String(value || "").replace(/\D/g, "");
+  return normalizePhoneDigits(value);
 }
 
 async function generateTeacherId(admin) {
@@ -80,6 +86,7 @@ async function loadStudentById(db, studentId, extraFields = "") {
     "lrn",
     "contact_number",
     "parent_access_code_shown",
+    "emergency_contact_name",
     "emergency_contact_number",
     extraFields,
   ]
@@ -235,6 +242,62 @@ export async function submitStudentActivation(form) {
   redirect("/student?notice=pending");
 }
 
+/**
+ * Promote incomplete students who already have guardian contacts to pending.
+ * Keeps Activations status badges aligned with Verify & Approve.
+ */
+export async function syncIncompleteActivationsWithContacts() {
+  const gate = await requireRegistrar();
+  if (gate.error) return { updated: 0, error: gate.error };
+
+  const db = gate.admin || gate.supabase;
+  let result = await db
+    .from("students")
+    .select(
+      "id, activation_status, emergency_contact_name, emergency_contact_number"
+    )
+    .eq("activation_status", "incomplete")
+    .is("deleted_at", null)
+    .limit(5000);
+
+  if (result.error && /deleted_at/i.test(result.error.message || "")) {
+    result = await db
+      .from("students")
+      .select(
+        "id, activation_status, emergency_contact_name, emergency_contact_number"
+      )
+      .eq("activation_status", "incomplete")
+      .limit(5000);
+  }
+
+  if (result.error) return { updated: 0, error: result.error.message };
+
+  const readyIds = (result.data || [])
+    .filter((row) => hasGuardianDetailsReady(row))
+    .map((row) => row.id);
+
+  if (!readyIds.length) return { updated: 0 };
+
+  let updated = 0;
+  for (let i = 0; i < readyIds.length; i += 100) {
+    const chunk = readyIds.slice(i, i + 100);
+    const { error } = await db
+      .from("students")
+      .update({ activation_status: "pending" })
+      .in("id", chunk);
+    if (error) return { updated, error: error.message };
+    updated += chunk.length;
+  }
+
+  if (updated > 0) {
+    invalidateRegistrarCaches();
+    revalidatePath("/registrar/activations");
+    revalidatePath("/registrar/enrollment");
+  }
+
+  return { updated };
+}
+
 export async function approveStudentActivation({ studentId, approve }) {
   const gate = await requireRegistrar();
   if (gate.error) return gate;
@@ -247,8 +310,11 @@ export async function approveStudentActivation({ studentId, approve }) {
   if (loaded.error) return loaded;
   const student = loaded.student;
 
-  if (student.activation_status !== "pending") {
-    return { error: "Student is not awaiting activation approval." };
+  if (!isReadyForRegistrarApproval(student)) {
+    return {
+      error:
+        "Student is still missing parent/guardian details. Edit the record or wait for the learner to submit activation.",
+    };
   }
 
   const writer = admin || supabase;
@@ -280,10 +346,10 @@ export async function approveStudentActivation({ studentId, approve }) {
         .join(" ");
     }
 
-    if (!parentPhone || normalizePhone(parentPhone).length < 10) {
+    if (!hasGuardianDetailsReady(student)) {
       return {
         error:
-          "Parent/guardian contact number is missing. Call and verify it before approving.",
+          "Parent/guardian name or contact number is missing. Edit the student record before approving.",
       };
     }
     const { error: activateError } = await writer
@@ -422,6 +488,13 @@ export async function updateActivatedStudent(form) {
     emergency_contact_name: guardianName,
     emergency_contact_number: parentPhone,
   };
+  // Registrar-captured guardian details mean the learner is ready to verify.
+  if (
+    String(student.activation_status || "").toLowerCase() === "incomplete" &&
+    hasGuardianDetailsReady(studentPatch)
+  ) {
+    studentPatch.activation_status = "pending";
+  }
   let { error: studentError } = await admin
     .from("students")
     .update(studentPatch)
@@ -742,6 +815,7 @@ export async function enrollStudentByRegistrar(form) {
     return { error: profileError.message };
   }
 
+  const guardianName = `${parentFirstName} ${parentLastName}`.trim();
   const studentInsert = {
     profile_id: userId,
     lrn,
@@ -750,9 +824,9 @@ export async function enrollStudentByRegistrar(form) {
     grade_level: gradeLevel,
     section_id: sectionId,
     status: "enrolled",
-    activation_status: "incomplete",
-    emergency_contact_name:
-      `${parentFirstName} ${parentLastName}`.trim() || null,
+    // Parent contacts are required at enroll — ready for registrar Verify & Approve.
+    activation_status: "pending",
+    emergency_contact_name: guardianName || null,
     emergency_contact_number: parentPhone || null,
     emergency_contact_address: null,
   };
@@ -780,7 +854,7 @@ export async function enrollStudentByRegistrar(form) {
   revalidatePath("/registrar/academics");
   return {
     ok: true,
-    message: `Enrolled LRN ${lrn}. They appear under Awaiting students until personal/guardian details are submitted and you verify them. Sign-in: LRN and birthdate (YYYYMMDD).`,
+    message: `Enrolled LRN ${lrn}. They appear under Pending activations for Verify & Approve. Sign-in: LRN and birthdate (YYYYMMDD).`,
     lrn,
   };
 }
