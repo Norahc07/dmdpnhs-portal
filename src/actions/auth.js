@@ -11,7 +11,11 @@ import {
   studentEmailFromLrn,
   teacherIdYearCode,
 } from "@/lib/constants";
-import { findActiveStudentByLrn } from "@/lib/student-active";
+import {
+  findActiveStudentByLrn,
+  findAnyStudentByLrn,
+  normalizeLrn,
+} from "@/lib/student-active";
 
 
 /**
@@ -37,7 +41,7 @@ async function generateTeacherId(admin) {
 }
 
 export async function loginStudent({ lrn, password }) {
-  const cleanLrn = String(lrn || "").trim();
+  const cleanLrn = normalizeLrn(lrn);
   const pass = String(password || "");
 
   if (!/^\d{12}$/.test(cleanLrn)) {
@@ -51,24 +55,49 @@ export async function loginStudent({ lrn, password }) {
   const { data: student, error: studentError } = await findActiveStudentByLrn(
     admin,
     cleanLrn,
-    "id, profile_id, activation_status, profiles(id, email, status, role)"
+    "id, profile_id, activation_status, status, section_id"
   );
 
-  if (studentError || !student) {
+  if (studentError) {
     return {
       error:
-        "Student record not found. Register an account if you are already enrolled, or contact the registrar.",
+        "Could not look up your LRN right now. Try again, or contact the registrar.",
+    };
+  }
+
+  if (!student) {
+    const { data: anyRow } = await findAnyStudentByLrn(
+      admin,
+      cleanLrn,
+      "id, deleted_at"
+    );
+    if (anyRow?.deleted_at) {
+      return {
+        error:
+          "This LRN is in Trash. Ask the registrar to restore it before signing in.",
+      };
+    }
+    return {
+      error:
+        "Student record not found. Ask the registrar to enroll your LRN first, then sign in.",
     };
   }
 
   if (!student.profile_id) {
     return {
       error:
-        "No portal account yet. Click Register Account and verify with your LRN and birthdate.",
+        "No portal account yet. Use Register Account with your LRN and birthdate to create a password.",
     };
   }
 
-  const email = student.profiles?.email || studentEmailFromLrn(cleanLrn);
+  let email = studentEmailFromLrn(cleanLrn);
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, email, status, role")
+    .eq("id", student.profile_id)
+    .maybeSingle();
+  if (profile?.email) email = profile.email;
+
   const supabase = await createClient();
 
   const { error: signError } = await supabase.auth.signInWithPassword({
@@ -77,7 +106,10 @@ export async function loginStudent({ lrn, password }) {
   });
 
   if (signError) {
-    return { error: "Invalid LRN or password." };
+    return {
+      error:
+        "Invalid LRN or password. After registrar enrollment, the default password is your birthdate (YYYYMMDD) unless you changed it.",
+    };
   }
 
   const activation = student.activation_status || "active";
@@ -91,7 +123,7 @@ export async function loginStudent({ lrn, password }) {
  * Verify LRN + birthdate, create password, then continue to Phase 2 profile.
  */
 export async function registerStudent(form) {
-  const cleanLrn = String(form.lrn || "").trim();
+  const cleanLrn = normalizeLrn(form.lrn);
   const birthdate = String(form.birthdate || "").trim();
   const password = String(form.password || "");
   const confirmPassword = String(form.confirmPassword || "");
@@ -108,23 +140,64 @@ export async function registerStudent(form) {
   }
 
   const admin = createAdminClient();
+  // Flat select only — nested profiles() embeds have caused false "not enrolled" errors.
   const { data: student, error: studentError } = await findActiveStudentByLrn(
     admin,
     cleanLrn,
-    "id, birthdate, profile_id, status, section_id, activation_status, profiles(email, first_name, last_name)"
+    "id, birthdate, profile_id, status, section_id, activation_status"
   );
 
-  if (studentError || !student) {
+  if (studentError) {
     return {
       error:
-        "You are not enrolled yet. Please visit the school registrar to enroll first.",
+        "Could not verify your LRN right now. Try again, or contact the registrar.",
+    };
+  }
+
+  if (!student) {
+    const { data: anyRow } = await findAnyStudentByLrn(
+      admin,
+      cleanLrn,
+      "id, deleted_at, activation_status"
+    );
+    if (anyRow?.deleted_at) {
+      return {
+        error:
+          "This LRN is in Trash. Ask the registrar to restore it before registering.",
+      };
+    }
+    return {
+      error:
+        "You are not enrolled yet. Please visit the school registrar to enroll your LRN first.",
+    };
+  }
+
+  const activation = String(student.activation_status || "")
+    .trim()
+    .toLowerCase();
+
+  // Registrar enroll already creates a portal account — activated students must Sign In.
+  if (activation === "active") {
+    return {
+      error:
+        "This account is already activated. Sign in with your LRN and password (default is birthdate YYYYMMDD if you never changed it).",
+    };
+  }
+
+  if (activation === "pending" && student.profile_id) {
+    return {
+      error:
+        "Your details are waiting for registrar verification. Sign in with your LRN and password to view your temporary dashboard.",
     };
   }
 
   const isEnrolled =
     student.status === "enrolled" ||
     student.status === "promoted" ||
-    Boolean(student.section_id);
+    Boolean(student.section_id) ||
+    activation === "pending" ||
+    activation === "incomplete" ||
+    activation === "active";
 
   if (!isEnrolled) {
     return {
@@ -140,22 +213,19 @@ export async function registerStudent(form) {
     return { error: "LRN and birthdate do not match school records." };
   }
 
-  if (student.activation_status === "active") {
-    return {
-      error: "This account is already active. Please sign in with your password.",
-    };
+  let email = studentEmailFromLrn(cleanLrn);
+  let firstName = "Student";
+  let lastName = cleanLrn;
+  if (student.profile_id) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("email, first_name, last_name")
+      .eq("id", student.profile_id)
+      .maybeSingle();
+    if (profile?.email) email = profile.email;
+    if (profile?.first_name) firstName = profile.first_name;
+    if (profile?.last_name) lastName = profile.last_name;
   }
-
-  if (student.activation_status === "pending" && student.profile_id) {
-    return {
-      error:
-        "Your details are waiting for registrar verification. Sign in to view your temporary dashboard.",
-    };
-  }
-
-  const email = student.profiles?.email || studentEmailFromLrn(cleanLrn);
-  const firstName = student.profiles?.first_name || "Student";
-  const lastName = student.profiles?.last_name || cleanLrn;
 
   let userId = student.profile_id;
 
@@ -216,15 +286,16 @@ export async function registerStudent(form) {
     .update({ status: "pending" })
     .eq("id", userId);
 
-  // Stay incomplete until Phase 2 personal/parent details are submitted
-  const { error: stuErr } = await admin
-    .from("students")
-    .update({
-      activation_status: "incomplete",
-    })
-    .eq("id", student.id);
-
-  if (stuErr) return { error: stuErr.message };
+  // Phase 2 still needed — keep incomplete, but never demote pending/active.
+  if (activation !== "pending" && activation !== "active") {
+    const { error: stuErr } = await admin
+      .from("students")
+      .update({
+        activation_status: "incomplete",
+      })
+      .eq("id", student.id);
+    if (stuErr) return { error: stuErr.message };
+  }
 
   const supabase = await createClient();
   const { error: signError } = await supabase.auth.signInWithPassword({
@@ -251,7 +322,7 @@ export async function registerStudent(form) {
  * Reset password: verify LRN + birthdate, then set a new password.
  */
 export async function resetStudentPassword(form) {
-  const cleanLrn = String(form.lrn || "").trim();
+  const cleanLrn = normalizeLrn(form.lrn);
   const birthdate = String(form.birthdate || "").trim();
   const password = String(form.password || "");
   const confirmPassword = String(form.confirmPassword || "");
@@ -268,11 +339,18 @@ export async function resetStudentPassword(form) {
   }
 
   const admin = createAdminClient();
-  const { data: student } = await findActiveStudentByLrn(
+  const { data: student, error: studentError } = await findActiveStudentByLrn(
     admin,
     cleanLrn,
-    "id, birthdate, profile_id, activation_status, profiles(email)"
+    "id, birthdate, profile_id, activation_status"
   );
+
+  if (studentError) {
+    return {
+      error:
+        "Could not verify your LRN right now. Try again, or contact the registrar.",
+    };
+  }
 
   if (!student) {
     return { error: "Student record not found." };
@@ -285,7 +363,7 @@ export async function resetStudentPassword(form) {
     return { error: "LRN and birthdate do not match." };
   }
 
-  if (!student.profile_id || student.activation_status === "incomplete") {
+  if (!student.profile_id) {
     return {
       error: "No account yet. Please Register Account first.",
     };

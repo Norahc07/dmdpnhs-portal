@@ -76,8 +76,9 @@ export function StudentRegisterForm() {
           Student Registration
         </h1>
         <p className="mt-1 font-sans text-sm text-neutral-600">
-          Phase 1: verify your LRN and birthdate, then create your portal
-          password. You must already be enrolled by the registrar.
+          Use this only if the registrar enrolled your LRN and you still need to
+          create or reset a portal password. Already activated? Use Sign In
+          instead.
         </p>
       </div>
 
@@ -91,16 +92,20 @@ export function StudentRegisterForm() {
             </h2>
           </div>
           <p className="mt-2 font-sans text-sm leading-relaxed text-neutral-600">
-            Follow these steps so the registrar can verify your account at{" "}
-            {SCHOOL_NAME}.
+            Follow these steps at {SCHOOL_NAME}. If the registrar already
+            enrolled and activated you, go to{" "}
+            <Link href="/login/student" className="font-semibold text-[#800000] underline">
+              Sign In
+            </Link>{" "}
+            (password defaults to birthdate YYYYMMDD).
           </p>
           <ol className="mt-5 space-y-3">
             {[
-              "Ask the registrar to enroll your LRN in the system first.",
-              "Phase 1: Verify with your LRN and birthdate, then create a password.",
-              "Phase 2: Enter personal details and parent/guardian contacts.",
-              "Wait for registrar verification (they will call the parent number).",
-              "When activated, sign in with your LRN and password.",
+              "Ask the registrar to enroll your LRN (and parent contacts) first.",
+              "If you do not have a password yet: verify LRN + birthdate here and create one.",
+              "Complete Phase 2 personal details only if the portal asks you to.",
+              "Wait for registrar Verify & Approve if your status is still Pending.",
+              "When status is Active, sign in with LRN and your password — do not register again.",
             ].map((step, i) => (
               <li key={step} className="flex gap-3 font-sans text-sm text-[#3d1212]">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#800000] text-xs font-bold text-white">

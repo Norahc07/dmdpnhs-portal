@@ -24,30 +24,61 @@ export async function selectActiveStudents(db, fields, apply = (q) => q) {
   return result;
 }
 
+/** Normalize LRN input to digits only (ignores spaces/dashes users may type). */
+export function normalizeLrn(lrn) {
+  return String(lrn || "").replace(/\D/g, "").trim();
+}
+
 export async function findActiveStudentByLrn(db, lrn, fields = "id") {
-  const clean = String(lrn || "").trim();
+  const clean = normalizeLrn(lrn);
   if (!clean) return { data: null, error: null };
+
+  // Avoid nested resource embeds here — callers can load related rows separately.
+  // Embeds can fail with schema-cache / relationship errors and look like "not enrolled".
   let result = await db
     .from("students")
     .select(fields)
     .eq("lrn", clean)
     .is("deleted_at", null)
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
   if (result.error && isMissingDeletedAtColumn(result.error)) {
     result = await db
       .from("students")
       .select(fields)
       .eq("lrn", clean)
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
   }
+
+  // If created_at is missing from schema, retry without order.
+  if (result.error && /created_at/i.test(result.error.message || "")) {
+    result = await db
+      .from("students")
+      .select(fields)
+      .eq("lrn", clean)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (result.error && isMissingDeletedAtColumn(result.error)) {
+      result = await db
+        .from("students")
+        .select(fields)
+        .eq("lrn", clean)
+        .limit(1)
+        .maybeSingle();
+    }
+  }
+
   return result;
 }
 
 /** Find any student row for an LRN, including Trash. */
 export async function findAnyStudentByLrn(db, lrn, fields = "id, deleted_at") {
-  const clean = String(lrn || "").trim();
+  const clean = normalizeLrn(lrn);
   if (!clean) return { data: null, error: null };
   let result = await db
     .from("students")
