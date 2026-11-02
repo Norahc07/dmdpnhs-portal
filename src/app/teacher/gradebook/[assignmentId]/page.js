@@ -11,10 +11,8 @@ import {
   humssTermLabel,
   isHumssGrade12,
 } from "@/lib/humss-academic-record";
-import { listSubjectEnrolledStudentIds } from "@/lib/shs-subject-enrollment";
 import { loadTeacherSectionRoster } from "@/lib/teacher-roster";
 import { getTeacherAccess } from "@/lib/teacher-access";
-import { isSeniorHighGrade } from "@/lib/constants";
 
 export const metadata = { title: "Class Record" };
 
@@ -49,23 +47,10 @@ export default async function ClassRecordPage({ params, searchParams }) {
     redirect(`/teacher/gradebook/${assignment.id}?term=${offeredTerm}`);
   }
 
+  // Teacher load is section-scoped (same subject may exist on other sections).
+  // Always use the full section roster so sparse subject-enrollment rows cannot hide learners.
   const roster = await loadTeacherSectionRoster(assignment.sections.id);
-  let students = roster.students || [];
-
-  // SHS: narrow to subject-term enrollments only when that list overlaps the section roster.
-  if (isSeniorHighGrade(assignment.sections.grade_level)) {
-    const enrolledIds = await listSubjectEnrolledStudentIds(supabase, {
-      sectionId: assignment.sections.id,
-      subjectId: assignment.subjects.id,
-      schoolYear: assignment.school_year,
-      term: offeredTerm || term,
-    });
-    if (Array.isArray(enrolledIds) && enrolledIds.length > 0) {
-      const allow = new Set(enrolledIds);
-      const filtered = students.filter((s) => allow.has(s.id));
-      if (filtered.length > 0) students = filtered;
-    }
-  }
+  const students = roster.students || [];
 
   let classRecord = null;
   const withTerm = await supabase

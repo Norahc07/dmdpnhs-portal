@@ -188,7 +188,7 @@ Expected: section appears on the teacher’s **Student Management** and **Academ
 4. Confirm message that term subjects were enrolled (or Activations → Edit → check “Enroll in current-term subjects”, or **Enroll term subjects** on an activated row).
 5. Assign Teacher A to HUMSS-A + MIL and Teacher B to HUMSS-B + MIL (same subject, different sections).
 
-Expected: student dashboard / grades prefer that term’s enrolled subjects. Gradebook roster for a load prefers students registered in that subject+term when enrollment rows exist; otherwise falls back to the whole section. Student self-enrollment windows are **not** in this release.
+Expected: student dashboard / grades prefer that term’s enrolled subjects. Teacher Academic Records / Class Record for a load always lists the full section roster (same learners as Student Management for that section). Student self-enrollment windows are **not** in this release.
 
 ### 3.2 Teacher — section rosters
 
