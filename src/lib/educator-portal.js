@@ -53,8 +53,8 @@ export const EDUCATOR_PORTAL_MODULES = [
   },
   {
     href: "/teacher/evaluation",
-    label: "Evaluation",
-    description: "Rate the portal and your assigned sections.",
+    label: "Student evaluations",
+    description: "Anonymous ratings students submitted about your teaching.",
     group: "modules",
   },
   {
@@ -66,19 +66,13 @@ export const EDUCATOR_PORTAL_MODULES = [
   {
     href: "/teacher/profile",
     label: "Profile",
-    description: "Photo and personal details used across the portal.",
+    description: "Photo, personal details, and password.",
     group: "account",
   },
   {
     href: "/teacher/settings",
     label: "Account Settings",
     description: "Teacher ID, sign-in details, and shortcuts.",
-    group: "account",
-  },
-  {
-    href: "/teacher/password",
-    label: "Change Password",
-    description: "Update the password for your email or Teacher ID.",
     group: "account",
   },
 ];

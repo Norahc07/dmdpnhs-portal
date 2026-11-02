@@ -11,7 +11,10 @@ import {
 import { getStudentGradesUnlockStatus } from "@/actions/evaluation";
 import { requireRole } from "@/lib/auth-guard";
 import { SCHOOL_YEAR_DEFAULT } from "@/lib/constants";
-import { currentEvaluationTerm } from "@/lib/evaluation";
+import {
+  resolveStudentGradeGateTerm,
+} from "@/lib/evaluation";
+import { termLabel } from "@/lib/grades-terms";
 import { isHumssGrade12 } from "@/lib/humss-academic-record";
 
 export const metadata = { title: "Academic Records" };
@@ -24,7 +27,7 @@ export default async function StudentGradesPage() {
 
   const { data: studentRow } = await supabase
     .from("students")
-    .select("id, grade_level, section_id, lrn, personal_email")
+    .select("id, grade_level, section_id, lrn, personal_email, current_term")
     .eq("profile_id", profile.id)
     .maybeSingle();
 
@@ -43,14 +46,14 @@ export default async function StudentGradesPage() {
 
   const studentId = student?.id;
   const schoolYear = student?.sections?.school_year || SCHOOL_YEAR_DEFAULT;
-  const unlockTerm = currentEvaluationTerm();
+  const unlockTerm = resolveStudentGradeGateTerm(student);
 
   const unlock = studentId
     ? await getStudentGradesUnlockStatus({
         schoolYear,
         term: unlockTerm,
       })
-    : { unlocked: false, progress: null };
+    : { unlocked: false, progress: null, activeTerm: unlockTerm };
 
   const academicMode = isHumssGrade12(student?.sections || student, null);
 
@@ -69,9 +72,10 @@ export default async function StudentGradesPage() {
     : "Not yet assigned";
 
   const progress = unlock.progress;
-  const unlocked = unlock.unlocked === true;
+  const currentTermUnlocked = unlock.unlocked === true;
   const classRecordRows = classRecord.rows || [];
   const gradeRows = subjectGrades.rows || [];
+  const gateLabel = termLabel(unlockTerm);
 
   return (
     <AppShell
@@ -107,8 +111,8 @@ export default async function StudentGradesPage() {
 
           <div className="space-y-4 p-4 sm:p-6">
             <EvaluationProgressCard
-              title={`Term ${unlockTerm} evaluation required`}
-              complete={unlocked}
+              title={`${gateLabel} evaluation (one-time)`}
+              complete={currentTermUnlocked}
               totalCompleted={progress?.totalCompleted || 0}
               totalRequired={progress?.totalRequired || 1}
               items={[
@@ -128,9 +132,12 @@ export default async function StudentGradesPage() {
                   done: t.done,
                 })),
               ]}
-              ctaHref={unlock.evaluationHref || "/student/evaluation"}
-              ctaLabel="Complete evaluation to unlock grades"
-              lockedMessage="You cannot view grades until evaluations for this term are complete."
+              ctaHref={
+                unlock.evaluationHref ||
+                `/student/evaluation?term=${unlockTerm}`
+              }
+              ctaLabel={`Complete ${gateLabel} evaluation`}
+              lockedMessage={`After ${gateLabel} grades are released, finish this evaluation once to open ${gateLabel} records. Earlier terms stay open.`}
             />
 
             <p className="rounded-xl border border-[#800000]/08 bg-[#faf7f5]/70 px-3 py-2 text-sm">
@@ -146,25 +153,40 @@ export default async function StudentGradesPage() {
           </div>
         </div>
 
-        {unlocked ? (
-          academicMode ? (
+        {academicMode ? (
+          currentTermUnlocked ? (
             <AcademicRecordView
               rows={academicRecord.rows || []}
               emptyHint="Your teacher has not encoded Final Grades yet."
             />
           ) : (
+            <div className="space-y-3">
+              <AcademicRecordView
+                rows={(academicRecord.rows || []).filter(
+                  (row) => Number(row.term) < Number(unlockTerm)
+                )}
+                emptyHint={`No earlier-term academic records yet. ${gateLabel} stays locked until you finish evaluation.`}
+              />
+              <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-[#faf7f5] px-5 py-6 text-center text-sm text-muted-foreground">
+                {gateLabel} academic record unlocks after you complete the
+                one-time evaluation for this term.
+              </div>
+            </div>
+          )
+        ) : (
           <StudentGradesTabs
             classRecordRows={classRecordRows}
             subjectGradeRows={gradeRows}
             privacyLabel="Your record only"
             classRecordEmpty="No class record scores yet. Written and Performance appear as your teacher encodes them."
             gradesEmpty="No published subject grades yet. Locked term grades appear here."
+            lockedTerm={unlockTerm}
+            currentTermUnlocked={currentTermUnlocked}
+            evaluationHref={
+              unlock.evaluationHref ||
+              `/student/evaluation?term=${unlockTerm}`
+            }
           />
-          )
-        ) : (
-          <div className="rounded-2xl border border-dashed border-[#800000]/20 bg-[#faf7f5] px-5 py-10 text-center text-sm text-muted-foreground">
-            Grades stay locked until you finish the required evaluations.
-          </div>
         )}
       </div>
     </AppShell>

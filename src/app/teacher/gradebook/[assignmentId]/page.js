@@ -12,7 +12,9 @@ import {
   isHumssGrade12,
 } from "@/lib/humss-academic-record";
 import { listSubjectEnrolledStudentIds } from "@/lib/shs-subject-enrollment";
+import { loadTeacherSectionRoster } from "@/lib/teacher-roster";
 import { getTeacherAccess } from "@/lib/teacher-access";
+import { isSeniorHighGrade } from "@/lib/constants";
 
 export const metadata = { title: "Class Record" };
 
@@ -47,33 +49,22 @@ export default async function ClassRecordPage({ params, searchParams }) {
     redirect(`/teacher/gradebook/${assignment.id}?term=${offeredTerm}`);
   }
 
-  let studentsRes = await supabase
-    .from("students")
-    .select("id, lrn, gender, profiles(first_name, last_name)")
-    .eq("section_id", assignment.sections.id)
-    .is("deleted_at", null)
-    .order("gender")
-    .order("lrn");
-  if (studentsRes.error && /deleted_at/i.test(studentsRes.error.message || "")) {
-    studentsRes = await supabase
-      .from("students")
-      .select("id, lrn, gender, profiles(first_name, last_name)")
-      .eq("section_id", assignment.sections.id)
-      .order("gender")
-      .order("lrn");
-  }
-  let students = studentsRes.data || [];
+  const roster = await loadTeacherSectionRoster(assignment.sections.id);
+  let students = roster.students || [];
 
-  // Prefer subject-registered SHS learners when enrollments exist for this load.
-  const enrolledIds = await listSubjectEnrolledStudentIds(supabase, {
-    sectionId: assignment.sections.id,
-    subjectId: assignment.subjects.id,
-    schoolYear: assignment.school_year,
-    term: offeredTerm || term,
-  });
-  if (Array.isArray(enrolledIds) && enrolledIds.length > 0) {
-    const allow = new Set(enrolledIds);
-    students = students.filter((s) => allow.has(s.id));
+  // SHS: narrow to subject-term enrollments only when that list overlaps the section roster.
+  if (isSeniorHighGrade(assignment.sections.grade_level)) {
+    const enrolledIds = await listSubjectEnrolledStudentIds(supabase, {
+      sectionId: assignment.sections.id,
+      subjectId: assignment.subjects.id,
+      schoolYear: assignment.school_year,
+      term: offeredTerm || term,
+    });
+    if (Array.isArray(enrolledIds) && enrolledIds.length > 0) {
+      const allow = new Set(enrolledIds);
+      const filtered = students.filter((s) => allow.has(s.id));
+      if (filtered.length > 0) students = filtered;
+    }
   }
 
   let classRecord = null;

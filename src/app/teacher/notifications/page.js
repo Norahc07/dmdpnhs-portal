@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
-import {
-  getEvaluationContext,
-  listMyEvaluations,
-} from "@/actions/evaluation";
 import { loadTeacherHandledSections } from "@/lib/announcements";
 import { requireRole } from "@/lib/auth-guard";
-import {
-  TEACHER_YEAR_END_TERM,
-  computeTeacherYearCompletion,
-} from "@/lib/evaluation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTeacherAccess } from "@/lib/teacher-access";
 import { cn } from "@/lib/utils";
@@ -20,29 +12,6 @@ export default async function TeacherNotificationsPage() {
   const { supabase, profile } = await requireRole("teacher");
   const teacherAccess = await getTeacherAccess(supabase, profile.id);
   const items = [];
-
-  const ctx = await getEvaluationContext();
-  if (!ctx.error) {
-    const listed = await listMyEvaluations({
-      schoolYear: ctx.schoolYear,
-      term: TEACHER_YEAR_END_TERM,
-    });
-    const progress = computeTeacherYearCompletion({
-      sections: ctx.sections || [],
-      evaluations: listed.evaluations || [],
-      schoolYear: ctx.schoolYear,
-    });
-    if (!progress.complete) {
-      items.push({
-        id: "evaluation",
-        href: "/teacher/evaluation",
-        kicker: "Evaluation",
-        title: "Year-end evaluation is still open",
-        detail: `${progress.totalCompleted} of ${progress.totalRequired} required ratings submitted.`,
-        unread: true,
-      });
-    }
-  }
 
   if (teacherAccess.canValidateGrades) {
     items.push({

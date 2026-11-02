@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Pencil } from "lucide-react";
 import { updateTeacherProfile } from "@/actions/profile";
 import { ProfilePicturePicker } from "@/components/profile/ProfilePicturePicker";
+import { ChangePasswordForm } from "@/components/student/ChangePasswordForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,6 +77,7 @@ export function TeacherProfileForm({ profile, teacher }) {
   }
 
   return (
+    <div className="space-y-5">
     <div
       className="flex w-full items-stretch gap-4"
       style={{ display: "flex", flexDirection: "row", alignItems: "stretch" }}
@@ -306,6 +308,24 @@ export function TeacherProfileForm({ profile, teacher }) {
           </div>
         </div>
       </form>
+    </div>
+
+      <section className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
+        <div className="portal-panel-head px-4 py-4 sm:px-5">
+          <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
+            Password management
+          </p>
+          <h3 className="mt-1 font-heading text-sm font-bold text-[#3d1212]">
+            Change the password for email or Teacher ID
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Enter your current password, then choose and confirm a new one.
+          </p>
+        </div>
+        <div className="p-4 sm:p-5">
+          <ChangePasswordForm embedded audience="teacher" />
+        </div>
+      </section>
     </div>
   );
 }

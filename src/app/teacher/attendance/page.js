@@ -12,6 +12,8 @@ import {
   unsealTeacherSectionToken,
 } from "@/lib/sealed-token";
 import { getTeacherAccess } from "@/lib/teacher-access";
+import { loadTeacherSectionRoster } from "@/lib/teacher-roster";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   filterHumssAttendanceSubjects,
   isHumssGrade12,
@@ -124,21 +126,22 @@ export default async function TeacherAttendancePage({ searchParams }) {
 
   const sectionIds = Array.from(sectionMap.keys());
   if (sectionIds.length) {
-    let studentCountRes = await supabase
+    const admin = createAdminClient();
+    let studentCountRes = await admin
       .from("students")
       .select("id, section_id")
       .in("section_id", sectionIds)
-      .eq("activation_status", "active")
+      .in("activation_status", ["active", "pending"])
       .is("deleted_at", null);
     if (
       studentCountRes.error &&
       /deleted_at/i.test(studentCountRes.error.message || "")
     ) {
-      studentCountRes = await supabase
+      studentCountRes = await admin
         .from("students")
         .select("id, section_id")
         .in("section_id", sectionIds)
-        .eq("activation_status", "active");
+        .in("activation_status", ["active", "pending"]);
     }
     const studentRows = studentCountRes.data;
     const counts = {};
@@ -257,22 +260,8 @@ export default async function TeacherAttendancePage({ searchParams }) {
     ? `Grade ${selectedSection.grade_level} · ${selectedSection.section_name}`
     : "Section";
 
-  let studentsRes = await supabase
-    .from("students")
-    .select("id, lrn, profiles(first_name, last_name)")
-    .eq("section_id", selectedId)
-    .eq("activation_status", "active")
-    .is("deleted_at", null)
-    .order("lrn");
-  if (studentsRes.error && /deleted_at/i.test(studentsRes.error.message || "")) {
-    studentsRes = await supabase
-      .from("students")
-      .select("id, lrn, profiles(first_name, last_name)")
-      .eq("section_id", selectedId)
-      .eq("activation_status", "active")
-      .order("lrn");
-  }
-  const students = studentsRes.data;
+  const roster = await loadTeacherSectionRoster(selectedId);
+  const students = roster.students || [];
 
   let attendanceQuery = supabase
     .from("attendance")

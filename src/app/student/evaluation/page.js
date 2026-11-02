@@ -59,7 +59,7 @@ export default async function StudentEvaluationPage({ searchParams }) {
       role="student"
       profile={profile}
       title="Term evaluation"
-      subtitle={`LRN ${ctx.lrn || "—"} · Finish system, self-assessment, and every subject teacher to unlock Term ${term} grades.`}
+      subtitle={`LRN ${ctx.lrn || "—"} · One-time for Term ${term}: finish system, self-assessment, and each subject teacher to unlock that term’s grades. Earlier terms stay open.`}
       studentAccess={studentAccess}
     >
       {listed.tableMissing ? (

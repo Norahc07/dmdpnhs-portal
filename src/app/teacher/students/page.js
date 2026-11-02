@@ -10,6 +10,7 @@ import {
   sealTeacherSectionToken,
   unsealTeacherSectionToken,
 } from "@/lib/sealed-token";
+import { loadTeacherSectionRoster } from "@/lib/teacher-roster";
 import {
   Table,
   TableBody,
@@ -124,27 +125,11 @@ export default async function TeacherStudentsPage({ searchParams }) {
     : null;
 
   let students = [];
+  let rosterError = "";
   if (selectedId) {
-    let roster = await supabase
-      .from("students")
-      .select(
-        "id, lrn, gender, grade_level, status, activation_status, section_id, profiles(first_name, last_name)"
-      )
-      .eq("section_id", selectedId)
-      .eq("activation_status", "active")
-      .is("deleted_at", null)
-      .order("lrn");
-    if (roster.error && /deleted_at/i.test(roster.error.message || "")) {
-      roster = await supabase
-        .from("students")
-        .select(
-          "id, lrn, gender, grade_level, status, activation_status, section_id, profiles(first_name, last_name)"
-        )
-        .eq("section_id", selectedId)
-        .eq("activation_status", "active")
-        .order("lrn");
-    }
-    students = roster.data || [];
+    const roster = await loadTeacherSectionRoster(selectedId);
+    students = roster.students || [];
+    rosterError = roster.error || "";
   }
 
   return (
@@ -227,7 +212,7 @@ export default async function TeacherStudentsPage({ searchParams }) {
             </p>
             <p className="font-heading text-sm font-bold text-[#3d1212]">
               {selectedSection
-                ? `Active learners · G${selectedSection.grade_level} ${selectedSection.section_name}`
+                ? `Enrolled learners · G${selectedSection.grade_level} ${selectedSection.section_name}`
                 : "Select a section to view learners"}
             </p>
           </div>
@@ -236,6 +221,11 @@ export default async function TeacherStudentsPage({ searchParams }) {
             {(students || []).length}
           </span>
         </div>
+        {rosterError ? (
+          <p className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+            {rosterError}
+          </p>
+        ) : null}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -244,6 +234,7 @@ export default async function TeacherStudentsPage({ searchParams }) {
                 <TableHead className="text-[#3d1212]">LRN</TableHead>
                 <TableHead className="text-[#3d1212]">Gender</TableHead>
                 <TableHead className="text-[#3d1212]">Section</TableHead>
+                <TableHead className="text-[#3d1212]">Activation</TableHead>
                 <TableHead className="text-[#3d1212]">Status</TableHead>
                 {canAssignSecretary ? (
                   <TableHead className="text-right text-[#3d1212]">
@@ -256,7 +247,7 @@ export default async function TeacherStudentsPage({ searchParams }) {
               {!selectedId && (
                 <TableRow>
                   <TableCell
-                    colSpan={canAssignSecretary ? 6 : 5}
+                    colSpan={canAssignSecretary ? 7 : 6}
                     className="text-muted-foreground"
                   >
                     Click an assigned section above to load its roster.
@@ -266,10 +257,11 @@ export default async function TeacherStudentsPage({ searchParams }) {
               {selectedId && (students || []).length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={canAssignSecretary ? 6 : 5}
+                    colSpan={canAssignSecretary ? 7 : 6}
                     className="text-muted-foreground"
                   >
-                    No active students in this section yet.
+                    No enrolled students in this section yet. Ask the registrar
+                    to place learners in this section.
                   </TableCell>
                 </TableRow>
               )}
@@ -278,7 +270,7 @@ export default async function TeacherStudentsPage({ searchParams }) {
                 return (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium text-[#3d1212]">
-                    {s.profiles?.last_name}, {s.profiles?.first_name}
+                    {s.profiles?.last_name || "—"}, {s.profiles?.first_name || "—"}
                     {isSecretary ? (
                       <span className="ml-2 inline-flex rounded-md bg-[#ffd700]/25 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#6a4d00] uppercase">
                         Secretary
@@ -289,6 +281,9 @@ export default async function TeacherStudentsPage({ searchParams }) {
                   <TableCell>{s.gender}</TableCell>
                   <TableCell>
                     G{selectedSection?.grade_level} {selectedSection?.section_name}
+                  </TableCell>
+                  <TableCell className="capitalize">
+                    {s.activation_status || "—"}
                   </TableCell>
                   <TableCell>{s.status}</TableCell>
                   {canAssignSecretary ? (

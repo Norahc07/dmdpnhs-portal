@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { ClassRecordCards } from "@/components/teacher/ClassRecordCards";
 import { requireRole } from "@/lib/auth-guard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
 export const metadata = { title: "Academic Records" };
@@ -62,12 +63,21 @@ export default async function TeacherGradebookPage() {
 
   let students = [];
   if (sectionIds.length) {
-    const { data } = await supabase
+    const admin = createAdminClient();
+    let result = await admin
       .from("students")
       .select("id, section_id")
       .in("section_id", sectionIds)
-      .eq("activation_status", "active");
-    students = data || [];
+      .in("activation_status", ["active", "pending"])
+      .is("deleted_at", null);
+    if (result.error && /deleted_at/i.test(result.error.message || "")) {
+      result = await admin
+        .from("students")
+        .select("id, section_id")
+        .in("section_id", sectionIds)
+        .in("activation_status", ["active", "pending"]);
+    }
+    students = result.data || [];
   }
 
   const groupsBySection = new Map();

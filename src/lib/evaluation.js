@@ -184,6 +184,21 @@ export function currentEvaluationTerm() {
   return 3;
 }
 
+/**
+ * Term that currently gates grade viewing for a student.
+ * Prefer registrar-set students.current_term; fall back to calendar term.
+ */
+export function resolveStudentGradeGateTerm(student) {
+  const fromRecord = Number(student?.current_term);
+  if ([1, 2, 3].includes(fromRecord)) return fromRecord;
+  return currentEvaluationTerm();
+}
+
+/** Previous terms are freely viewable; only the active/current term needs evaluation. */
+export function isPriorGradeTerm(term, activeTerm) {
+  return Number(term) < Number(activeTerm);
+}
+
 export function evaluationTermOptions(schoolYear = SCHOOL_YEAR_DEFAULT) {
   return GRADE_TERMS.map((t) => ({
     value: String(t.value),

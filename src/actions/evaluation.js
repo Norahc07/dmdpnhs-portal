@@ -8,7 +8,9 @@ import {
   averageFromScores,
   computeStudentTermCompletion,
   currentEvaluationTerm,
+  isPriorGradeTerm,
   questionsFor,
+  resolveStudentGradeGateTerm,
   TEACHER_YEAR_END_TERM,
 } from "@/lib/evaluation";
 
@@ -268,7 +270,8 @@ export async function listMyEvaluations({ schoolYear, term } = {}) {
 
 /**
  * Whether a student may view official grades for a school year + term.
- * Requires system eval + all section teachers evaluated for that term.
+ * Prior terms are always unlocked. The active term requires a one-time
+ * system + self + subject-teacher evaluation before grades for that term open.
  */
 export async function getStudentGradesUnlockStatus({
   schoolYear,
@@ -282,15 +285,31 @@ export async function getStudentGradesUnlockStatus({
 
   const { profile, admin } = auth;
   const sy = schoolYear || SCHOOL_YEAR_DEFAULT;
-  const termNum = Number(term) || currentEvaluationTerm();
 
   const { data: student } = await admin
     .from("students")
-    .select("id, section_id")
+    .select("id, section_id, current_term")
     .eq("profile_id", profile.id)
     .maybeSingle();
 
   if (!student) return { error: "Student record not found." };
+
+  const activeTerm = resolveStudentGradeGateTerm(student);
+  const termNum = Number(term) || activeTerm;
+
+  // Finished / previous terms stay readable without re-evaluating.
+  if (isPriorGradeTerm(termNum, activeTerm)) {
+    return {
+      unlocked: true,
+      priorTerm: true,
+      activeTerm,
+      progress: null,
+      schoolYear: sy,
+      term: termNum,
+      tableMissing: false,
+      evaluationHref: `/student/evaluation?term=${activeTerm}`,
+    };
+  }
 
   const teachers = await loadStudentSectionTeachers(
     admin,
@@ -311,6 +330,8 @@ export async function getStudentGradesUnlockStatus({
     if (isMissingTable(evalError)) {
       return {
         unlocked: false,
+        priorTerm: false,
+        activeTerm,
         progress: computeStudentTermCompletion({
           teachers,
           evaluations: [],
@@ -335,6 +356,8 @@ export async function getStudentGradesUnlockStatus({
 
   return {
     unlocked: progress.complete,
+    priorTerm: false,
+    activeTerm,
     progress,
     schoolYear: sy,
     term: termNum,
@@ -359,26 +382,22 @@ export async function submitEvaluation({
   const { admin, profile } = auth;
 
   const role = profile.role;
-  if (!["student", "teacher"].includes(role)) {
+  if (role === "teacher") {
+    return {
+      error: "Teacher evaluation forms are no longer available.",
+    };
+  }
+  if (role !== "student") {
     return { error: "Unauthorized role." };
   }
 
   const type = String(evaluationType || "").trim();
-  const allowed = ["system", "teacher", "section", "self", "student"];
+  const allowed = ["system", "teacher", "self"];
   if (!allowed.includes(type)) {
     return { error: "Invalid evaluation type." };
   }
-  if ((type === "teacher" || type === "self") && role !== "student") {
-    return { error: "Only students can submit this evaluation." };
-  }
-  if ((type === "section" || type === "student") && role !== "teacher") {
-    return { error: "Only teachers can submit this evaluation." };
-  }
 
   let termNum = Number(term);
-  if (role === "teacher") {
-    termNum = TEACHER_YEAR_END_TERM;
-  }
   if (![1, 2, 3].includes(termNum)) return { error: "Choose a valid term." };
   const sy = schoolYear || SCHOOL_YEAR_DEFAULT;
 
@@ -527,7 +546,173 @@ export async function submitEvaluation({
   revalidatePath(`/${role}/evaluation`);
   revalidatePath("/student/grades");
   revalidatePath("/registrar/evaluation");
+  if (type === "teacher" && teacherId) {
+    revalidatePath("/teacher/evaluation");
+  }
   return { ok: true, average };
+}
+
+/**
+ * Teacher read-only: anonymous student ratings of this teacher (per subject/term).
+ * Students must complete these before term grades unlock.
+ */
+export async function listTeacherReceivedEvaluations({
+  schoolYear,
+  term,
+} = {}) {
+  const auth = await getAuth();
+  if (auth.error) return { error: auth.error };
+  if (auth.profile.role !== "teacher") {
+    return { error: "Teachers only." };
+  }
+
+  const { admin, profile } = auth;
+  const sy = schoolYear || SCHOOL_YEAR_DEFAULT;
+  const termNum = term != null && term !== "" ? Number(term) : null;
+
+  const { data: teacher } = await admin
+    .from("teachers")
+    .select("id, teacher_id")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  if (!teacher?.id) return { error: "Teacher record not found." };
+
+  let query = admin
+    .from("evaluations")
+    .select(
+      `
+      id,
+      school_year,
+      term,
+      evaluation_type,
+      target_teacher_id,
+      target_subject_id,
+      target_section_id,
+      scores,
+      average_score,
+      comments,
+      updated_at,
+      subjects ( id, subject_name ),
+      sections ( id, section_name, grade_level )
+    `
+    )
+    .eq("evaluator_role", "student")
+    .eq("evaluation_type", "teacher")
+    .eq("target_teacher_id", teacher.id)
+    .eq("school_year", sy)
+    .order("updated_at", { ascending: false });
+
+  if ([1, 2, 3].includes(termNum)) {
+    query = query.eq("term", termNum);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingTable(error)) {
+      return { tableMissing: true, rows: [], summary: null, teacher };
+    }
+    // Fallback without embeds if relationship names differ
+    if (/subjects|sections|relationship/i.test(error.message || "")) {
+      let plain = admin
+        .from("evaluations")
+        .select(
+          "id, school_year, term, evaluation_type, target_teacher_id, target_subject_id, target_section_id, scores, average_score, comments, updated_at"
+        )
+        .eq("evaluator_role", "student")
+        .eq("evaluation_type", "teacher")
+        .eq("target_teacher_id", teacher.id)
+        .eq("school_year", sy)
+        .order("updated_at", { ascending: false });
+      if ([1, 2, 3].includes(termNum)) plain = plain.eq("term", termNum);
+      const retry = await plain;
+      if (retry.error) return { error: retry.error.message };
+      const subjectIds = [
+        ...new Set(
+          (retry.data || []).map((r) => r.target_subject_id).filter(Boolean)
+        ),
+      ];
+      const sectionIds = [
+        ...new Set(
+          (retry.data || []).map((r) => r.target_section_id).filter(Boolean)
+        ),
+      ];
+      const [{ data: subjects }, { data: sections }] = await Promise.all([
+        subjectIds.length
+          ? admin
+              .from("subjects")
+              .select("id, subject_name")
+              .in("id", subjectIds)
+          : Promise.resolve({ data: [] }),
+        sectionIds.length
+          ? admin
+              .from("sections")
+              .select("id, section_name, grade_level")
+              .in("id", sectionIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      const subjectById = Object.fromEntries(
+        (subjects || []).map((s) => [s.id, s])
+      );
+      const sectionById = Object.fromEntries(
+        (sections || []).map((s) => [s.id, s])
+      );
+      const rows = (retry.data || []).map((row) => ({
+        ...row,
+        subjects: subjectById[row.target_subject_id] || null,
+        sections: sectionById[row.target_section_id] || null,
+      }));
+      return buildTeacherReceivedPayload(rows, teacher, sy, termNum);
+    }
+    return { error: error.message };
+  }
+
+  return buildTeacherReceivedPayload(data || [], teacher, sy, termNum);
+}
+
+function buildTeacherReceivedPayload(rows, teacher, schoolYear, term) {
+  const vals = rows
+    .map((r) => Number(r.average_score))
+    .filter((n) => Number.isFinite(n));
+  const overallAverage = vals.length
+    ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100
+    : null;
+
+  const bySubject = new Map();
+  for (const row of rows) {
+    const name = row.subjects?.subject_name || "Subject";
+    const key = row.target_subject_id || name;
+    if (!bySubject.has(key)) {
+      bySubject.set(key, { subjectName: name, count: 0, sum: 0 });
+    }
+    const bucket = bySubject.get(key);
+    bucket.count += 1;
+    const avg = Number(row.average_score);
+    if (Number.isFinite(avg)) bucket.sum += avg;
+  }
+
+  const subjectBreakdown = Array.from(bySubject.values())
+    .map((b) => ({
+      subjectName: b.subjectName,
+      count: b.count,
+      average:
+        b.count > 0
+          ? Math.round((b.sum / b.count) * 100) / 100
+          : null,
+    }))
+    .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+
+  return {
+    tableMissing: false,
+    teacher,
+    schoolYear,
+    term,
+    rows,
+    summary: {
+      count: rows.length,
+      overallAverage,
+      subjectBreakdown,
+    },
+  };
 }
 
 /** Registrar read-only summary counts */

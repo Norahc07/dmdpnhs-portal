@@ -83,7 +83,7 @@ export function StudentEvaluationTabs({
         lockedMessage={
           progress?.awaitingTeachers
             ? "Subject teachers are not assigned yet. Ask the registrar to set teaching loads so you can finish teacher evaluations."
-            : "Finish system, self-assessment, and every subject teacher before this term’s grades unlock."
+            : "One-time for this term: finish system, self-assessment, and every subject teacher before this term’s grades unlock. Earlier terms stay open."
         }
       />
 

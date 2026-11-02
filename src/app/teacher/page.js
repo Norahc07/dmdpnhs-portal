@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { BookOpen, ClipboardList, Users } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import {
-  EducatorModuleGrid,
-  TeacherProfileBanner,
-} from "@/components/teacher/TeacherDashboard";
+import { TeacherProfileBanner } from "@/components/teacher/TeacherDashboard";
 import { requireRole } from "@/lib/auth-guard";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
@@ -38,7 +35,7 @@ export default async function TeacherDashboard() {
       profile={profile}
       teacherAccess={teacherAccess}
       title="Dashboard"
-      subtitle="Your educator portal home — classes, records, announcements, and account tools."
+      subtitle="Your educator portal home — overview, advisory sections, and assigned classes."
     >
       <div className="space-y-5">
         <TeacherProfileBanner
@@ -47,8 +44,6 @@ export default async function TeacherDashboard() {
           advisorySections={sections || []}
           assignmentCount={(assignments || []).length}
         />
-
-        <EducatorModuleGrid teacherAccess={teacherAccess} />
 
         <div className="grid gap-4 md:grid-cols-3">
           <section className="rounded-2xl border border-[#800000]/10 bg-white p-5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">

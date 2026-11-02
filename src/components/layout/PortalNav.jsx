@@ -11,7 +11,6 @@ import {
   Clock3,
   FileText,
   GraduationCap,
-  KeyRound,
   LayoutDashboard,
   Users,
   UserCheck,
@@ -59,7 +58,6 @@ const EDUCATOR_ICONS = {
   "/teacher/notifications": Bell,
   "/teacher/profile": UserRound,
   "/teacher/settings": Settings,
-  "/teacher/password": KeyRound,
 };
 
 const NAV = {

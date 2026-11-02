@@ -25,16 +25,27 @@ export function StudentGradesTabs({
   privacyLabel = "Your record only",
   classRecordEmpty = "No class record scores yet for you.",
   gradesEmpty = "No published subject grades yet.",
+  /** Active term that needs evaluation before its grades open. */
+  lockedTerm = null,
+  /** Whether the lockedTerm evaluations are complete. */
+  currentTermUnlocked = true,
+  evaluationHref = "/student/evaluation",
 }) {
   const termsPresent = useMemo(() => {
     const set = new Set([
       ...classRecordRows.map((r) => Number(r.term)),
       ...subjectGradeRows.map((r) => Number(r.term)),
+      ...(lockedTerm ? [Number(lockedTerm)] : []),
     ]);
     return GRADE_TERMS.filter((t) => set.has(t.value));
-  }, [classRecordRows, subjectGradeRows]);
+  }, [classRecordRows, subjectGradeRows, lockedTerm]);
 
-  const defaultTerm = String(termsPresent[0]?.value || 1);
+  const preferredDefault = lockedTerm
+    ? String(lockedTerm)
+    : String(termsPresent[0]?.value || 1);
+  const defaultTerm = termsPresent.some((t) => String(t.value) === preferredDefault)
+    ? preferredDefault
+    : String(termsPresent[0]?.value || 1);
   const [termFilter, setTermFilter] = useState(defaultTerm);
 
   useEffect(() => {
@@ -44,19 +55,31 @@ export function StudentGradesTabs({
   }, [termsPresent, termFilter]);
 
   const selectedTerm = Number(termFilter) || Number(defaultTerm) || 1;
+  const termLocked =
+    lockedTerm != null &&
+    Number(selectedTerm) === Number(lockedTerm) &&
+    !currentTermUnlocked;
 
   const classRecordFiltered = useMemo(
-    () => classRecordRows.filter((r) => Number(r.term) === selectedTerm),
-    [classRecordRows, selectedTerm]
+    () =>
+      termLocked
+        ? []
+        : classRecordRows.filter((r) => Number(r.term) === selectedTerm),
+    [classRecordRows, selectedTerm, termLocked]
   );
 
   const gradesFiltered = useMemo(
-    () => subjectGradeRows.filter((r) => Number(r.term) === selectedTerm),
-    [subjectGradeRows, selectedTerm]
+    () =>
+      termLocked
+        ? []
+        : subjectGradeRows.filter((r) => Number(r.term) === selectedTerm),
+    [subjectGradeRows, selectedTerm, termLocked]
   );
 
-  const classCount = classRecordFiltered.length;
-  const gradeCount = gradesFiltered.length;
+  const classCount = termLocked
+    ? 0
+    : classRecordFiltered.length;
+  const gradeCount = termLocked ? 0 : gradesFiltered.length;
   const selectedLabel = termLabel(selectedTerm);
 
   return (
@@ -110,20 +133,50 @@ export function StudentGradesTabs({
               <span className="mr-1 shrink-0 text-[10px] font-semibold tracking-[0.14em] text-[#800000]/55 uppercase">
                 Term
               </span>
-              {termsPresent.map((t) => (
-                <TermChip
-                  key={t.value}
-                  active={selectedTerm === t.value}
-                  onClick={() => setTermFilter(String(t.value))}
-                  label={t.shortLabel}
-                />
-              ))}
+              {termsPresent.map((t) => {
+                const needsEval =
+                  lockedTerm != null &&
+                  Number(t.value) === Number(lockedTerm) &&
+                  !currentTermUnlocked;
+                return (
+                  <TermChip
+                    key={t.value}
+                    active={selectedTerm === t.value}
+                    onClick={() => setTermFilter(String(t.value))}
+                    label={
+                      needsEval ? `${t.shortLabel} · locked` : t.shortLabel
+                    }
+                  />
+                );
+              })}
             </div>
           ) : null}
         </div>
 
         <div className="p-3 sm:p-4">
+          {termLocked ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-950">
+              <p className="font-semibold">
+                {selectedLabel} grades are locked
+              </p>
+              <p className="mt-1 text-amber-900/90">
+                After grades are released for this term, complete the one-time
+                evaluation (system, self-assessment, and each subject teacher)
+                to open your {selectedLabel} records. Earlier terms stay
+                available without re-evaluating.
+              </p>
+              <a
+                href={evaluationHref}
+                className="mt-3 inline-flex font-semibold text-[#800000] underline-offset-2 hover:underline"
+              >
+                Complete {selectedLabel} evaluation
+              </a>
+            </div>
+          ) : null}
+
           <TabsContent value="class-record" className="mt-0 space-y-3 outline-none">
+            {termLocked ? null : (
+              <>
             <p className="text-[12px] leading-relaxed text-muted-foreground">
               Written Works, Performance Tasks, and Examinations —{" "}
               <span className="font-medium text-[#3d1212]">your scores only</span>
@@ -138,12 +191,19 @@ export function StudentGradesTabs({
             </p>
             <StudentClassRecordSemestralView
               rows={classRecordFiltered}
-              emptyMessage={`No class record scores for ${selectedLabel} yet.`}
+              emptyMessage={
+                classRecordEmpty ||
+                `No class record scores for ${selectedLabel} yet.`
+              }
               privacyLabel={privacyLabel}
             />
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="grades" className="mt-0 space-y-3 outline-none">
+            {termLocked ? null : (
+              <>
             <p className="text-[12px] leading-relaxed text-muted-foreground">
               Published subject grades for{" "}
               <span className="font-medium text-[#800000]">{selectedLabel}</span>
@@ -159,10 +219,14 @@ export function StudentGradesTabs({
             </p>
             <SemestralGradesTable
               rows={gradesFiltered}
-              emptyMessage={`No published grades for ${selectedLabel} yet.`}
+              emptyMessage={
+                gradesEmpty || `No published grades for ${selectedLabel} yet.`
+              }
               gradeColumnLabel={selectedLabel}
               showTermColumn={false}
             />
+              </>
+            )}
           </TabsContent>
         </div>
       </div>

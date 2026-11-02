@@ -104,7 +104,7 @@ Expected: student continues to personal details / activation. Faculty lands on p
 ### 1.5 Change password
 
 1. Student: Profile → **Password management** (`/student/profile`).
-2. Teacher: `/teacher/password`.
+2. Teacher: Profile → **Password management** (`/teacher/profile`).
 3. Enter current password, new password, confirm.
 
 Expected: success toast; next login uses the new password. Wrong current password is rejected.
@@ -380,9 +380,9 @@ Walk:
 | Announcements | `/teacher/announcements` | Post to handled sections |
 | Calendar | `/teacher/calendar` | Official + teacher events |
 | Documents | `/teacher/documents` | Required uploads review + official copy list |
-| Evaluation | `/teacher/evaluation` | System, sections, learners, records |
+| Student evaluations | `/teacher/evaluation` | Anonymous student ratings of this teacher |
 | Notifications | `/teacher/notifications` | Reminders |
-| Profile / Settings / Password | `/teacher/profile` etc. | Account tools |
+| Profile / Settings | `/teacher/profile`, `/teacher/settings` | Account tools (password on Profile) |
 
 Dept head only: extra **Validation** item when `canValidateGrades` is true.
 
@@ -406,9 +406,9 @@ Expected: names of modules stay the same on dashboard cards and sidebar. Logout 
 
 **SQL:** `evaluations-upgrade.sql`, `evaluations-v2-types.sql`, `evaluations-self-student.sql`
 
-**Pages:** `/student/evaluation` · `/teacher/evaluation` · `/registrar/evaluation`
+**Pages:** `/student/evaluation` · `/teacher/evaluation` (read-only received ratings) · `/registrar/evaluation`
 
-Parent evaluation must **not** appear. `/parent/evaluation` redirects away.
+Teachers do **not** submit evaluation forms. They only view anonymous student ratings of their teaching. Parent evaluation must **not** appear.
 
 ### 11.1 Student forms and status
 
@@ -416,21 +416,20 @@ Parent evaluation must **not** appear. `/parent/evaluation` redirects away.
 2. Complete **System** (portal).
 3. Complete **Self** (self-assessment).
 4. Open **Teachers** — every subject teacher listed; submit each (1–5 + optional comment).
-5. Progress card: Not submitted vs Submitted; grades stay locked until all required items are done.
-6. **Evaluation records** table lists submitted forms, averages, dates.
+5. Progress card: Not submitted vs Submitted; **current term** grades stay locked until all required items for that term are done (one-time per term).
+6. Switch Academic Records to a **previous** term (e.g. Term 1 while on Term 2) — those grades remain viewable without re-evaluating.
+7. **Evaluation records** table lists submitted forms, averages, dates.
 
-### 11.2 Teacher → student
+### 11.2 Teacher — received student ratings
 
-1. Teacher → **Evaluation**.
-2. **System** (year-end portal) and **Sections** (each handled section).
-3. **Learners** — each active student in handled sections shows **Not submitted** or **Submitted**.
-4. Open a learner, score 1–5, submit.
-5. Records table updates.
+1. Teacher → **Student evaluations** (`/teacher/evaluation`).
+2. Switch term tabs (1st / 2nd / 3rd).
+3. Confirm overall average, per-subject breakdown, and anonymous response rows (subject, section, scores, comment — no learner names).
 
 ### 11.3 Registrar summary
 
 1. `/registrar/evaluation`.
-2. Counts/averages for: Student → System, Student → Teachers, Student self-assessment, Teacher → System, Teacher → Sections, Teacher → Students.
+2. Counts/averages for: Student → System, Student → Teachers, Student self-assessment (and any legacy teacher-submitted rows if present).
 
 If you see a SQL hint, the evaluation scripts are not applied yet.
 
