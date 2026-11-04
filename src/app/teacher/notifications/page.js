@@ -1,26 +1,29 @@
-import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
+import { PushNotificationManager } from "@/components/notifications/PushNotificationManager";
+import { PortalNotificationsInbox } from "@/components/notifications/PortalNotificationsInbox";
+import { listMyPortalNotifications } from "@/actions/portal-notifications";
 import { loadTeacherHandledSections } from "@/lib/announcements";
 import { requireRole } from "@/lib/auth-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTeacherAccess } from "@/lib/teacher-access";
-import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Notifications" };
 
 export default async function TeacherNotificationsPage() {
   const { supabase, profile } = await requireRole("teacher");
   const teacherAccess = await getTeacherAccess(supabase, profile.id);
-  const items = [];
+  const portal = await listMyPortalNotifications();
+  const items = [...(portal.items || [])];
 
   if (teacherAccess.canValidateGrades) {
-    items.push({
-      id: "validation",
+    items.unshift({
+      id: "validation-cue",
+      category: "grades",
       href: "/teacher/validation",
-      kicker: "Academic records",
       title: "Check the validation queue",
-      detail: "Review submitted class records for your department.",
+      body: "Review submitted class records for your department.",
       unread: true,
+      createdAt: new Date().toISOString(),
     });
   }
 
@@ -44,18 +47,22 @@ export default async function TeacherNotificationsPage() {
           .in("student_id", studentIds)
           .in("status", ["pending", "processing"]);
         if (count) {
-          items.push({
-            id: "documents",
+          items.unshift({
+            id: "documents-cue",
+            category: "documents",
             href: "/teacher/documents",
-            kicker: "Documents",
             title: `${count} learner document request${count === 1 ? "" : "s"} in progress`,
-            detail: "Open Documents to see requests from your sections.",
+            body: "Open Documents to see requests from your sections.",
             unread: true,
+            createdAt: new Date().toISOString(),
           });
         }
       }
     }
   }
+
+  const unreadCount =
+    (portal.unreadCount || 0) + items.filter((i) => i.unread && String(i.id).includes("-cue")).length;
 
   return (
     <AppShell
@@ -63,44 +70,17 @@ export default async function TeacherNotificationsPage() {
       profile={profile}
       teacherAccess={teacherAccess}
       title="Notifications"
-      subtitle="Reminders for evaluation, documents, and class records."
+      subtitle="Teacher coordination, grade workflow, documents, and phone alerts."
     >
-      <section className="overflow-hidden rounded-2xl border border-[#800000]/10 bg-white shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)]">
-        <div className="portal-panel-head px-5 py-4">
-          <p className="text-xs font-semibold tracking-[0.16em] text-[#800000] uppercase">
-            Inbox
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {items.length} notice{items.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        <div className="space-y-2 p-4">
-          {items.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#800000]/20 px-4 py-8 text-center text-sm text-muted-foreground">
-              No notifications right now.
-            </p>
-          ) : (
-            items.map((item) => (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={cn(
-                  "block rounded-xl border px-4 py-3 transition hover:border-[#800000]/20 hover:bg-[#faf7f5]",
-                  item.unread
-                    ? "border-[#800000]/20 bg-[#800000]/5"
-                    : "border-[#800000]/08 bg-white"
-                )}
-              >
-                <p className="text-[11px] font-semibold tracking-wide text-[#800000] uppercase">
-                  {item.kicker}
-                </p>
-                <p className="mt-1 font-medium text-[#3d1212]">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.detail}</p>
-              </Link>
-            ))
-          )}
-        </div>
-      </section>
+      <div className="mb-4">
+        <PushNotificationManager variant="card" />
+      </div>
+      <PortalNotificationsInbox
+        items={items}
+        unreadCount={unreadCount}
+        hint={portal.hint || portal.error || ""}
+        emptyText="No notifications right now. Enable phone alerts above for sound alerts on submitted or returned class records."
+      />
     </AppShell>
   );
 }

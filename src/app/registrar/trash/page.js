@@ -14,7 +14,7 @@ export default async function RegistrarTrashPage() {
       role="registrar"
       profile={profile}
       title="Student Trash"
-      subtitle="Temporarily hold deleted learners. Restore them to the system, or permanently remove records. Trashed LRNs are free for new enrollment."
+      subtitle="Temporarily hold deleted learners. Restore them, or permanently delete to free the LRN for a new enrollment."
     >
       <StudentTrashTable
         students={result.students || []}

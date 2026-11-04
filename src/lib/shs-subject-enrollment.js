@@ -1,16 +1,24 @@
 import { SCHOOL_YEAR_DEFAULT, isSeniorHighGrade } from "@/lib/constants";
 import { normalizeGradeTerm } from "@/lib/grades-terms";
 
+function filterStrandSubjects(rows, strandKey) {
+  const strandUpper = String(strandKey || "").trim().toUpperCase();
+  if (!strandUpper) return [];
+  return (rows || []).filter((s) => {
+    const ts = String(s.track_strand || "").trim();
+    if (!ts) {
+      return String(s.subject_kind || "major").toLowerCase() === "minor";
+    }
+    const upper = ts.toUpperCase();
+    return upper === strandUpper || upper.includes(strandUpper);
+  });
+}
+
 /**
- * Catalog subjects for an SHS grade + strand + term.
- * Includes strand majors and shared minors (track_strand null + subject_kind minor).
+ * All SHS catalog subjects for a grade + strand (terms 1–3) in one query.
  */
-export async function listShsTermSubjects(
-  db,
-  { gradeLevel, strand, term }
-) {
+export async function listShsStrandSubjects(db, { gradeLevel, strand }) {
   const grade = Number(gradeLevel);
-  const t = normalizeGradeTerm(term);
   const strandKey = String(strand || "").trim();
   if (!isSeniorHighGrade(grade) || !strandKey) return [];
 
@@ -20,30 +28,32 @@ export async function listShsTermSubjects(
       "id, subject_name, grade_level, track_strand, academic_term, subject_kind"
     )
     .eq("grade_level", grade)
-    .eq("academic_term", t)
+    .order("academic_term")
     .order("subject_name");
 
   if (error) {
-    // Columns may be missing before migration — fall back to strand-only catalog.
     const fallback = await db
       .from("subjects")
       .select("id, subject_name, grade_level, track_strand")
       .eq("grade_level", grade)
       .order("subject_name");
-    return (fallback.data || []).filter((s) => {
-      const ts = String(s.track_strand || "").trim();
-      return !ts || ts.toUpperCase() === strandKey.toUpperCase();
-    });
+    return filterStrandSubjects(fallback.data || [], strandKey);
   }
 
-  const strandUpper = strandKey.toUpperCase();
-  return (data || []).filter((s) => {
-    const ts = String(s.track_strand || "").trim();
-    if (!ts) {
-      return String(s.subject_kind || "major").toLowerCase() === "minor";
-    }
-    return ts.toUpperCase() === strandUpper || ts.toUpperCase().includes(strandUpper);
-  });
+  return filterStrandSubjects(data || [], strandKey);
+}
+
+/**
+ * Catalog subjects for an SHS grade + strand + term.
+ * Includes strand majors and shared minors (track_strand null + subject_kind minor).
+ */
+export async function listShsTermSubjects(
+  db,
+  { gradeLevel, strand, term }
+) {
+  const t = normalizeGradeTerm(term);
+  const all = await listShsStrandSubjects(db, { gradeLevel, strand });
+  return all.filter((s) => Number(s.academic_term) === t);
 }
 
 /**

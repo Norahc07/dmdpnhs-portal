@@ -4,6 +4,7 @@ import {
   isHumssAttendanceSubject,
   isHumssGrade12,
 } from "@/lib/humss-academic-record";
+import { loadTeacherSectionRoster } from "@/lib/teacher-roster";
 
 function missingSecretaryColumn(error) {
   return /secretary_student_id/i.test(String(error?.message || ""));
@@ -22,7 +23,24 @@ export async function findSecretarySection(studentId) {
     if (missingSecretaryColumn(error)) return null;
     return null;
   }
-  return data || null;
+  if (!data?.id) return null;
+
+  // Appointment must match the learner's current section (registrar transfers).
+  const { data: student } = await admin
+    .from("students")
+    .select("id, section_id")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student?.section_id || student.section_id !== data.id) {
+    await admin
+      .from("sections")
+      .update({ secretary_student_id: null })
+      .eq("id", data.id)
+      .eq("secretary_student_id", studentId);
+    return null;
+  }
+
+  return data;
 }
 
 export async function isSectionSecretary(studentId) {
@@ -187,13 +205,8 @@ export async function loadSecretarySubjects(section) {
 }
 
 export async function loadSecretaryRoster(sectionId) {
-  const admin = createAdminClient();
-  const { data: students } = await admin
-    .from("students")
-    .select("id, lrn, profiles(first_name, last_name)")
-    .eq("section_id", sectionId)
-    .eq("activation_status", "active")
-    .order("lrn");
+  // Same enrolled learners as teacher Student Management / Academic Records.
+  const { students } = await loadTeacherSectionRoster(sectionId);
   return students || [];
 }
 

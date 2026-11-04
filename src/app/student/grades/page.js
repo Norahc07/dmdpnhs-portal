@@ -57,15 +57,20 @@ export default async function StudentGradesPage() {
 
   const academicMode = isHumssGrade12(student?.sections || student, null);
 
-  const [classRecord, subjectGrades, academicRecord] = studentId
-    ? await Promise.all([
+  // Avoid triple-loading the same class records (was causing 15–30s / intermittent 504s).
+  let classRecord = { rows: [] };
+  let subjectGrades = { rows: [] };
+  let academicRecord = { rows: [] };
+  if (studentId) {
+    if (academicMode) {
+      academicRecord = await getStudentAcademicRecord({ studentId, schoolYear });
+    } else {
+      [classRecord, subjectGrades] = await Promise.all([
         getStudentSemestralGrades({ studentId, schoolYear }),
         getStudentSubjectGrades({ studentId, schoolYear }),
-        academicMode
-          ? getStudentAcademicRecord({ studentId, schoolYear })
-          : Promise.resolve({ rows: [] }),
-      ])
-    : [{ rows: [] }, { rows: [] }, { rows: [] }];
+      ]);
+    }
+  }
 
   const sectionLabel = student?.sections
     ? `Grade ${student.sections.grade_level ?? student.grade_level ?? "—"} - ${student.sections.section_name}`

@@ -25,6 +25,41 @@ function snippet(text, max = 140) {
   return `${value.slice(0, max - 1)}…`;
 }
 
+const CATEGORY_LABEL = {
+  system: "System",
+  teacher: "Teacher",
+  grades: "Grades",
+  attendance: "Attendance",
+  announcement: "Announcement",
+  documents: "Documents",
+  evaluation: "Evaluation",
+};
+
+/** Phone/desktop payload — silent:false so OS plays the alert sound. */
+export function buildPortalPushPayload({
+  category = "system",
+  title,
+  body,
+  href,
+  priority = "high",
+  tag,
+}) {
+  const kind = CATEGORY_LABEL[category] || "Portal";
+  return {
+    title: `${kind} · ${SCHOOL_SHORT}`,
+    body: snippet(body) || snippet(title) || "You have a new portal update.",
+    url: href || "/student/notifications",
+    tag: tag || `portal-${category}`,
+    category,
+    priority,
+    silent: false,
+    renotify: true,
+    vibrate:
+      priority === "high" ? [160, 70, 160, 70, 220] : [120, 80, 120],
+    requireInteraction: priority === "high",
+  };
+}
+
 export function announcementPushPayload({ id, title, body, postType }) {
   const kind =
     postType === "reminder"
@@ -34,12 +69,14 @@ export function announcementPushPayload({ id, title, body, postType }) {
         : postType === "update"
           ? "Important update"
           : "Announcement";
-  return {
+  return buildPortalPushPayload({
+    category: "announcement",
     title: `${kind} · ${SCHOOL_SHORT}`,
     body: snippet(title) || snippet(body) || "A new post was published for your section.",
-    url: `/student/announcements/${id}`,
+    href: `/student/announcements/${id}`,
+    priority: postType === "update" || postType === "reminder" ? "high" : "normal",
     tag: `announcement-${id}`,
-  };
+  });
 }
 
 export async function sendWebPushToProfileIds(admin, profileIds, payload) {
@@ -71,7 +108,10 @@ export async function sendWebPushToProfileIds(admin, profileIds, payload) {
             keys: { p256dh: row.p256dh, auth: row.auth },
           },
           message,
-          { TTL: 60 * 60 * 12, urgency: "high" }
+          {
+            TTL: 60 * 60 * 12,
+            urgency: payload?.priority === "high" ? "high" : "normal",
+          }
         );
         sent += 1;
       } catch (err) {

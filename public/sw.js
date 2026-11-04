@@ -1,4 +1,4 @@
-const CACHE = "dmdpnhs-portal-v6";
+const CACHE = "dmdpnhs-portal-v7";
 const OFFLINE_URLS = [
   "/",
   "/login",
@@ -102,13 +102,19 @@ self.addEventListener("push", (event) => {
 
   const title = data.title || "PastraPortal";
   const options = {
-    body: data.body || "You have a new announcement.",
+    body: data.body || "You have a new portal notification.",
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
-    tag: data.tag || "pastraportal-announcement",
-    renotify: true,
-    data: { url: data.url || "/student/notifications" },
-    vibrate: [120, 80, 120],
+    tag: data.tag || "pastraportal",
+    // Keep silent false so the phone plays the system notification sound.
+    silent: data.silent === true ? true : false,
+    renotify: data.renotify !== false,
+    requireInteraction: Boolean(data.requireInteraction),
+    vibrate: Array.isArray(data.vibrate) ? data.vibrate : [120, 80, 120],
+    data: {
+      url: data.url || "/student/notifications",
+      category: data.category || "system",
+    },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -116,7 +122,8 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification?.data?.url || "/student/notifications";
+  const target =
+    event.notification?.data?.url || "/student/notifications";
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })

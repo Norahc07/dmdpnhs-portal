@@ -127,15 +127,17 @@ export async function moveStudentToTrash(admin, student, deletedBy = null) {
   if (error) return { error: error.message };
 
   if (student.profile_id) {
+    const freedEmail = trashedAuthEmail(student.id, student.lrn);
+    // Free the LRN sign-in email on profiles too — otherwise re-enroll hits profiles_email_key.
     await admin
       .from("profiles")
-      .update({ status: "trashed" })
+      .update({ status: "trashed", email: freedEmail })
       .eq("id", student.profile_id);
 
     try {
       await admin.auth.admin.updateUserById(student.profile_id, {
         ban_duration: "876000h",
-        email: trashedAuthEmail(student.id, student.lrn),
+        email: freedEmail,
         email_confirm: true,
         user_metadata: {
           trashed: true,
@@ -234,8 +236,8 @@ export async function purgeStudentRecord(admin, student) {
 }
 
 /**
- * When re-enrolling an LRN, remove orphaned auth users left by old hard deletes
- * so createUser does not fail on the reserved student email.
+ * When re-enrolling an LRN, free the reserved student email on profiles + auth
+ * (trash leftovers / failed enrolls) so createUser / profiles insert can proceed.
  */
 export async function clearOrphanStudentAuth(admin, lrn) {
   const email = studentEmailFromLrn(lrn).toLowerCase();
@@ -247,6 +249,58 @@ export async function clearOrphanStudentAuth(admin, lrn) {
   if (active?.id) return { blocked: true, studentId: active.id };
 
   try {
+    // profiles.email is what triggers profiles_email_key — clear that first.
+    const { data: profileByEmail } = await admin
+      .from("profiles")
+      .select("id, email, status")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (profileByEmail?.id) {
+      const { data: linked } = await admin
+        .from("students")
+        .select("id, deleted_at, lrn")
+        .eq("profile_id", profileByEmail.id)
+        .order("deleted_at", { ascending: true, nullsFirst: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (linked?.id && !linked.deleted_at) {
+        return { blocked: true, studentId: linked.id };
+      }
+
+      if (linked?.id && linked.deleted_at) {
+        const freed = trashedAuthEmail(linked.id, linked.lrn || lrn);
+        await admin
+          .from("profiles")
+          .update({ email: freed, status: "trashed" })
+          .eq("id", profileByEmail.id);
+        try {
+          await admin.auth.admin.updateUserById(profileByEmail.id, {
+            ban_duration: "876000h",
+            email: freed,
+            email_confirm: true,
+            user_metadata: {
+              trashed: true,
+              original_lrn: linked.lrn || lrn || null,
+            },
+          });
+        } catch {
+          /* auth may already use a freed email */
+        }
+        return { cleared: true, trashed: true };
+      }
+
+      // Profile holds the LRN email but no student row — remove the orphan.
+      await admin.from("profiles").delete().eq("id", profileByEmail.id);
+      try {
+        await admin.auth.admin.deleteUser(profileByEmail.id);
+      } catch {
+        /* auth user may already be gone */
+      }
+      return { cleared: true };
+    }
+
     const { data: list } = await admin.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
@@ -258,7 +312,7 @@ export async function clearOrphanStudentAuth(admin, lrn) {
 
     const { data: linked } = await admin
       .from("students")
-      .select("id, deleted_at")
+      .select("id, deleted_at, lrn")
       .eq("profile_id", orphan.id)
       .maybeSingle();
 
@@ -267,11 +321,15 @@ export async function clearOrphanStudentAuth(admin, lrn) {
     }
 
     if (linked?.id && linked.deleted_at) {
-      /* Trashed row still holding the LRN email — rename it so re-enroll can proceed. */
+      const freed = trashedAuthEmail(linked.id, linked.lrn || lrn);
+      await admin
+        .from("profiles")
+        .update({ email: freed, status: "trashed" })
+        .eq("id", orphan.id);
       try {
         await admin.auth.admin.updateUserById(orphan.id, {
           ban_duration: "876000h",
-          email: trashedAuthEmail(linked.id, lrn),
+          email: freed,
           email_confirm: true,
           user_metadata: {
             trashed: true,

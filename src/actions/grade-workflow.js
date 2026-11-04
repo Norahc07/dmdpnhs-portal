@@ -16,6 +16,7 @@ import {
   canTeacherEditWorkflow,
 } from "@/lib/grade-workflow";
 import { normalizeGradeTerm, termLabel } from "@/lib/grades-terms";
+import { notifyProfiles } from "@/lib/portal-notifications";
 
 async function getAuthContext() {
   const supabase = await createClient();
@@ -368,6 +369,51 @@ export async function submitClassRecordForReview({
     },
   });
 
+  try {
+    const { data: load } = await admin
+      .from("teacher_assignments")
+      .select(
+        "section_id, subjects(subject_name), sections(section_name, grade_level, adviser_id)"
+      )
+      .eq("id", assignmentId)
+      .maybeSingle();
+    const subjectName = load?.subjects?.subject_name || "Class record";
+    const sectionLabel = load?.sections
+      ? `G${load.sections.grade_level} ${load.sections.section_name}`
+      : "section";
+    const adviserId = load?.sections?.adviser_id;
+    let reviewerIds = [];
+    if (adviserId) {
+      const { data: adviser } = await admin
+        .from("teachers")
+        .select("profile_id")
+        .eq("id", adviserId)
+        .maybeSingle();
+      if (adviser?.profile_id) reviewerIds.push(adviser.profile_id);
+    }
+    const { data: heads } = await admin
+      .from("teachers")
+      .select("profile_id")
+      .eq("faculty_position", "department_head")
+      .limit(20);
+    reviewerIds = [
+      ...new Set([
+        ...reviewerIds,
+        ...(heads || []).map((row) => row.profile_id).filter(Boolean),
+      ]),
+    ];
+    await notifyProfiles(admin, reviewerIds, {
+      category: "grades",
+      title: "Class record submitted for review",
+      body: `${subjectName} · ${sectionLabel} · ${termLabel(loaded.term)} is ready for validation.`,
+      href: "/teacher/validation",
+      priority: "high",
+      tag: `grade-submit-${record.id}`,
+    });
+  } catch {
+    /* non-blocking */
+  }
+
   revalidateGradePaths(assignmentId);
   return { ok: true, term: loaded.term };
 }
@@ -443,6 +489,33 @@ export async function returnClassRecordToTeacher({
       term: loaded.term,
     },
   });
+
+  try {
+    const { data: load } = await admin
+      .from("teacher_assignments")
+      .select("teacher_id, subjects(subject_name)")
+      .eq("id", assignmentId)
+      .maybeSingle();
+    if (load?.teacher_id) {
+      const { data: teacher } = await admin
+        .from("teachers")
+        .select("profile_id")
+        .eq("id", load.teacher_id)
+        .maybeSingle();
+      if (teacher?.profile_id) {
+        await notifyProfiles(admin, [teacher.profile_id], {
+          category: "teacher",
+          title: "Class record returned",
+          body: `${load?.subjects?.subject_name || "Your class record"} · ${termLabel(loaded.term)} needs revisions. ${noteText}`,
+          href: `/teacher/gradebook/${assignmentId}?term=${loaded.term}`,
+          priority: "high",
+          tag: `grade-return-${record.id}`,
+        });
+      }
+    }
+  } catch {
+    /* non-blocking */
+  }
 
   revalidateGradePaths(assignmentId);
   return { ok: true, term: loaded.term };
@@ -591,6 +664,55 @@ export async function lockClassRecordGrades({
       term: loaded.term,
     },
   });
+
+  try {
+    const { data: load } = await admin
+      .from("teacher_assignments")
+      .select(
+        "teacher_id, section_id, subjects(subject_name), sections(id, section_name, grade_level)"
+      )
+      .eq("id", assignmentId)
+      .maybeSingle();
+    const subjectName = load?.subjects?.subject_name || "Subject";
+    const termName = termLabel(loaded.term);
+    if (load?.teacher_id) {
+      const { data: teacher } = await admin
+        .from("teachers")
+        .select("profile_id")
+        .eq("id", load.teacher_id)
+        .maybeSingle();
+      if (teacher?.profile_id) {
+        await notifyProfiles(admin, [teacher.profile_id], {
+          category: "grades",
+          title: "Grades locked & published",
+          body: `${subjectName} · ${termName} was locked by the registrar.`,
+          href: "/teacher/gradebook",
+          priority: "high",
+          tag: `grade-lock-teacher-${record.id}`,
+        });
+      }
+    }
+    if (load?.section_id) {
+      const { data: students } = await admin
+        .from("students")
+        .select("profile_id")
+        .eq("section_id", load.section_id)
+        .eq("activation_status", "active");
+      const studentIds = (students || [])
+        .map((row) => row.profile_id)
+        .filter(Boolean);
+      await notifyProfiles(admin, studentIds, {
+        category: "grades",
+        title: "Grades published",
+        body: `${subjectName} · ${termName} is now visible on Academic Records.`,
+        href: "/student/grades",
+        priority: "high",
+        tag: `grade-lock-student-${record.id}`,
+      });
+    }
+  } catch {
+    /* non-blocking */
+  }
 
   revalidateGradePaths(assignmentId);
   return { ok: true, term: loaded.term };

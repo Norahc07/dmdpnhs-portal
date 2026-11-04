@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { UserRound } from "lucide-react";
+import { Bell, UserRound } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { PushNotificationManager } from "@/components/notifications/PushNotificationManager";
 import { requireRole } from "@/lib/auth-guard";
 import { getTeacherAccess } from "@/lib/teacher-access";
 
@@ -69,6 +70,21 @@ export default async function TeacherSettingsPage() {
         </section>
 
         <section className="space-y-3">
+          <PushNotificationManager variant="card" />
+          <Link
+            href="/teacher/notifications"
+            className="flex items-start gap-3 rounded-2xl border border-[#800000]/10 bg-white p-4 transition hover:border-[#800000]/25"
+          >
+            <span className="flex size-10 items-center justify-center rounded-xl bg-[#800000]/8 text-[#800000]">
+              <Bell className="size-5" />
+            </span>
+            <div>
+              <p className="font-heading font-bold text-[#3d1212]">Notifications</p>
+              <p className="text-xs text-muted-foreground">
+                Grade workflow, documents, and coordination alerts.
+              </p>
+            </div>
+          </Link>
           <Link
             href="/teacher/profile"
             className="flex items-start gap-3 rounded-2xl border border-[#800000]/10 bg-white p-4 transition hover:border-[#800000]/25"

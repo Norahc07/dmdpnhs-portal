@@ -11,6 +11,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { EnrollButton } from "@/components/student/EnrollButton";
+import { groupSubjectsByStudentTerm } from "@/lib/student-dashboard";
 import { cn } from "@/lib/utils";
 
 const EVENT_STYLES = {
@@ -225,7 +226,36 @@ export function TodaySchedulePanel({ events = [], todayLabel }) {
   );
 }
 
-export function EnrolledSubjectsPanel({ subjects = [] }) {
+function SubjectCard({ item }) {
+  return (
+    <article className="rounded-xl border border-[#800000]/10 bg-linear-to-br from-white to-[#faf7f5] p-4 transition hover:border-[#800000]/20 hover:shadow-sm">
+      <p className="inline-flex items-center gap-2 font-(family-name:--font-montserrat) font-semibold text-[#3d1212]">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
+          <BookOpen className="size-4" />
+        </span>
+        {item.subject_name}
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Schedule: {item.schedule_label || "TBA"}
+      </p>
+
+      <div className="mt-3 space-y-1.5 border-t border-[#800000]/8 pt-3 text-sm">
+        <p className="inline-flex items-center gap-1.5 text-[#3d1212]">
+          <UserRound className="size-3.5 text-[#800000]" />
+          {item.teacher_name || "Teacher TBA"}
+        </p>
+        <p className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <Mail className="size-3.5" />
+          {item.teacher_email || "—"}
+        </p>
+      </div>
+    </article>
+  );
+}
+
+export function EnrolledSubjectsPanel({ subjects = [], currentTerm = null }) {
+  const groups = groupSubjectsByStudentTerm(subjects, currentTerm);
+
   return (
     <section className="rounded-2xl border border-[#800000]/10 bg-white p-5 shadow-[0_12px_28px_-20px_rgba(61,18,18,0.35)] sm:p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -245,41 +275,33 @@ export function EnrolledSubjectsPanel({ subjects = [] }) {
         </Link>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {subjects.length === 0 && (
-          <div className="rounded-xl border border-dashed border-[#800000]/15 px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
-            No enrolled subjects yet. Complete enrollment or wait for subject
-            assignment.
-          </div>
-        )}
-        {subjects.map((item) => (
-          <article
-            key={item.id}
-            className="rounded-xl border border-[#800000]/10 bg-linear-to-br from-white to-[#faf7f5] p-4 transition hover:border-[#800000]/20 hover:shadow-sm"
-          >
-            <p className="inline-flex items-center gap-2 font-(family-name:--font-montserrat) font-semibold text-[#3d1212]">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-[#800000]/8 text-[#800000]">
-                <BookOpen className="size-4" />
-              </span>
-              {item.subject_name}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Schedule: {item.schedule_label || "TBA"}
-            </p>
-
-            <div className="mt-3 space-y-1.5 border-t border-[#800000]/8 pt-3 text-sm">
-              <p className="inline-flex items-center gap-1.5 text-[#3d1212]">
-                <UserRound className="size-3.5 text-[#800000]" />
-                {item.teacher_name || "Teacher TBA"}
-              </p>
-              <p className="inline-flex items-center gap-1.5 text-muted-foreground">
-                <Mail className="size-3.5" />
-                {item.teacher_email || "—"}
-              </p>
+      {subjects.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[#800000]/15 px-4 py-8 text-center text-sm text-muted-foreground">
+          No enrolled subjects yet. Complete enrollment or wait for subject
+          assignment.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <div key={group.heading}>
+              <div className="mb-3 flex flex-wrap items-baseline gap-2 border-b border-[#800000]/10 pb-2">
+                <h4 className="font-(family-name:--font-montserrat) text-base font-bold text-[#3d1212]">
+                  {group.heading}
+                </h4>
+                <span className="text-xs text-muted-foreground">
+                  {group.subjects.length} subject
+                  {group.subjects.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {group.subjects.map((item) => (
+                  <SubjectCard key={item.id} item={item} />
+                ))}
+              </div>
             </div>
-          </article>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

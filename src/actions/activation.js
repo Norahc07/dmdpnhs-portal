@@ -32,6 +32,7 @@ import {
 } from "@/lib/activation-status";
 import { normalizeGradeTerm } from "@/lib/grades-terms";
 import { enrollStudentInTermSubjects } from "@/lib/shs-subject-enrollment";
+import { notifyProfiles } from "@/lib/portal-notifications";
 
 function normalizePhone(value) {
   return normalizePhoneDigits(value);
@@ -368,6 +369,20 @@ export async function approveStudentActivation({ studentId, approve }) {
         .from("profiles")
         .update({ status: "active" })
         .eq("id", student.profile_id);
+
+      try {
+        const adminClient = admin || createAdminClient();
+        await notifyProfiles(adminClient, [student.profile_id], {
+          category: "system",
+          title: "Portal activated",
+          body: "The registrar activated your student account. Grades, attendance, and teacher posts are now available.",
+          href: "/student",
+          priority: "high",
+          tag: `activation-${student.id}`,
+        });
+      } catch {
+        /* non-blocking */
+      }
     }
 
     try {
@@ -631,10 +646,11 @@ export async function listTrashedStudents() {
   const { admin, db } = gate;
   const client = admin || db;
 
+  // Flat select — nested profiles embeds fail when multiple FKs exist to profiles.
   let result = await client
     .from("students")
     .select(
-      "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, emergency_contact_name, emergency_contact_number, profile_id, deleted_at, deleted_by, profiles(first_name, last_name, email, status)"
+      "id, lrn, gender, grade_level, section_id, status, activation_status, contact_number, emergency_contact_name, emergency_contact_number, profile_id, deleted_at, deleted_by"
     )
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false })
@@ -648,8 +664,21 @@ export async function listTrashedStudents() {
   }
   if (result.error) return { error: result.error.message, students: [] };
 
+  const rows = result.data || [];
+  const profileIds = [
+    ...new Set(rows.map((s) => s.profile_id).filter(Boolean)),
+  ];
+  let profilesById = new Map();
+  if (profileIds.length) {
+    const { data: profiles } = await client
+      .from("profiles")
+      .select("id, first_name, last_name, email, status")
+      .in("id", profileIds);
+    profilesById = new Map((profiles || []).map((p) => [p.id, p]));
+  }
+
   const sectionIds = [
-    ...new Set((result.data || []).map((s) => s.section_id).filter(Boolean)),
+    ...new Set(rows.map((s) => s.section_id).filter(Boolean)),
   ];
   let sectionsById = new Map();
   if (sectionIds.length) {
@@ -660,8 +689,9 @@ export async function listTrashedStudents() {
     sectionsById = new Map((sections || []).map((s) => [s.id, s]));
   }
 
-  const students = (result.data || []).map((row) => ({
+  const students = rows.map((row) => ({
     ...row,
+    profiles: row.profile_id ? profilesById.get(row.profile_id) || null : null,
     sections: row.section_id ? sectionsById.get(row.section_id) || null : null,
   }));
 
@@ -784,20 +814,26 @@ export async function enrollStudentByRegistrar(form) {
 
   const email = studentEmailFromLrn(lrn);
 
+  // Flat selects only — nested profiles embeds can fail and skip these checks.
   const { data: existing } = await findActiveStudentByLrn(
     admin,
     lrn,
-    "id, lrn, activation_status, status, grade_level, section_id, profile_id, profiles(first_name, last_name)"
+    "id, lrn, activation_status, status, grade_level, section_id, profile_id"
   );
   if (existing) {
-    const name = [
-      existing.profiles?.first_name,
-      existing.profiles?.last_name,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-    const label = name || `LRN ${lrn}`;
+    let label = `LRN ${lrn}`;
+    if (existing.profile_id) {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", existing.profile_id)
+        .maybeSingle();
+      const name = [profile?.first_name, profile?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      if (name) label = name;
+    }
     const act = existing.activation_status || "enrolled";
     return {
       error: `A student with this LRN already exists: ${label} (${act}). Search Enrollment or Activations for ${lrn}.`,
@@ -809,16 +845,21 @@ export async function enrollStudentByRegistrar(form) {
   const { data: anyRow } = await findAnyStudentByLrn(
     admin,
     lrn,
-    "id, deleted_at, profiles(first_name, last_name)"
+    "id, deleted_at, profile_id"
   );
   if (anyRow?.deleted_at) {
-    const name = [
-      anyRow.profiles?.first_name,
-      anyRow.profiles?.last_name,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
+    let name = "";
+    if (anyRow.profile_id) {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", anyRow.profile_id)
+        .maybeSingle();
+      name = [profile?.first_name, profile?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    }
     return {
       error: `LRN ${lrn}${name ? ` (${name})` : ""} is in Trash. Restore it from Registrar → Trash, or permanently delete it there before enrolling again.`,
       trashedStudentId: anyRow.id,
@@ -870,7 +911,7 @@ export async function enrollStudentByRegistrar(form) {
   if (createError) return { error: createError.message };
   const userId = created.user.id;
 
-  const { error: profileError } = await admin.from("profiles").insert({
+  let { error: profileError } = await admin.from("profiles").insert({
     id: userId,
     role: "student",
     first_name: firstName,
@@ -879,8 +920,37 @@ export async function enrollStudentByRegistrar(form) {
     status: "pending",
   });
 
+  if (
+    profileError &&
+    /profiles_email_key|duplicate key.*email/i.test(profileError.message || "")
+  ) {
+    const freed = await clearOrphanStudentAuth(admin, lrn);
+    if (freed?.blocked) {
+      await admin.auth.admin.deleteUser(userId);
+      return {
+        error: `A student with this LRN already exists. Search Enrollment or Activations for ${lrn}.`,
+        existingStudentId: freed.studentId || null,
+      };
+    }
+    if (freed?.cleared) {
+      ({ error: profileError } = await admin.from("profiles").insert({
+        id: userId,
+        role: "student",
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        status: "pending",
+      }));
+    }
+  }
+
   if (profileError) {
     await admin.auth.admin.deleteUser(userId);
+    if (/profiles_email_key|duplicate key.*email/i.test(profileError.message || "")) {
+      return {
+        error: `Sign-in email for LRN ${lrn} is still reserved (often a Trash leftover). Restore or permanently delete that learner under Registrar → Trash, then enroll again.`,
+      };
+    }
     return { error: profileError.message };
   }
 

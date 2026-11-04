@@ -28,30 +28,29 @@ import {
 import { listStudentEnrolledSubjects } from "@/lib/shs-subject-enrollment";
 
 async function loadStudentWithSection(admin, studentId) {
-  const { data: student, error } = await admin
+  // Flat select only — nested profiles embeds fail when multiple FKs exist.
+  let result = await admin
     .from("students")
-    .select(
-      "id, section_id, grade_level, current_term, lrn, profiles(first_name, last_name)"
-    )
+    .select("id, section_id, grade_level, current_term, lrn, profile_id")
     .eq("id", studentId)
     .maybeSingle();
-  if (error && /current_term/i.test(error.message || "")) {
-    const retry = await admin
+
+  if (result.error && /current_term/i.test(result.error.message || "")) {
+    result = await admin
       .from("students")
-      .select("id, section_id, grade_level, lrn, profiles(first_name, last_name)")
+      .select("id, section_id, grade_level, lrn, profile_id")
       .eq("id", studentId)
       .maybeSingle();
-    if (retry.error || !retry.data) {
-      return {
-        student: null,
-        error: retry.error?.message || "Student not found.",
-      };
-    }
-    return loadStudentSectionJoin(admin, retry.data);
   }
-  if (error || !student) return { student: null, error: error?.message || "Student not found." };
 
-  return loadStudentSectionJoin(admin, student);
+  if (result.error || !result.data) {
+    return {
+      student: null,
+      error: result.error?.message || "Student not found.",
+    };
+  }
+
+  return loadStudentSectionJoin(admin, result.data);
 }
 
 async function loadStudentSectionJoin(admin, student) {
@@ -64,7 +63,18 @@ async function loadStudentSectionJoin(admin, student) {
       .maybeSingle();
     section = data;
   }
-  return { student: { ...student, sections: section } };
+
+  let profiles = null;
+  if (student.profile_id) {
+    const { data } = await admin
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .eq("id", student.profile_id)
+      .maybeSingle();
+    profiles = data;
+  }
+
+  return { student: { ...student, sections: section, profiles } };
 }
 
 async function assertCanViewStudentGrades(admin, profile, studentId) {
@@ -444,26 +454,8 @@ export async function getStudentSubjectGrades({
     });
   }
 
-  // 2) Locked class records (fill gaps / override with latest locked TG)
-  const detail = await getStudentSemestralGrades({ studentId: sid, schoolYear: sy });
-  if (!detail.error) {
-    for (const row of detail.rows || []) {
-      if (row.workflow_status !== GRADE_WORKFLOW.LOCKED) continue;
-      if (row.semestral_grade == null) continue;
-      const key = `${row.subject_id || row.subject_name}-${row.term}`;
-      byKey.set(key, {
-        id: `locked-${row.id}`,
-        subject_id: row.subject_id,
-        subject_name: row.subject_name,
-        school_year: row.school_year || sy,
-        term: row.term,
-        term_label: row.term_label || termLabel(row.term),
-        semestral_grade: row.semestral_grade,
-        final_transmuted_grade: row.semestral_grade,
-        source: "class_record_locked",
-      });
-    }
-  }
+  // Official grades table is enough for the published-grades tab.
+  // (Previously re-ran full class-record decode here and doubled page time.)
 
   const rows = Array.from(byKey.values()).sort(
     (a, b) =>

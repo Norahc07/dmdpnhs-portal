@@ -14,6 +14,7 @@ import {
   announcementPushPayload,
   sendWebPushToProfileIds,
 } from "@/lib/web-push";
+import { notifyProfiles } from "@/lib/portal-notifications";
 
 const SELECT_POST = `
   id, teacher_id, author_profile_id, post_type, title, body, created_at, updated_at,
@@ -189,16 +190,22 @@ async function notifyTargetStudents(admin, announcementId, sectionIds, post) {
   const profileIds = (students || [])
     .map((student) => student.profile_id)
     .filter(Boolean);
-  await sendWebPushToProfileIds(
-    admin,
-    profileIds,
-    announcementPushPayload({
-      id: announcementId,
-      title: post?.title,
-      body: post?.body,
-      postType: post?.postType,
-    })
-  );
+  const payload = announcementPushPayload({
+    id: announcementId,
+    title: post?.title,
+    body: post?.body,
+    postType: post?.postType,
+  });
+  await notifyProfiles(admin, profileIds, {
+    category: "announcement",
+    title: post?.title || "New announcement",
+    body: post?.body || "",
+    href: `/student/announcements/${announcementId}`,
+    meta: { announcementId, postType: post?.postType || "announcement" },
+    push: false,
+    tag: `announcement-${announcementId}`,
+  });
+  await sendWebPushToProfileIds(admin, profileIds, payload);
 }
 
 export async function createAnnouncement(formData) {

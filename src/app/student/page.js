@@ -63,7 +63,7 @@ export default async function StudentDashboardPage({ searchParams }) {
   if (studentRow?.section_id) {
     const { data } = await supabase
       .from("sections")
-      .select("section_name, grade_level, school_year")
+      .select("section_name, grade_level, school_year, track_strand")
       .eq("id", studentRow.section_id)
       .maybeSingle();
     section = data;
@@ -183,7 +183,10 @@ export default async function StudentDashboardPage({ searchParams }) {
               events={todayEvents}
               todayLabel={formatLongDate(new Date())}
             />
-            <EnrolledSubjectsPanel subjects={subjects} />
+            <EnrolledSubjectsPanel
+              subjects={subjects}
+              currentTerm={student?.current_term}
+            />
           </>
         ) : (
           <section className="rounded-2xl border border-dashed border-[#800000]/20 bg-white p-6 text-sm text-muted-foreground">

@@ -124,7 +124,9 @@ export function PushNotificationManager({
           return;
         }
         setStatus("on");
-        toast.success("Phone alerts are on. New announcements will appear in your notification bar.");
+        toast.success(
+          "Phone alerts are on — system, teacher, and grade updates will sound on this device."
+        );
       } catch (error) {
         toast.error(error?.message || "Could not enable phone alerts.");
       }
@@ -157,7 +159,7 @@ export function PushNotificationManager({
           <p className="mt-2 text-sm text-muted-foreground">
             {status === "unsupported"
               ? "This browser does not support push notifications."
-              : "Phone alerts are not configured on this server yet."}
+              : "Phone alerts need VAPID keys on the server (NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY). After they are set, restart the app and enable alerts here."}
           </p>
         </section>
       );
@@ -169,10 +171,10 @@ export function PushNotificationManager({
 
   const copy =
     status === "on"
-      ? "Announcement alerts are on. They appear in your phone notification bar even when the portal is closed."
+      ? "Phone alerts are on. System, teacher coordination, grades, and announcements appear in your notification bar with sound — even when the portal is closed."
       : status === "denied"
         ? "Notifications are blocked in this browser. Allow them in site settings, then try again."
-        : "Turn on phone alerts so new teacher announcements appear in your notification bar in real time.";
+        : "Turn on phone alerts for system updates, teacher posts, grades, and coordination — with sound on your notification bar.";
 
   if (variant === "card") {
     return (
@@ -190,7 +192,7 @@ export function PushNotificationManager({
               Phone alerts
             </p>
             <h3 className="mt-1 font-heading text-sm font-bold text-[#3d1212]">
-              Announcement notification bar
+              Phone alerts with sound
             </h3>
             <p className="mt-1 text-xs text-muted-foreground">{copy}</p>
             {hint ? (
@@ -235,7 +237,7 @@ export function PushNotificationManager({
         </div>
         <div className="flex-1">
           <p className="text-sm font-semibold text-[#3d1212]">
-            Enable announcement alerts
+            Enable phone alerts
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{copy}</p>
           {hint ? <p className="mt-1 text-xs text-amber-800">{hint}</p> : null}
