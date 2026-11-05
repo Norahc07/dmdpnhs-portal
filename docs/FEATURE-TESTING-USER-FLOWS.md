@@ -221,8 +221,9 @@ Expected: scores persist after refresh. Locked/published terms are not freely ed
 
 ### 4.2 Department head / registrar lock (if SQL applied)
 
-1. Dept head → **Validation** — endorse or return.
-2. Registrar → **Grade Lock** — lock / publish.
+1. Dept head (faculty position + department) → **Validation**. Pending rows use an authorized admin read (RLS alone only shows the encoding teacher’s workbook). Committee-style departments (e.g. SHS Department) include subjects in that band/grade.
+2. Endorse or return.
+3. Registrar → **Grade Lock** — lock / publish.
 
 Expected: students see published grades only when the term is unlocked for them (and after required evaluations — see Evaluations).
 

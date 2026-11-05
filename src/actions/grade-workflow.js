@@ -122,31 +122,29 @@ async function publishGradesFromRecord(
 async function assertDeptHeadCanReviewAssignment(admin, reviewer, assignmentId) {
   const { data: assignment } = await admin
     .from("teacher_assignments")
-    .select(
-      "id, subject_id, subjects(id, subject_name, department_id, grade_level)"
-    )
+    .select("id, subject_id")
     .eq("id", assignmentId)
     .maybeSingle();
 
   if (!assignment) return { error: "Assignment not found." };
 
-  const subject = assignment.subjects || {};
-  if (subject.department_id && subject.department_id === reviewer.department_id) {
-    return { ok: true, assignment };
-  }
+  const { data: subject } = await admin
+    .from("subjects")
+    .select("id, subject_name, department_id, grade_level")
+    .eq("id", assignment.subject_id)
+    .maybeSingle();
 
   const { data: dept } = await admin
     .from("departments")
-    .select("id, name, grade_level")
+    .select("id, name, grade_level, band")
     .eq("id", reviewer.department_id)
     .maybeSingle();
 
-  if (
-    dept &&
-    subject.subject_name &&
-    String(dept.name).toLowerCase() === String(subject.subject_name).toLowerCase()
-  ) {
-    return { ok: true, assignment };
+  const { departmentCanReviewSubject } = await import(
+    "@/lib/grade-validation-queue"
+  );
+  if (dept && subject && departmentCanReviewSubject(dept, subject)) {
+    return { ok: true, assignment: { ...assignment, subjects: subject } };
   }
 
   return {
